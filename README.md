@@ -7,3 +7,12 @@ It reads a posting, extracts requirements, maps each requirement to facts in a c
 Status: spec phase done, implementation not started. Work is tracked as a kanban in this repo's issues (one issue per card, labeled by lane). Cards marked `core` are the smallest set that makes the repo credible and demoable on its own.
 
 License: MIT.
+
+## Quick start (developers)
+
+```bash
+uv sync
+uv run pytest
+```
+
+See [docs/contributing.md](docs/contributing.md) for how we work.
