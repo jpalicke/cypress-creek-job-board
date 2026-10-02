@@ -1,6 +1,7 @@
 # ABOUTME: Stage 3 entailment: the model verdict can confirm or lower the rule ceiling, never raise.
 # ABOUTME: Citations and the rationale are checked by validators. A failed call keeps the ceiling.
-from collections.abc import Sequence
+import time
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -8,8 +9,13 @@ from pydantic import BaseModel, ConfigDict
 
 from cypress_creek.facts.models import Bank, Fact
 from cypress_creek.ingest.models import Requirement
+from cypress_creek.pipeline.extract import failure_label
+from cypress_creek.pipeline.prompt import Prompt, Stage, build_prompt, prompt_facts
+from cypress_creek.pipeline.retrieve import RequirementCandidates
 from cypress_creek.pipeline.schemas import EntailmentOutput, EntailmentVerdict
-from cypress_creek.providers.base import Capabilities, Usage
+from cypress_creek.providers import ProviderError
+from cypress_creek.providers.base import Capabilities, Provider, Usage
+from cypress_creek.providers.retry import RetryPolicy, call_with_retry
 from cypress_creek.scoring.score import Match, lowest
 from cypress_creek.scoring.support import Support
 from cypress_creek.validators.citations import (
@@ -20,6 +26,7 @@ from cypress_creek.validators.citations import (
 from cypress_creek.validators.claims import check_citation_required, check_novel_terms
 from cypress_creek.validators.consistency import check_entities, check_numbers
 
+ENTAIL_MAX_OUTPUT_TOKENS = 500
 RATIONALE_WITHHELD = "rationale withheld: failed grounding check"
 
 _VERDICT_SUPPORT = {
@@ -133,4 +140,83 @@ def judge(
         fact_ids=valid,
         rationale=rationale,
         raise_attempted=lowest(claimed, ceiling) is not claimed,
+    )
+
+
+def entail_cap(capabilities: Capabilities) -> int:
+    """Room for a short verdict: at most half the window, so a small window still has room."""
+    return min(ENTAIL_MAX_OUTPUT_TOKENS, capabilities.context_tokens // 2)
+
+
+def entail(
+    requirement: Requirement,
+    candidates: RequirementCandidates,
+    bank: Bank,
+    provider: Provider,
+    *,
+    sleep: Callable[[float], None] = time.sleep,
+    policy: RetryPolicy | None = None,
+) -> EntailedMatch:
+    """Ask the model once whether the candidate facts support the requirement, then judge it.
+
+    A requirement with no candidate is a gap and makes no call. A typed provider failure keeps
+    the rule ceiling and is marked not run. BudgetExceeded and any other error propagate.
+    """
+    ceiling = candidates.support
+    capabilities = provider.capabilities
+    if candidates.is_gap:
+        return _unjudged(requirement, ceiling, Entailment.NOT_NEEDED)
+    by_id = {fact.id: fact for fact in bank.facts}
+    shown = prompt_facts([by_id[fact_id] for fact_id in candidates.fact_ids], capabilities)
+
+    def build(feedback: str | None = None) -> Prompt:
+        return build_prompt(
+            Stage.ENTAIL,
+            requirement.text,
+            shown,
+            capabilities,
+            EntailmentOutput,
+            retry_feedback=feedback,
+        )
+
+    def attempt(feedback: str | None) -> tuple[EntailmentOutput, Usage]:
+        used = build(feedback)
+        result = provider.complete_structured(
+            used.system, used.user_message, EntailmentOutput, entail_cap(capabilities)
+        )
+        return result.parsed, result.usage
+
+    prompt_hash = build().prompt_hash
+    try:
+        output, usage = call_with_retry(attempt, sleep=sleep, policy=policy)
+    except ProviderError as error:
+        label = failure_label(error)
+        if label is None:
+            raise
+        return _unjudged(requirement, ceiling, Entailment.NOT_RUN, label, prompt_hash)
+    judged = judge(output, requirement, candidates.fact_ids, ceiling, bank, capabilities)
+    return judged.model_copy(update={"usage": usage, "prompt_hash": prompt_hash})
+
+
+def _unjudged(
+    requirement: Requirement,
+    ceiling: Support,
+    entailment: Entailment,
+    failure: str | None = None,
+    prompt_hash: str | None = None,
+) -> EntailedMatch:
+    """The rule ceiling as the support, for a requirement the model did not weigh in on."""
+    return EntailedMatch(
+        match=Match(
+            requirement_id=requirement.id,
+            importance=requirement.importance,
+            ceiling=ceiling,
+            support=ceiling,
+        ),
+        entailment=entailment,
+        fact_ids=[],
+        rationale=None,
+        raise_attempted=False,
+        failure=failure,
+        prompt_hash=prompt_hash,
     )
