@@ -9,7 +9,8 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [pipeline.md](pipeline.md) | Each pipeline stage and its rules: posting normalization, the prompt builder (extraction and entailment prompts), accepting extraction output, stage 1 extraction, stage 2 retrieval, stage 3 entailment, stages 4 and 5 score and report, the support gate, the score |
 | [validators.md](validators.md) | The grounding validators V1 to V14: what each rejects and its known limits |
 | [providers.md](providers.md) | The provider interface, typed errors, retry policy, backend config, the loopback rule, the Ollama adapter and the budget guard |
-| [threat-model.md](threat-model.md) | The prompt structure (T1 to T4), URL target validation, SSRF rules and test coverage, compatibility limits and the pending HTTP transport |
+| [architecture.md](architecture.md) | How guarded public HTTP fetching pins the connection, bounds the response and isolates DNS behind a deadline |
+| [threat-model.md](threat-model.md) | The prompt structure (T1 to T4), URL target validation and guarded HTTP transport, SSRF rules, compatibility limits and test coverage |
 | [spec.md](spec.md) | The full design spec: goals, architecture, data model, pipeline, providers, validators, evals, threat model, discovery, ingestion, UI, testing and the card plan |
 | [lanes.md](lanes.md) | How the lanes depend on each other and which can be worked in parallel |
 | [handoff.md](handoff.md) | The card routine step by step, for a new contributor or assistant picking up a card |
@@ -30,6 +31,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [0010](adr/0010-extraction-stage-design.md) | How stage 1 extraction trusts the model: code sets spans and importance, failures are incomplete |
 | [0011](adr/0011-entailment-can-only-lower-support.md) | How stage 3 entailment can change support: the lower of ceiling and verdict, citations required, rationale display only |
 | [0012](adr/0012-report-fails-closed-and-cites.md) | How the gap report is built: fails closed, incomplete when a stage failed, every claim cites or the report is refused |
+| [0013](adr/0013-pinned-http-transport.md) | Pinned HTTP connections, deadline isolation and bounded response decoding |
 
 ## Configuration
 - `config/aliases.yaml`: tag alias table, described in [data-model.md](data-model.md#tag-alias-table).
@@ -39,4 +41,4 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 - `config/provider.toml` (or the file named by `CYPRESS_CREEK_CONFIG`) and `CYPRESS_CREEK_<FIELD>` variables: which model backend to use and the run budget limits, described in [providers.md](providers.md#configuration). API keys are read only from the environment variable the file names.
 - `facts.private/bank.yaml` (gitignored) or the path in `CYPRESS_CREEK_BANK`: your fact bank.
 
-URL target validation has no configuration or environment override. In particular, the provider's `allow_remote` setting does not relax the URL guard's public-address rule.
+URL target validation and guarded HTTP fetching have no configuration or environment override for private destinations. In particular, the provider's `allow_remote` setting does not relax the URL guard's public-address rule.

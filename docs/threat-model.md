@@ -1,10 +1,10 @@
 # Threat model
 
-The full design threat model is in [spec.md, section 9](spec.md#9-threat-model). This page records the implemented URL boundary, the remaining SSRF controls and the prompt structure. It does not claim that the complete fetching path exists.
+The full design threat model is in [spec.md, section 9](spec.md#9-threat-model). This page records the URL and HTTP transport boundary and the prompt structure. User-facing fetch orchestration remains a later card.
 
 ## SSRF boundary
 
-A posting link or discovery URL is hostile input. It must not cause a connection to a local service, private network or cloud metadata endpoint. F1a implements `validate_url` in `src/cypress_creek/ingest/url_guard.py`; F1b supplies the guarded HTTP transport. URL validation alone cannot prevent DNS rebinding if a caller later resolves the hostname again.
+A posting link or discovery URL is hostile input. It must not cause a connection to a local service, private network or cloud metadata endpoint. F1a implements `validate_url` in `src/cypress_creek/ingest/url_guard.py`; F1b's `fetch_url` in `src/cypress_creek/ingest/safe_http.py` uses its selected IP for the actual connection. See [the fetching architecture](architecture.md).
 
 | Rule | Enforcement |
 | --- | --- |
@@ -14,13 +14,13 @@ A posting link or discovery URL is hostile input. It must not cause a connection
 | Canonical public IPv4 or IPv6 only; reject private, loopback, link-local, multicast, reserved, unspecified, shared and metadata addresses | Implemented in F1a |
 | Reject scoped, IPv4-mapped, site-local, 6to4, Teredo and well-known NAT64 IPv6 addresses | Implemented in F1a |
 | Resolve a hostname once and reject the whole answer set if any address is unsafe | Implemented in F1a |
-| Connect directly to the validated IP, keeping the hostname for Host and TLS certificate/SNI checks | Pending F1b |
-| Follow redirects manually, at most three, validating every hop | Pending F1b |
-| Stream with byte and decompression-ratio caps, a content-type allow list, connect and total timeouts | Pending F1b |
-| Fetch without cookies, credentials or JavaScript execution | Pending F1b; F1a makes no HTTP request |
-| Restrict HTTP client imports to reviewed modules and prove connection pinning with real DNS/server tests | Pending F1b |
+| Connect directly to the validated IP, keeping the hostname for Host and TLS certificate/SNI checks | Implemented in F1b |
+| Follow redirects manually, at most three, validating every hop | Implemented in F1b |
+| Stream with byte and decompression-ratio caps, a content-type allow list, connect and total timeouts | Implemented in F1b |
+| Fetch without cookies, credentials or JavaScript execution | Implemented in F1b |
+| Restrict HTTP client imports to reviewed modules; prove IP pinning with real DNS/server tests | Implemented in F1b |
 
-`validate_url(url)` returns a frozen `ValidatedTarget` containing `scheme`, `host`, `ip` and `port`. The hostname is lowercased and one trailing dot is removed; IP literals are canonicalized. A future transport must use the IP for the connection, handle the original path/query consistently, omit the fragment and repeat validation for every redirect. Merely constructing a `ValidatedTarget` yourself is not validation.
+`validate_url(url)` returns a frozen `ValidatedTarget` containing `scheme`, `host`, `ip` and `port`. The hostname is lowercased and one trailing dot is removed; IP literals are canonicalized. The transport connects to this IP, keeps the hostname for Host and TLS verification, omits fragments and revalidates every redirect. Merely constructing a `ValidatedTarget` yourself is not validation.
 
 No flag, config field or environment variable can permit a private destination. The separate provider configuration has its own loopback and remote opt-in rules; changing it does not change this guard.
 
@@ -44,11 +44,12 @@ Every rejection raises `UrlGuardError`. Branch on `reason_code`, not the message
 - Decimal-integer, octal, hexadecimal and shortened IPv4 spellings are rejected rather than repaired. For example, `2130706433`, `0177.0.0.1` and `0x7f.1` cannot pass through to a resolver. IP literals with a trailing dot are also refused.
 - Only exact explicit port strings `80` and `443` are accepted. Either is permitted with either supported scheme; an omitted port defaults to 80 for HTTP or 443 for HTTPS.
 - IPv6 mapped and transition mechanisms are refused even when their embedded IPv4 is public. This is deliberately conservative.
-- Paths and queries are not decoded or turned into HTTP request lines here. The literal-character check covers ASCII controls and Unicode whitespace, not every Unicode control category. F1b must preserve encoded path/query data without turning it into protocol syntax.
-- DNS uses the real operating system resolver, whose timeout is not bounded by this function. F1b must account for resolution in its timeout design.
-- The result is not an HTTP response. Pinned connections, TLS verification, redirects, response limits and rebinding resistance remain unverified until F1b lands.
+- Paths and queries are not decoded by the guard. The literal-character check covers ASCII controls and Unicode whitespace, not every Unicode control category. The transport preserves encoded data in the HTTP request target; HTTPX handles request framing.
+- The guard's operating-system DNS call has no independent timeout. The transport runs it in a child process under the whole-fetch deadline. OS process creation and cleanup can add latency beyond the configured deadline.
+- The final body defaults to 10 MiB wire, 10 MiB decoded and a 100:1 decompression ratio. Redirect bodies are not read. Only identity or one complete gzip stream is allowed. Only HTML, XHTML, plain text and PDF content types are accepted by default, and a missing content type is rejected.
+- The public entry does not execute JavaScript or forward cookies or URL credentials. Sites requiring login or client-side rendering need later user-facing guidance in F2.
 
-The choices are recorded in [ADR 0009](adr/0009-url-target-validation.md). Python's [URL parser documentation](https://docs.python.org/3.13/library/urllib.parse.html#url-parsing-security) explains why parsing needs additional validation. The all-address check follows [OWASP's SSRF guidance](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html).
+The choices are recorded in [ADR 0009](adr/0009-url-target-validation.md) and [ADR 0013](adr/0013-pinned-http-transport.md). Python's [URL parser documentation](https://docs.python.org/3.13/library/urllib.parse.html#url-parsing-security) explains why parsing needs additional validation. The all-address check follows [OWASP's SSRF guidance](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html). HTTPX documents [IP connection with separate Host and TLS hostname](https://www.python-httpx.org/advanced/extensions/#sni_hostname).
 
 ## Try it locally
 
@@ -74,25 +75,33 @@ except UrlGuardError as error:
 
 Expected: `unsafe_address`.
 
+Fetch a public page through the guarded transport (requires public network access):
+
+```bash
+uv run python -c "from cypress_creek.ingest.safe_http import fetch_url; r = fetch_url('https://example.com/'); print(r.status, r.content_type, len(r.body))"
+```
+
+Expected: a `200` status, `text/html`, and a positive byte count. This is a library call, not an app workflow.
+
 ## Tests
 
 | Tier | Evidence |
 | --- | --- |
-| Unit | Hostile URL/reason table, IPv4 and IPv6 Hypothesis properties, malformed-input handling, immutable targets and mixed public/private address rejection |
-| Component | Real machine hostname resolves to a nonpublic address and is rejected; public target literals work with numeric-only OS address lookup |
-| Integration (`needs_network`) | Real public DNS resolution, hostname case/trailing-dot normalization, and a real failed lookup with a redacted exception |
-| End to end | A separate Python consumer receives a public target or a typed, redacted rejection |
+| Unit | Hostile URL/reason table, IP properties, malformed input and address sets; transport coordinates, bounded decoding, limits, redacted worker protocol and HTTP-import audit |
+| Component | Real local HTTP servers exercise redirects, Host and request path, cookies, type, size, gzip ratio and deadlines; production entry refuses a local target |
+| Integration (`needs_network`) | Real public DNS and HTTPS fetch with certificate verification, plus typed failure for a rejected local URL |
+| End to end | Separate process consumes the public guard; a real UDP DNS responder alternates loopback answers while the test-only worker connects to the first resolved IP |
 
-Run the local URL tests (the component tier requires the machine's hostname to resolve to at least one nonpublic address):
+Run local guard and transport tests (the URL component tier requires the machine's hostname to resolve to at least one nonpublic address):
 
 ```bash
-uv run pytest tests/unit/test_url_guard.py tests/component/test_url_guard_resolver.py tests/e2e/test_url_guard_process.py -q
+uv run pytest tests/unit/test_url_guard.py tests/unit/test_safe_http.py tests/component/test_url_guard_resolver.py tests/component/test_safe_http_transport.py tests/e2e/test_url_guard_process.py tests/e2e/test_safe_http_rebinding.py -q
 ```
 
 Run the public-DNS tests with working network access. An unavailable resolver fails loudly:
 
 ```bash
-uv run pytest tests/integration/test_url_guard_dns.py -q
+uv run pytest tests/integration/test_url_guard_dns.py tests/integration/test_safe_http_network.py -q
 ```
 
 Run all tiers with the project coverage gate:
@@ -101,7 +110,7 @@ Run all tiers with the project coverage gate:
 uv run pytest --cov --cov-fail-under=80 -q
 ```
 
-There are no mock resolvers or providers. Hostile address lists are data supplied directly to a pure validator. A public HTTPS fetch, real DNS-rebinding arrangement, local HTTP server tests and browser flows are not established by these tests; the first three belong to F1b and browser flows await the UI.
+There are no mock resolvers or providers. Hostile address lists are data supplied directly to a pure validator. The loopback test resolver is isolated in the test tree and is unreachable through production arguments, config or environment. The rebinding arrangement demonstrates connection pinning with a real local DNS responder and server; public-address validation is independently tested. Browser flows await the UI.
 
 ## Prompt structure (T1 to T4)
 
