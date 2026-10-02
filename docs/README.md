@@ -6,7 +6,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | --- | --- |
 | [codebase.md](codebase.md) | Start here if you are new: layout, how the pieces fit, ideas to know, how a card goes |
 | [data-model.md](data-model.md) | The fact bank, Posting and Requirement, and the tag alias table (`config/aliases.yaml`) the company name key (`company_key`) and the SQLite storage and migrations |
-| [pipeline.md](pipeline.md) | Each pipeline stage and its rules: posting normalization, the prompt builder, accepting extraction output, stage 1 extraction, stage 2 retrieval, the support gate, the score |
+| [pipeline.md](pipeline.md) | Each pipeline stage and its rules: posting normalization, the prompt builder (extraction and entailment prompts), accepting extraction output, stage 1 extraction, stage 2 retrieval, the support gate, the score |
 | [validators.md](validators.md) | The grounding validators V1 to V14: what each rejects and its known limits |
 | [providers.md](providers.md) | The provider interface, typed errors, retry policy, backend config, the loopback rule, the Ollama adapter and the budget guard |
 | [threat-model.md](threat-model.md) | The prompt structure (T1 to T4), URL target validation, SSRF rules and test coverage, compatibility limits and the pending HTTP transport |
@@ -28,6 +28,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [0008](adr/0008-ollama-truncation-signature-and-window-floor.md) | How the Ollama adapter detects silent truncation, and the 2048 window floor |
 | [0009](adr/0009-url-target-validation.md) | Public URL targets, strict hostname syntax and validation of every resolved address |
 | [0010](adr/0010-extraction-stage-design.md) | How stage 1 extraction trusts the model: code sets spans and importance, failures are incomplete |
+| [0011](adr/0011-entailment-can-only-lower-support.md) | How stage 3 entailment can change support: the lower of ceiling and verdict, citations required, rationale display only |
 
 ## Configuration
 - `config/aliases.yaml`: tag alias table, described in [data-model.md](data-model.md#tag-alias-table).
