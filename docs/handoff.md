@@ -68,3 +68,4 @@ Stale docs are the most common failure here. For every new module, config file, 
 | Setup, gates, audit, ABOUTME headers | [contributing.md](contributing.md) |
 | Why decisions were made | [adr/](adr/) |
 | Data model, pipeline, validators | [data-model.md](data-model.md), [pipeline.md](pipeline.md), [validators.md](validators.md) |
+| Providers, errors, retry | [providers.md](providers.md) |

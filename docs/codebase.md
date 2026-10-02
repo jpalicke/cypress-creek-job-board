@@ -40,6 +40,10 @@ src/cypress_creek/       The library
     fact_dates.py        V12 date sanity (wraps facts/dates.py)
     names.py             V14 company name shape
     registry.py          REGISTRY: id, name, rule and function for each validator
+  providers/             The model backend interface, typed errors and retry policy
+    base.py              Provider protocol, Capabilities, CostPerMtok, Usage, StructuredResult
+    errors.py            ContextTruncated, SchemaViolation, ProviderUnavailable, RateLimited, BudgetExceeded, Refusal
+    retry.py             call_with_retry, RetryPolicy
   storage/               Mutable state: the company name key and the SQLite database
     company_key.py       company_key, load_confusables: the one company name normalizer
     db.py                data_dir, connect, migrate, schema_version, MigrationError
@@ -78,13 +82,14 @@ flowchart LR
     score --> result["score, supported of total, inputs"]
     reqs -. model output .-> val["validators (V1 to V14)"]
 ```
-Dotted means not built yet. Extraction, model verdicts, validators, gap reports and drafting arrive in later cards (see the issue board and the spec). The pieces that exist are libraries with no app around them yet.
+Dotted means not built yet. Extraction, model verdicts, real provider adapters, validators, gap reports and drafting arrive in later cards (see the issue board and the spec). The pieces that exist are libraries with no app around them yet.
 
 ## Ideas to know
 - **One source of truth.** The bank file is the only record of facts. Verification is derived from `verified_on` and is never stored as a separate flag. The pipeline only ever sees `Bank.verified_facts()`.
 - **Pure and deterministic.** Scoring functions take everything as arguments, including `today`. Nothing reads the clock or the network.
 - **Data, not code.** Things a person should tune (the alias table, the score weights) or bundled third party data (the Unicode confusables) are YAML in `config/`, loaded and validated, never hard coded.
 - **Typed errors.** Failures are specific exception classes (`PostingTooLong`, `FactValidationError`), so callers and tests can tell them apart. Text is rejected, never silently cut or repaired.
+- **One retry place.** Providers raise typed errors and `providers.call_with_retry` is the only code that retries them. Adapters never loop on their own.
 - **Frozen models.** Pydantic models are frozen and reject unknown fields, so a typo or smuggled field is an error.
 - **Two stores, on purpose.** The fact bank and config are hand edited YAML (reviewable, diffable, versioned). Mutable app state, which later cards add (postings, drafts, watchlists), is SQLite behind numbered migrations.
 - **Shared normalization.** `terms.normalize_term` is used for bank tags, requirement terms and the alias table, so they always compare under the same rules. Company names have their own single normalizer, `company_key`, which every blacklist, denied list and watchlist comparison must use.

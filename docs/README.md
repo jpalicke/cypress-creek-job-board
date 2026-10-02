@@ -8,6 +8,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [data-model.md](data-model.md) | The fact bank, Posting and Requirement, and the tag alias table (`config/aliases.yaml`) the company name key (`company_key`) and the SQLite storage and migrations |
 | [pipeline.md](pipeline.md) | Each pipeline stage and its rules: posting normalization, the support gate, the score |
 | [validators.md](validators.md) | The grounding validators V1 to V14: what each rejects and its known limits |
+| [providers.md](providers.md) | The provider interface, the six typed errors and the retry policy |
 | [spec.md](spec.md) | The full design spec: goals, architecture, data model, pipeline, providers, validators, evals, threat model, discovery, ingestion, UI, testing and the card plan |
 | [lanes.md](lanes.md) | How the lanes depend on each other and which can be worked in parallel |
 | [handoff.md](handoff.md) | The card routine step by step, for a new contributor or assistant picking up a card |
