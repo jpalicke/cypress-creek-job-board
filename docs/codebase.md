@@ -34,6 +34,9 @@ src/cypress_creek/       The library
     citations.py         V4 fact exists, V5 fact verified, V6 fact shareable
     consistency.py       V7 entity consistency, V8 numeric consistency
     claims.py            V9 citation required, V10 novel term flag
+    requirements.py      V11 cap and dedupe, V13 cue sentence coverage
+    fact_dates.py        V12 date sanity (wraps facts/dates.py)
+    names.py             V14 company name shape
     registry.py          REGISTRY: id, name, rule and function for each validator
   scoring/               Deterministic scoring, no model calls
     aliases.py           AliasTable, load_aliases

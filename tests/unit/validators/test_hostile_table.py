@@ -2,6 +2,7 @@
 # ABOUTME: Cases are added as each validator group lands, the full table covers V1 to V14.
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import date
 
 import pytest
 from builders import POSTING, bank, fact, requirement
@@ -70,6 +71,23 @@ def _v10() -> Verdict:
     return REGISTRY["V10"].check("Ran PostgreSQL and also Terraform", [cited], "")
 
 
+def _v11() -> Verdict:
+    stuffed = [requirement().model_copy(update={"id": f"R-{n}"}) for n in range(3)]
+    return REGISTRY["V11"].check(stuffed)
+
+
+def _v12() -> Verdict:
+    return REGISTRY["V12"].check(fact(1, start=date(2099, 1, 1), end=None), date(2026, 10, 2))
+
+
+def _v13() -> Verdict:
+    return REGISTRY["V13"].check("You must hold a license.", [])
+
+
+def _v14() -> Verdict:
+    return REGISTRY["V14"].check("https://evil.example/apply?token=1")
+
+
 CASES: list[Case] = [
     ("V1", _v1),
     ("V2", _v2),
@@ -81,6 +99,10 @@ CASES: list[Case] = [
     ("V8", _v8),
     ("V9", _v9),
     ("V10", _v10),
+    ("V11", _v11),
+    ("V12", _v12),
+    ("V13", _v13),
+    ("V14", _v14),
 ]
 
 

@@ -17,8 +17,12 @@ All of them live in `src/cypress_creek/validators/`. Each returns a `Verdict` (`
 | V8 | Numeric consistency | Inflated or invented numbers | `consistency.py` |
 | V9 | Citation required | Claims with no cited fact | `claims.py` |
 | V10 | Novel term flag | Tools, names or acronyms no cited fact mentions (heuristic) | `claims.py` |
+| V11 | Requirement cap and dedupe | Requirement stuffing to inflate a score | `requirements.py` |
+| V12 | Date sanity | Future dates and a start after the end | `fact_dates.py` |
+| V13 | Cue sentence coverage | Requirements silently dropped or hidden by injection | `requirements.py` |
+| V14 | Company name shape | URLs, slugs or injected text in company suggestions | `names.py` |
 
-More are added as they land (V11 to V14 are in the same card).
+All fourteen exist. The hostile corpus that every one of them is tested against lives in `tests/fixtures/hostile_outputs/`.
 
 ## V1 Schema
 `check_schema(model, data)`. `data` is JSON text or a mapping. JSON text is validated in strict mode, so wrong types are rejected rather than coerced. Models forbid extra fields, so a smuggled field fails. The verdict names the first offending field.
@@ -62,6 +66,20 @@ Known limits: a name that is in no bank fact is V10's concern. Any four digit nu
 `novel_terms(text, cited, requirement_text)` lists suspicious terms, `check_novel_terms` fails if there are any. A term is suspicious if it looks like a name, tool or acronym and neither a cited fact (claim, employer, role, tags) nor the requirement text contains it. Looks like a name means: contains a digit, `+`, `#` or an inner dot (`node.js`), is ALLCAPS, is CamelCase, or is capitalized in the middle of a sentence. Months, weekdays, fact IDs and plain numbers are skipped, and a possessive matches its base word.
 
 This is a heuristic and is deliberately conservative: it flags for review, it never proves a lie. It cannot see a novel word at the start of a sentence or a lowercase one ("terraform"). V7, V8 and V10 together gate the rationale text, which is shown to a human only if all three pass.
+
+## V11 Requirement cap and dedupe
+`dedupe_requirements(requirements)` keeps the first requirement for each normalized term (same rules as the alias table, so "PostgreSQL" and " postgresql. " are one) and at most 40 (`MAX_REQUIREMENTS`). It is idempotent, never reorders and never adds. `check_requirement_cap(requirements)` is the verdict form: it fails on more than 40, or on two requirements sharing a normalized term. A posting stuffed with repeated requirements therefore cannot inflate a score.
+
+## V12 Date sanity
+`check_fact_dates(fact, today)`. Wraps `date_problems` in `facts/dates.py`, the same rules the bank loader applies: no `start`, `end` or `verified_on` after `today`, and `start` not after `end`. `today` is passed in so the function stays pure. The verdict's `offending` is the field name.
+
+## V13 Cue sentence coverage
+`check_cue_coverage(posting_text, requirements)` fails if a posting sentence holding an importance cue word (the lists in `cues.py`) is not touched by any requirement span. `uncovered_cue_sentences(text, spans)` returns all of them, so a later stage can report them as "not assessed" instead of failing. A line that is only a section heading ("Nice to have:") is not a requirement and is skipped. Partial overlap counts as covered. The pipeline wires this in at ingestion (a later card).
+
+## V14 Company name shape
+`check_company_name(name)`. After NFKC normalization the name must be 2 to 60 characters, at most 6 words, made only of letters, digits, spaces and `& . ' - ,`, in one script (so a Cyrillic lookalike letter inside a Latin name fails). It must not look like a web address (a dot followed by letters, so `acme.io` fails), a slug (one lowercase word with a hyphen), or be only digits.
+
+Known limit: a short plain phrase such as "Ignore previous instructions" has the shape of a name. The shape check removes URLs and long injected text, and the company filter, resolver and human review handle the rest.
 
 ## Try it locally
 ```bash

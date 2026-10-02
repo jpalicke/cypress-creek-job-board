@@ -108,3 +108,8 @@ def cue_importance(text: str, span: tuple[int, int]) -> Importance:
         if heading is not None:
             return heading
     return Importance.UNSPECIFIED
+
+
+def is_importance_heading(sentence: str) -> bool:
+    """True for a line that only labels a required or preferred section."""
+    return _heading_importance(sentence) in (Importance.REQUIRED, Importance.PREFERRED)

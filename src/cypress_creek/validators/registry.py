@@ -11,6 +11,9 @@ from cypress_creek.validators.citations import (
 from cypress_creek.validators.claims import check_citation_required, check_novel_terms
 from cypress_creek.validators.consistency import check_entities, check_numbers
 from cypress_creek.validators.extraction import check_importance, check_schema, check_verbatim_span
+from cypress_creek.validators.fact_dates import check_fact_dates
+from cypress_creek.validators.names import check_company_name
+from cypress_creek.validators.requirements import check_cue_coverage, check_requirement_cap
 from cypress_creek.validators.verdict import Verdict
 
 
@@ -66,5 +69,29 @@ REGISTRY: dict[str, ValidatorInfo] = _catalogue(
         "Novel term flag",
         "Terms absent from the cited facts and the requirement are flagged (heuristic).",
         check_novel_terms,
+    ),
+    (
+        "V11",
+        "Requirement cap and dedupe",
+        "At most 40 requirements, deduplicated on normalized term.",
+        check_requirement_cap,
+    ),
+    (
+        "V12",
+        "Date sanity",
+        "Fact dates are not in the future and are in order.",
+        check_fact_dates,
+    ),
+    (
+        "V13",
+        "Cue sentence coverage",
+        "Every posting sentence with an importance cue is covered by a requirement span.",
+        check_cue_coverage,
+    ),
+    (
+        "V14",
+        "Company name shape",
+        "A suggested company name is short plain text with no URL, slug or free text.",
+        check_company_name,
     ),
 )
