@@ -1,6 +1,6 @@
 # ADR 0005: SQLite for mutable state, numbered SQL migrations, data directory
 
-Status: proposed (card B6b)
+Status: accepted (Joe P, card B6b)
 
 ## Decision
 - The fact bank and config stay YAML. Mutable application state is one SQLite file, using the standard library `sqlite3` module and no ORM.
