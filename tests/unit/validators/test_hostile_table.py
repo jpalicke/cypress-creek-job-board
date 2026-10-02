@@ -3,8 +3,9 @@
 from collections.abc import Callable
 
 import pytest
-from builders import POSTING, requirement
+from builders import POSTING, bank, fact, requirement
 
+from cypress_creek.facts.models import Share
 from cypress_creek.ingest.models import Importance, Requirement
 from cypress_creek.validators import REGISTRY
 from cypress_creek.validators.verdict import Verdict
@@ -28,7 +29,20 @@ def _v3() -> Verdict:
     return REGISTRY["V3"].check(POSTING, promoted)
 
 
-CASES: list[Case] = [("V1", _v1), ("V2", _v2), ("V3", _v3)]
+def _v4() -> Verdict:
+    return REGISTRY["V4"].check(["F-0001", "F-9999"], bank(fact(1)))
+
+
+def _v5() -> Verdict:
+    return REGISTRY["V5"].check(["F-0002"], bank(fact(1), fact(2, verified=False)))
+
+
+def _v6() -> Verdict:
+    private = bank(fact(1, share=Share.LOCAL_ONLY))
+    return REGISTRY["V6"].check(["F-0001"], private, hosted=True)
+
+
+CASES: list[Case] = [("V1", _v1), ("V2", _v2), ("V3", _v3), ("V4", _v4), ("V5", _v5), ("V6", _v6)]
 
 
 @pytest.mark.parametrize(("validator_id", "run"), CASES, ids=[c[0] for c in CASES])

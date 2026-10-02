@@ -31,6 +31,7 @@ src/cypress_creek/       The library
     verdict.py           Verdict, ok(), fail()
     cues.py              The one list of importance cue words, sentence splitting
     extraction.py        V1 schema, V2 verbatim span, V3 importance cues
+    citations.py         V4 fact exists, V5 fact verified, V6 fact shareable
     registry.py          REGISTRY: id, name, rule and function for each validator
   scoring/               Deterministic scoring, no model calls
     aliases.py           AliasTable, load_aliases

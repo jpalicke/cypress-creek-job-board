@@ -3,6 +3,11 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from cypress_creek.validators.citations import (
+    check_fact_exists,
+    check_fact_shareable,
+    check_fact_verified,
+)
 from cypress_creek.validators.extraction import check_importance, check_schema, check_verbatim_span
 from cypress_creek.validators.verdict import Verdict
 
@@ -32,5 +37,13 @@ REGISTRY: dict[str, ValidatorInfo] = _catalogue(
         "Importance cues",
         "Importance agrees with the cue words near the span.",
         check_importance,
+    ),
+    ("V4", "Fact exists", "Every cited ID is in the bank.", check_fact_exists),
+    ("V5", "Fact verified", "Every cited fact has verified_on.", check_fact_verified),
+    (
+        "V6",
+        "Fact shareable",
+        "No local_only fact was sent to, or cited from, a hosted backend.",
+        check_fact_shareable,
     ),
 )

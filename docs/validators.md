@@ -10,8 +10,11 @@ All of them live in `src/cypress_creek/validators/`. Each returns a `Verdict` (`
 | V1 | Schema | Malformed or extra-field output | `extraction.py` |
 | V2 | Verbatim span | Invented or altered requirements | `extraction.py` |
 | V3 | Importance cues | A model promoting or demoting a requirement | `extraction.py` |
+| V4 | Fact exists | Fabricated fact IDs | `citations.py` |
+| V5 | Fact verified | Citing unverified facts | `citations.py` |
+| V6 | Fact shareable | Privacy leaks to a hosted backend | `citations.py` |
 
-More are added as they land (V4 to V14 are in the same card).
+More are added as they land (V7 to V14 are in the same card).
 
 ## V1 Schema
 `check_schema(model, data)`. `data` is JSON text or a mapping. JSON text is validated in strict mode, so wrong types are rejected rather than coerced. Models forbid extra fields, so a smuggled field fails. The verdict names the first offending field.
@@ -28,6 +31,15 @@ More are added as they land (V4 to V14 are in the same card).
 The cue lists and heading lists are defined once, in `cues.py`, and are shared with the cue sentence coverage check (V13).
 
 Known limits: negation is not understood ("not required" still counts as a required cue), and a cue word used in another sense can mislead the check. Both err toward rejecting, which is the safe direction.
+
+## V4 Fact exists
+`check_fact_exists(cited_ids, bank)`. Every cited ID must be a fact in the bank (verified or not). IDs match exactly, so `f-0001` or `F-0001 ` fail. An empty list passes, because requiring a citation at all is V9's job.
+
+## V5 Fact verified
+`check_fact_verified(cited_ids, bank)`. Every cited fact must have `verified_on`. An ID not in the bank cannot be verified, so it fails here as well as in V4.
+
+## V6 Fact shareable
+`check_fact_shareable(fact_ids, bank, hosted=...)`. With a local backend everything passes. With a hosted backend, any `local_only` fact fails. Pass every ID that was sent to the backend as well as every ID cited from it. Unknown IDs are left to V4.
 
 ## Try it locally
 ```bash
