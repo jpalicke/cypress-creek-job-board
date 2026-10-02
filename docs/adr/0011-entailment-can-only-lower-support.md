@@ -7,7 +7,7 @@ Status: accepted (Joe P, card D4)
 - `Match` refuses support above its ceiling and allows a drop of any size. This replaces the one step limit in [ADR 0003](0003-score-formula-and-downgrade-only.md). `downgrade()` keeps its one step meaning.
 - The requirement text goes in the untrusted data block. The candidate facts follow it in a separate trusted block, so a fact is never inside the boundary and never in the system message.
 - A `supports` or `partial` verdict needs at least one valid citation: the id exists (V4), is verified (V5) and was one of the candidates sent. Without one the verdict is `does_not_support`.
-- The rationale is display text only. It is shown only if V7, V8, V9 and V10 pass, and is otherwise replaced by "rationale withheld: failed grounding check".
+- The rationale is display text only. It is shown only if V7, V8 and V10 pass (and V9 for a positive verdict, since a does_not_support verdict has nothing to cite), and is otherwise replaced by "rationale withheld: failed grounding check".
 - A typed provider failure keeps the rule ceiling and marks the requirement not model checked. A requirement with no candidates makes no call and is marked as not needing one. `BudgetExceeded` propagates.
 
 ## Why

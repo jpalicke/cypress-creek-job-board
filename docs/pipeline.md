@@ -215,6 +215,61 @@ print(p.boundary_token in p.system, 'F-0002' in p.user_message)"
 ```
 It prints the facts block with only the verified fact, `F-0001: Fictional work number 1.`, then `False False`: the token is not in the system text and the unverified fact is not shown.
 
+## Stage 3: entailment
+`entail(requirement, candidates, bank, provider)` in `pipeline/entail.py` is the second opinion on one requirement. It asks the model whether the candidate facts from stage 2 support the requirement, then `judge` applies the answer. It returns an `EntailedMatch`: `match` (the final `Match`), `entailment`, `fact_ids`, `rationale`, `raise_attempted`, `failure`, `usage` and `prompt_hash`.
+
+- **Downgrade only.** Support is the lower of the rule ceiling and the verdict (`supports` is strong, `partial` is partial, `does_not_support` is none). A verdict above the ceiling is ignored and counted in `raise_attempted`. A drop of any size is allowed. See [ADR 0011](adr/0011-entailment-can-only-lower-support.md).
+- **A positive verdict must cite.** A cited id counts only if it was one of the candidates sent, exists (V4), is verified (V5) and, on a hosted backend, is shareable (V6). A `supports` or `partial` verdict with no valid citation counts as `does_not_support`.
+- **The rationale is display text.** It is shown only if V7, V8 and V10 pass against the cited facts (and V9 for a positive verdict). Otherwise it is replaced by `rationale withheld: failed grounding check`. It never changes support.
+- **`entailment` says what happened.** `confirmed` (support equals the ceiling), `downgraded` (lower), `not_run` (the call failed, support is the ceiling and `failure` holds the label) and `not_needed` (a gap, no call was made).
+- **Costs and failures.** One call per requirement that has candidates, with the one schema retry. A typed provider failure gives `not_run` and the ceiling stays. `BudgetExceeded` is not caught. The model may answer at most half the window, never more than 500 tokens.
+- Known limit: `not_run` leaves the support at the rule ceiling, which has not had the second opinion. A report must show which requirements were not model checked.
+
+### Try judging an answer
+No model is needed. This feeds `judge` a hostile answer: it claims strong support, cites a fact that does not exist and invents a number.
+```bash
+uv run python -c "
+from cypress_creek.facts import parse_bank
+from cypress_creek.ingest.models import Importance, Requirement, RequirementKind
+from cypress_creek.pipeline.entail import judge
+from cypress_creek.pipeline.schemas import EntailmentOutput, EntailmentVerdict
+from cypress_creek.providers.base import Capabilities, CostPerMtok
+from cypress_creek.scoring.support import Support
+
+bank = parse_bank({'facts': [{'id': 'F-0001', 'claim': 'Ran a fictional Python data service for 3 years.', 'kind': 'project', 'tags': [{'name': 'python', 'level': 'expert'}], 'verified_on': '2024-01-01', 'evidence': {'type': 'repo', 'pointer': 'https://example.invalid/a'}, 'share': 'shareable'}]})
+caps = Capabilities(context_tokens=8192, strict_schema=True, local=True, cost_per_mtok=CostPerMtok(input=0, output=0))
+req = Requirement(id='R-1', text='Needs Python.', span=(0, 13), kind=RequirementKind.SKILL, term='python', importance=Importance.REQUIRED)
+def run(verdict, ids, why, ceiling=Support.STRONG):
+    out = EntailmentOutput(schema_version=1, verdict=verdict, fact_ids=ids, rationale=why)
+    r = judge(out, req, ['F-0001'], ceiling, bank, caps)
+    print(r.match.support.value, r.entailment.value, r.raise_attempted, r.fact_ids, r.rationale)
+run(EntailmentVerdict.SUPPORTS, ['F-0001'], 'F-0001 shows Python work.')
+run(EntailmentVerdict.SUPPORTS, ['F-9999'], 'Led 40 engineers.')
+run(EntailmentVerdict.SUPPORTS, ['F-0001'], 'F-0001 shows Python work.', Support.PARTIAL)"
+```
+It prints three lines: `strong confirmed False ['F-0001'] F-0001 shows Python work.`, then `none downgraded False [] rationale withheld: failed grounding check` (the cited fact does not exist), then `partial confirmed True ['F-0001'] F-0001 shows Python work.` (the model tried to raise a partial ceiling and was held to it).
+
+### Try entailment against a local model
+Needs Ollama running with `qwen3.5:0.8b` (see [providers.md](providers.md#try-it-locally)). A missing server shows up as `not_run provider_unavailable`.
+```bash
+uv run python -c "
+from cypress_creek.config import parse_settings
+from cypress_creek.facts import parse_bank
+from cypress_creek.ingest.models import Importance, Requirement, RequirementKind
+from cypress_creek.pipeline.entail import entail
+from cypress_creek.pipeline.retrieve import RequirementCandidates
+from cypress_creek.providers import OllamaProvider
+from cypress_creek.scoring.support import Gate, Support
+
+bank = parse_bank({'facts': [{'id': 'F-0001', 'claim': 'Ran a fictional Python data service for 3 years.', 'kind': 'project', 'tags': [{'name': 'python', 'level': 'expert'}], 'verified_on': '2024-01-01', 'evidence': {'type': 'repo', 'pointer': 'https://example.invalid/a'}, 'share': 'shareable'}]})
+req = Requirement(id='R-1', text='Needs Python.', span=(0, 13), kind=RequirementKind.SKILL, term='python', importance=Importance.REQUIRED)
+cands = RequirementCandidates(requirement_id='R-1', fact_ids=['F-0001'], dropped_count=0, support=Support.STRONG, gate=Gate.TERM_MATCH)
+provider = OllamaProvider(parse_settings({'provider': 'ollama', 'model': 'qwen3.5:0.8b', 'context_tokens': 4096}))
+r = entail(req, cands, bank, provider)
+print(r.entailment.value, r.failure, r.match.support.value, r.fact_ids, r.rationale)"
+```
+It prints the entailment status, the failure label or `None`, the final support, the validated citations and the rationale. A small model may disagree with the rule ceiling. The support is never above `strong` here, and a failed call prints `not_run` with the ceiling kept.
+
 ## Try it locally
 ```bash
 uv run python -c "
