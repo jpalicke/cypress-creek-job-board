@@ -1,11 +1,13 @@
 # ABOUTME: Normalizes untrusted posting text: strips hostile characters, NFKC, whitespace, cap.
 # ABOUTME: Pure functions. Over-long or empty text raises a typed error, it is never cut.
-import hashlib
 import re
 import unicodedata
 
 from cypress_creek.ingest.errors import EmptyPosting, PostingTooLong
+from cypress_creek.ingest.hashing import text_hash
 from cypress_creek.ingest.models import PostingWarning, WarningKind
+
+__all__ = ["MAX_CHARS", "normalize", "text_hash"]
 
 MAX_CHARS = 30_000
 # Raw input far beyond the cap is refused before any per-character work happens.
@@ -43,7 +45,3 @@ def normalize(raw_text: str) -> tuple[str, list[PostingWarning]]:
             PostingWarning(kind=WarningKind.CONTROL_CHARS_STRIPPED, count=stripped_count)
         )
     return text, warnings
-
-
-def text_hash(text: str) -> str:
-    return hashlib.sha256(text.encode("utf8")).hexdigest()
