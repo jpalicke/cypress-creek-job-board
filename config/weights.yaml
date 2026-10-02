@@ -1,0 +1,9 @@
+# Score weights and support values, see docs/pipeline.md#score. Edit freely, it is data.
+# Weights must be above zero. Values must be 0 to 1 with none <= partial <= strong.
+weights:
+  required: 3
+  unspecified: 2
+  preferred: 1
+  strong: 1.0
+  partial: 0.5
+  none: 0.0
