@@ -38,4 +38,4 @@ The score (0 to 100) ranks postings so you can triage them. It is a weighted sha
 ## Documentation
 New here? Read [docs/codebase.md](docs/codebase.md) first. [docs/README.md](docs/README.md) is the index: the data model, the pipeline stages, the decision records and how we work.
 
-See [docs/contributing.md](docs/contributing.md) for how we work.
+See [docs/contributing.md](docs/contributing.md) for how we work, and [docs/handoff.md](docs/handoff.md) if you are picking up a card.
