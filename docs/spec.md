@@ -338,7 +338,7 @@ For each requirement, support is computed from the candidate facts before any mo
 - **Education and certification.** Matched against `kind`, issuer and certificate entities, not free text.
 - **No candidate.** Support is `none` and the requirement goes in the gap list.
 
-The model's entailment verdict then applies: `confirmed` leaves support unchanged, `downgraded` lowers it one step, and nothing can raise it.
+The model's entailment verdict then applies: `confirmed` leaves support unchanged, `downgraded` lowers it to the verdict's level (so `does_not_support` takes `strong` to `none`), and nothing can raise it.
 
 ### 7.3 Score
 
