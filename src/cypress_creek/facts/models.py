@@ -5,6 +5,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from cypress_creek.storage.company_key import CompanyNameError, company_key
 from cypress_creek.terms import normalize_term
 
 
@@ -33,6 +34,17 @@ class EvidenceType(StrEnum):
 class Share(StrEnum):
     SHAREABLE = "shareable"
     LOCAL_ONLY = "local_only"
+
+
+def clean_issuer(value: str | None) -> str | None:
+    """Trim an issuer name and refuse one that is not a usable organization name."""
+    if value is None:
+        return None
+    try:
+        company_key(value)
+    except CompanyNameError as error:
+        raise ValueError(f"issuer is not a usable name: {error}") from error
+    return value.strip()
 
 
 class Tag(BaseModel):
@@ -64,6 +76,7 @@ class Fact(BaseModel):
     claim: str = Field(min_length=1, max_length=300)
     kind: Kind
     employer: str | None = None
+    issuer: str | None = None
     role: str | None = None
     start: date | None = None
     end: date | None = None
@@ -71,6 +84,11 @@ class Fact(BaseModel):
     verified_on: date | None = None
     evidence: Evidence
     share: Share = Share.LOCAL_ONLY
+
+    @field_validator("issuer")
+    @classmethod
+    def _clean_issuer(cls, value: str | None) -> str | None:
+        return clean_issuer(value)
 
     @property
     def is_verified(self) -> bool:
