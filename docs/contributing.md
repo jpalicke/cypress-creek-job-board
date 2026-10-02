@@ -34,6 +34,7 @@ On every commit the hooks run, and CI (`.github/workflows/deterministic.yml`) ru
 
 - **detect-secrets**: blocks committed secrets (baseline in `.secrets.baseline`).
 - **ruff lint** and **ruff format check**: style and common errors.
+- **ABOUTME header check**: every code file starts with the two line header (see below).
 - **mypy --strict**: strict type check over `src` and `tests`.
 - **pytest** over the unit and component tiers with `--cov-fail-under=80`. Only `src/cypress_creek` counts toward coverage.
 
@@ -52,4 +53,19 @@ uv run python scripts/check_licenses.py licenses.json
 ```
 
 If the audit fails, upgrade the dependency to the fixed version shown. If a license check fails, prefer replacing the dependency (copyleft such as AGPL is not acceptable). If an exception is truly justified, add an entry with a written reason to `license-exceptions.toml`. The exception is a reviewed change in the pull request, and an entry without a reason is rejected.
+
+## ABOUTME headers
+Every code file starts with two comment lines, each beginning with `ABOUTME: `. The first says what the file does, the second adds detail. A shebang line may come first in scripts. The check (`scripts/check_aboutme.py`) verifies structure only. It skips Markdown, JSON, YAML, lockfiles and other non-code files.
+
+```python
+# ABOUTME: Parses a posting into requirements.
+# ABOUTME: Rejects text that fails size checks.
+```
+
+TypeScript and JavaScript use `// `, shell uses `# `, SQL uses `-- `, and Svelte puts each line in its own HTML comment on the first two lines:
+
+```svelte
+<!-- ABOUTME: Shows the gap report. -->
+<!-- ABOUTME: Renders all text as plain text. -->
+```
 
