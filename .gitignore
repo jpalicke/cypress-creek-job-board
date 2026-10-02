@@ -13,3 +13,5 @@ dist/
 *.sqlite3
 # The private fact bank never lands in the repo
 facts.private/
+requirements-audit.txt
+licenses.json

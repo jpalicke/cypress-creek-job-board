@@ -1,0 +1,5 @@
+# Reviewed license exceptions. Each entry needs a package name and a written reason.
+# Example:
+# [[exception]]
+# package = "example"
+# reason = "why this is acceptable and who reviewed it"
