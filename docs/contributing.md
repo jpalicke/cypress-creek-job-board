@@ -22,3 +22,20 @@ Four tiers exist: unit, component, integration and e2e. Markers `live` (needs a 
 uv sync
 uv run pytest
 ```
+
+## Quality gates
+Install the hooks once per clone:
+
+```bash
+uv run pre-commit install
+```
+
+On every commit the hooks run, and CI (`.github/workflows/deterministic.yml`) runs the same checks on every push and pull request:
+
+- **detect-secrets**: blocks committed secrets (baseline in `.secrets.baseline`).
+- **ruff lint** and **ruff format check**: style and common errors.
+- **mypy --strict**: strict type check over `src` and `tests`.
+- **pytest** over the unit and component tiers with `--cov-fail-under=80`. Only `src/cypress_creek` counts toward coverage.
+
+Warnings are errors, and a skipped test fails the whole run, so a missing service can never hide as a skip. Tool versions are pinned by `uv.lock`. Run everything by hand with `uv run pre-commit run --all-files`. Never use `--no-verify`.
+
