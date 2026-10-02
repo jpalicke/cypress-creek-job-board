@@ -10,6 +10,7 @@ htmlcov/
 node_modules/
 dist/
 *.sqlite
+data/
 *.sqlite3
 # The private fact bank never lands in the repo
 facts.private/
