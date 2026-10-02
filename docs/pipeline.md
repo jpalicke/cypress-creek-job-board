@@ -2,6 +2,25 @@
 
 Stages are added here as their cards land. Everything in this file is deterministic: no model is called and nothing reads the clock (the caller passes `today`).
 
+## Stage 0: normalize the posting
+`normalize(raw_text)` in `src/cypress_creek/ingest/normalize.py` cleans untrusted posting text before anything else sees it. It returns `(text, warnings)` or raises a typed error.
+
+1. Reject raw input over 300,000 characters.
+2. Unify line endings, strip control, zero-width and bidi characters (counted in a `control_chars_stripped` warning).
+3. Unicode NFKC, collapse runs of spaces and tabs, keep single newlines, collapse runs of blank lines, trim.
+4. Reject over 30,000 characters (`PostingTooLong`) or nothing left (`EmptyPosting`). Text is never silently cut.
+
+`text_hash(text)` is the sha256 of the normalized text. See [ADR 0002](adr/0002-posting-whitespace-and-normalization-order.md) for the reasoning.
+
+Try it:
+```bash
+uv run python -c "from cypress_creek.ingest.normalize import normalize; print(normalize('Py​thon   dev
+
+
+
+Wanted'))"
+```
+
 ## Support rules (the support gate)
 For each requirement the gate decides the most support the fact bank can ever justify. A model verdict later may confirm or downgrade this ceiling, never raise it.
 
