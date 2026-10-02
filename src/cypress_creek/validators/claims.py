@@ -62,7 +62,13 @@ def _terms(text: str) -> list[str]:
 def _known_terms(cited: Sequence[Fact], requirement_text: str) -> set[str]:
     texts = [requirement_text]
     for fact in cited:
-        texts += [fact.claim, fact.employer or "", fact.role or "", *(t.name for t in fact.tags)]
+        texts += [
+            fact.claim,
+            fact.employer or "",
+            fact.role or "",
+            fact.issuer or "",
+            *(t.name for t in fact.tags),
+        ]
     return {term for text in texts for term in _terms(text)}
 
 

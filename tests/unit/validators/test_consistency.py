@@ -151,3 +151,49 @@ def test_v8_signs_matter() -> None:
 )
 def test_extract_numbers(text: str, expected: list[str]) -> None:
     assert extract_numbers(text) == expected
+
+
+ISSUED = fact(
+    4,
+    kind=Kind.CERTIFICATION,
+    employer=None,
+    role=None,
+    start=None,
+    end=None,
+    claim="Holds the CKA certification",
+    issuer="Linux Foundation",
+    tags=[Tag(name="CKA", level=Level.EXPERT)],
+)
+OTHER_ISSUED = fact(
+    5,
+    kind=Kind.CERTIFICATION,
+    employer=None,
+    role=None,
+    start=None,
+    end=None,
+    claim="Holds the CKAD certification",
+    issuer="Globex Academy",
+    tags=[Tag(name="CKAD", level=Level.EXPERT)],
+)
+ISSUER_BANK = bank(ISSUED, OTHER_ISSUED)
+
+
+def test_v7_rejects_the_issuer_of_a_fact_that_was_not_cited() -> None:
+    verdict = check_entities("CKA certified by Globex Academy.", [ISSUED], ISSUER_BANK)
+    assert not verdict.passed
+    assert verdict.validator == "V7"
+    assert verdict.offending == "globex academy"
+
+
+def test_v7_accepts_the_issuer_of_a_cited_fact() -> None:
+    assert check_entities("CKA certified by Linux Foundation.", [ISSUED], ISSUER_BANK).passed
+
+
+def test_v7_ignores_an_issuer_on_a_fact_that_is_not_a_certification_or_education() -> None:
+    employment = fact(6, issuer="Globex Academy")
+    assert check_entities("Trained at Globex Academy.", [MINE], bank(MINE, employment)).passed
+
+
+def test_v8_counts_digits_in_a_cited_issuer() -> None:
+    issued = fact(7, kind=Kind.EDUCATION, issuer="Campus 42", employer=None, role=None)
+    assert check_numbers("Studied at Campus 42.", [issued], "").passed

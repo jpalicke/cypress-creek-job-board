@@ -1,0 +1,8 @@
+{
+  "validator": "V7",
+  "description": "A real certification is credited to a different real issuer than the cited fact names.",
+  "input": {
+    "text": "Earned the CKA certification from Globex Academy.",
+    "cited_ids": ["F-0005"]
+  }
+}
