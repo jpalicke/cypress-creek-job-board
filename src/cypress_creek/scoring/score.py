@@ -79,7 +79,7 @@ def load_weights(path: Path = DEFAULT_WEIGHTS_PATH) -> Weights:
 class Match(BaseModel):
     """A requirement's final support, with the ceiling the deterministic gate allowed.
 
-    Entailment may confirm the ceiling or lower it by one step. Anything else is refused."""
+    Entailment may confirm the ceiling or lower it. Support above the ceiling is refused."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -89,12 +89,9 @@ class Match(BaseModel):
     support: Support
 
     @model_validator(mode="after")
-    def _support_may_only_be_downgraded_one_step(self) -> "Match":
-        drop = _rank(self.ceiling) - _rank(self.support)
-        if drop < 0:
+    def _support_may_not_exceed_its_ceiling(self) -> "Match":
+        if _rank(self.support) > _rank(self.ceiling):
             raise ValueError(f"{self.requirement_id}: support is above its ceiling")
-        if drop > 1:
-            raise ValueError(f"{self.requirement_id}: support dropped more than one step")
         return self
 
 

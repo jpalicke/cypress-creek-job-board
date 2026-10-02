@@ -113,9 +113,8 @@ def test_a_raised_support_is_refused() -> None:
         match(1, REQUIRED, STRONG, ceiling=PARTIAL)
 
 
-def test_a_drop_of_more_than_one_step_is_refused() -> None:
-    with pytest.raises(ValidationError, match="more than one step"):
-        match(1, REQUIRED, NONE, ceiling=STRONG)
+def test_a_drop_of_two_steps_is_accepted() -> None:
+    assert match(1, REQUIRED, NONE, ceiling=STRONG).support == NONE
 
 
 def test_a_one_step_downgrade_is_accepted() -> None:
