@@ -1,0 +1,15 @@
+# Maps requirement terms to canonical fact bank tag names. Edit freely, it is data.
+# Every term is normalized (NFKC, casefold, edge punctuation trimmed) before it is compared.
+aliases:
+  postgresql: [postgres, psql, pg]
+  javascript: [js, ecmascript]
+  typescript: [ts]
+  python: [python3, py]
+  kubernetes: [k8s]
+  amazon web services: [aws]
+  google cloud platform: [gcp, google cloud]
+  continuous integration: [ci, ci/cd]
+  machine learning: [ml]
+  node.js: [node, nodejs]
+  c#: [csharp, c sharp]
+  c++: [cpp]

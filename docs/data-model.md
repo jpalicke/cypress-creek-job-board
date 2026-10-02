@@ -50,3 +50,22 @@ mkdir facts.private
 uv run python -c "from cypress_creek.facts import load_bank; b = load_bank(); print(len(b.facts), 'facts,', len(b.verified_facts()), 'verified; unverified:', b.unverified_ids())"
 ```
 Add `strict=True` to `load_bank` to see the strict mode behavior.
+
+## Tag alias table
+Requirement terms rarely match a bank tag word for word ("postgres" versus "postgresql"). The alias table in `config/aliases.yaml` maps each canonical tag name to the other terms that mean the same thing. It is data, not code, so you can extend it without touching Python.
+
+```yaml
+aliases:
+  postgresql: [postgres, psql, pg]
+  kubernetes: [k8s]
+```
+
+Rules:
+- Every term, alias and fact tag name goes through the same normalization (`cypress_creek.terms.normalize_term`: NFKC, casefold, whitespace collapsed, edge punctuation trimmed). `c++`, `c#` and `.net` survive intact.
+- An alias may appear under only one canonical tag, and may not equal another canonical tag. Either is a load error.
+- A term the table does not know stands for itself, so a tag still matches a requirement that uses the identical word.
+
+## Try the alias table
+```bash
+uv run python -c "from cypress_creek.scoring.aliases import load_aliases; print(load_aliases().resolve('Postgres'))"
+```
