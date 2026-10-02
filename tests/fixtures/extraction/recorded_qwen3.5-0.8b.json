@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "requirements": [
+    {
+      "text": "You must have 3 years of Python experience.",
+      "kind": "responsibility",
+      "term": "Python experience","importance": "required",
+      "issuer": "none"
+    },
+    {
+      "text": "Experience with PostgreSQL is required.",
+      "kind": "skill",
+      "term": "PostgreSQL experience",
+      "importance": "required",
+      "issuer": "none"
+    }
+  ]
+}

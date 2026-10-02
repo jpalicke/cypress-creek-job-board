@@ -1,0 +1,13 @@
+Backend Developer at Harbor Light Software
+
+About the role
+You will build and run the services behind our scheduling product.
+
+Requirements
+You must have 3 years of Python experience.
+Experience with PostgreSQL is required.
+You must be comfortable working in a small team.
+
+Nice to have
+Kubernetes experience is preferred.
+A degree in computer science is a plus.
