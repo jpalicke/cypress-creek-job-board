@@ -24,6 +24,11 @@ repos:
         language: system
         types: [python]
         pass_filenames: false
+      - id: aboutme
+        name: ABOUTME header check
+        entry: uv run --locked python scripts/check_aboutme.py
+        language: system
+        types_or: [python, shell, ts, tsx, javascript, sql, svelte]
       - id: pytest
         name: pytest unit and component with coverage gate
         entry: uv run --locked pytest tests/unit tests/component --cov --cov-fail-under=80

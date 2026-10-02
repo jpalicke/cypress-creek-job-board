@@ -13,4 +13,6 @@ jobs:
       - run: uv run --locked ruff format --check
       - run: uv run --locked mypy
       - run: uv run --locked pre-commit run detect-secrets --all-files
+      - name: ABOUTME headers
+        run: uv run --locked python scripts/check_aboutme.py $(git ls-files '*.py' '*.sh' '*.ts' '*.tsx' '*.js' '*.mjs' '*.cjs' '*.sql' '*.svelte')
       - run: uv run --locked pytest tests/unit tests/component --cov --cov-fail-under=80
