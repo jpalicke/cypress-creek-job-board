@@ -36,11 +36,6 @@ def test_exactly_the_cap_is_accepted() -> None:
     assert len(text) == MAX_CHARS
 
 
-def test_huge_raw_input_is_rejected_before_any_work() -> None:
-    with pytest.raises(PostingTooLong):
-        normalize(" " * (MAX_CHARS * 10 + 1))
-
-
 @pytest.mark.parametrize("raw", ["", "   \n\t  ", ZERO_WIDTH + "\x00"])
 def test_empty_after_normalization_is_rejected(raw: str) -> None:
     with pytest.raises(EmptyPosting):

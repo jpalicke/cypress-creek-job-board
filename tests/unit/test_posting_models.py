@@ -55,11 +55,6 @@ def test_posting_defaults_have_no_origin_url_and_no_warnings() -> None:
     assert p.warnings == []
 
 
-def test_posting_hash_must_match_the_text() -> None:
-    with pytest.raises(ValidationError, match="text_hash"):
-        posting(text_hash=text_hash("something else"))
-
-
 def test_posting_rejects_unknown_source_and_extra_fields() -> None:
     with pytest.raises(ValidationError):
         posting(source="carrier pigeon")

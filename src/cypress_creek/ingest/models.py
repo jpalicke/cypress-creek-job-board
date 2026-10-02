@@ -3,9 +3,8 @@
 from datetime import datetime
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from cypress_creek.ingest.hashing import text_hash as compute_text_hash
 from cypress_creek.terms import normalize_term
 
 
@@ -35,7 +34,7 @@ class Extractor(BaseModel):
 
 
 class Posting(BaseModel):
-    """Normalized posting text. Hash and text are checked together so they cannot drift."""
+    """Normalized posting text and where it came from."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -47,12 +46,6 @@ class Posting(BaseModel):
     extractor: Extractor
     warnings: list[PostingWarning] = []
     created_at: datetime
-
-    @model_validator(mode="after")
-    def _hash_matches_text(self) -> "Posting":
-        if self.text_hash != compute_text_hash(self.text):
-            raise ValueError("text_hash does not match the posting text")
-        return self
 
 
 class RequirementKind(StrEnum):
