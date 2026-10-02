@@ -24,6 +24,9 @@ src/cypress_creek/       The library
     loader.py            Safe YAML loading, parse_bank, load_bank
     dates.py             Date sanity rules
     errors.py            BankLoadError, FactValidationError
+  pipeline/              Stages that build model prompts (extraction wording lives in prompts/)
+    prompt.py            Stage, Prompt, build_prompt, prompt_facts, PromptError
+    prompts/             Versioned system texts, one file per stage and version (extract_v1.txt)
   ingest/                Untrusted posting text in, clean models out
     models.py            Posting, Requirement, typed warnings
     normalize.py         normalize(), text_hash()
@@ -105,6 +108,7 @@ URL validation is a separate library entry point. It rejects unsafe syntax, reso
 - **Safe by default config.** Backends default to loopback only, going remote needs `allow_remote`, and keys come from the environment alone. Config errors never echo a submitted value.
 - **Truncation is refused, not tolerated.** The Ollama adapter estimates before the call and checks the reported count after it, so a prompt the server would silently cut never produces an answer.
 - **Spend is capped before it happens.** `BudgetedProvider` checks the worst case (estimate plus output cap) against the run limits before a call and records the server's real usage after it. Real usage above an estimate blocks the next call, so the guard fails closed.
+- **Posting text never leaves its block.** `build_prompt` puts the posting between boundary lines carrying a random 128 bit token, keeps it out of the system message and shows extraction no facts. It is the first layer only, the validators are the control.
 - **One retry place.** Providers raise typed errors and `providers.call_with_retry` is the only code that retries them. Adapters never loop on their own.
 - **Frozen models.** Pydantic models are frozen and reject unknown fields, so a typo or smuggled field is an error.
 - **Two stores, on purpose.** The fact bank and config are hand edited YAML (reviewable, diffable, versioned). Mutable app state, which later cards add (postings, drafts, watchlists), is SQLite behind numbered migrations.

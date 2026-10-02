@@ -1,6 +1,6 @@
 # Threat model
 
-The full design threat model is in [spec.md, section 9](spec.md#9-threat-model). This page records the implemented URL boundary and the remaining SSRF controls. It does not claim that the complete fetching path exists.
+The full design threat model is in [spec.md, section 9](spec.md#9-threat-model). This page records the implemented URL boundary, the remaining SSRF controls and the prompt structure. It does not claim that the complete fetching path exists.
 
 ## SSRF boundary
 
@@ -102,3 +102,15 @@ uv run pytest --cov --cov-fail-under=80 -q
 ```
 
 There are no mock resolvers or providers. Hostile address lists are data supplied directly to a pure validator. A public HTTPS fetch, real DNS-rebinding arrangement, local HTTP server tests and browser flows are not established by these tests; the first three belong to F1b and browser flows await the UI.
+
+## Prompt structure (T1 to T4)
+
+Posting text is hostile (injection, instruction override, omission, fact extraction). Code is `src/cypress_creek/pipeline/prompt.py`, the behavior is in [pipeline.md](pipeline.md#prompt-builder).
+
+- **Three blocks.** The system message is trusted and static and holds no posting text and no facts. The data block holds the posting and nothing else. The facts block is trusted and separate, and only for stages that need facts.
+- **Random boundary.** Each call wraps the posting in a boundary with a token from `secrets` (128 bits). The token is checked against the posting and replaced if it clashes. A fake closing line in the posting cannot match a token the attacker has not seen.
+- **No bank in extraction.** The extraction prompt shows the model no facts (T4). Later stages see only the candidate facts for one requirement.
+- **Fact filter.** Only verified facts are rendered, and `local_only` facts never go to a hosted backend.
+- **Not a defense on its own.** A model can be talked out of any boundary. The deterministic validators after the model (V1 to V14) are the control, and the human review is the last one. Do not add prompt wording to cover for a missing validator.
+
+Tests: `tests/unit/test_prompt.py` covers fake closing delimiters, a token clash, hostile postings never reaching the system message, the fact filter and a Hypothesis property that any posting sits between exactly one opening and one closing boundary. Run it with `uv run pytest tests/unit/test_prompt.py -q`. Model level injection resistance is measured by the eval harness, not here.
