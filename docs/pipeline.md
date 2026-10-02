@@ -95,6 +95,40 @@ print(score(matches, load_weights()).model_dump_json(indent=1))"
 - The prompt is the first layer only. The validators after the model are the real control, see [threat-model.md](threat-model.md#prompt-structure-t1-to-t4).
 - To change the extraction wording, add `extract_v2.txt`, point `TEMPLATES` at it and update the tests. Do not edit a released version, so old hashes stay meaningful.
 
+## Accepting extraction output
+The extraction model proposes requirements. `accept_proposals(posting_text, output)` in `src/cypress_creek/pipeline/extract.py` decides which ones are kept. The model's answer must fit `ExtractionOutput` in `pipeline/schemas.py` (V1: no unknown fields, `schema_version` 1). The model gives no offsets and no ids.
+
+| Field | Where it comes from |
+| --- | --- |
+| `text` | The model proposes it. It is kept only if the exact text is in the posting. |
+| `span` | Code. The first occurrence of `text` that an earlier requirement has not already claimed. |
+| `id` | Code. `R-1`, `R-2` and so on, in order. |
+| `importance` | Code, from the cue words around the span (the same rule as V3). The model's value is ignored. No cue gives `unspecified`. |
+| `kind`, `term`, `years`, `issuer` | The model proposes them. They pass the `Requirement` rules, and a term that normalizes to nothing drops the proposal. |
+
+- A dropped proposal is reported with a reason: `text_not_in_posting` (invented or altered text, or a sentence already claimed), `duplicate_term` (same normalized term as a kept requirement) or `invalid_field`. The reported text is cut to 200 characters, and nothing else the model said is kept.
+- At most 40 requirements are kept (V11). Proposals past the cap are counted in `not_assessed_count` and never silently lost.
+- The model is never asked to vouch for a span or for importance, so there is nothing to trust there.
+- Tests use a recorded real output (`tests/fixtures/extraction/recorded_qwen3.5-0.8b.json`) and hand written hostile ones, and run V2, V3 and V11 over the accepted set.
+
+### Try the accept step
+```bash
+uv run python -c "
+import json
+from pathlib import Path
+from cypress_creek.pipeline.extract import accept_proposals
+from cypress_creek.pipeline.schemas import ExtractionOutput
+
+d = Path('tests/fixtures/extraction')
+posting = (d / 'posting.txt').read_text(encoding='utf-8')
+out = json.loads((d / 'recorded_qwen3.5-0.8b.json').read_text(encoding='utf-8'))
+out['requirements'].append({'text': 'You must hold a clearance.', 'kind': 'skill', 'term': 'clearance', 'importance': 'required'})
+r = accept_proposals(posting, ExtractionOutput.model_validate(out))
+print([(q.id, q.span, q.importance.value) for q in r.requirements])
+print([(x.text, x.reason.value) for x in r.dropped], r.not_assessed_count)"
+```
+It prints two requirements with their spans and `required`, then the invented clearance line dropped as `text_not_in_posting`, and `0`.
+
 ## Try it locally
 ```bash
 uv run python -c "
