@@ -45,6 +45,7 @@ src/cypress_creek/       The library
     errors.py            ContextTruncated, SchemaViolation, ProviderUnavailable, RateLimited, BudgetExceeded, Refusal
     retry.py             call_with_retry, RetryPolicy
     factory.py           get_provider, ProviderRegistry, UnknownProvider
+    ollama.py            OllamaProvider and its pre-flight and post-flight truncation checks
   config/                Backend settings (not the repo level config/ data folder)
     settings.py          ProviderSettings, load_settings, resolve_api_key, ConfigError
   storage/               Mutable state: the company name key and the SQLite database
@@ -93,6 +94,7 @@ Dotted means not built yet. Extraction, model verdicts, real provider adapters, 
 - **Data, not code.** Things a person should tune (the alias table, the score weights) or bundled third party data (the Unicode confusables) are YAML in `config/`, loaded and validated, never hard coded.
 - **Typed errors.** Failures are specific exception classes (`PostingTooLong`, `FactValidationError`), so callers and tests can tell them apart. Text is rejected, never silently cut or repaired.
 - **Safe by default config.** Backends default to loopback only, going remote needs `allow_remote`, and keys come from the environment alone. Config errors never echo a submitted value.
+- **Truncation is refused, not tolerated.** The Ollama adapter estimates before the call and checks the reported count after it, so a prompt the server would silently cut never produces an answer.
 - **One retry place.** Providers raise typed errors and `providers.call_with_retry` is the only code that retries them. Adapters never loop on their own.
 - **Frozen models.** Pydantic models are frozen and reject unknown fields, so a typo or smuggled field is an error.
 - **Two stores, on purpose.** The fact bank and config are hand edited YAML (reviewable, diffable, versioned). Mutable app state, which later cards add (postings, drafts, watchlists), is SQLite behind numbered migrations.
