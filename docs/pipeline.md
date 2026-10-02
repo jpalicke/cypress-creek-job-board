@@ -5,9 +5,10 @@ Stages are added here as their cards land. Everything in this file is determinis
 ## Stage 0: normalize the posting
 `normalize(raw_text)` in `src/cypress_creek/ingest/normalize.py` cleans untrusted posting text before anything else sees it. It returns `(text, warnings)` or raises a typed error.
 
-1. Unify line endings, strip control, zero-width and bidi characters (counted in a `control_chars_stripped` warning).
-2. Unicode NFKC, collapse runs of spaces and tabs, keep single newlines, collapse runs of blank lines, trim.
-3. Reject over 30,000 characters (`PostingTooLong`) or nothing left (`EmptyPosting`). Text is never silently cut.
+1. Reject raw input over 300,000 characters.
+2. Unify line endings, strip control, zero-width and bidi characters (counted in a `control_chars_stripped` warning).
+3. Unicode NFKC, collapse runs of spaces and tabs, keep single newlines, collapse runs of blank lines, trim.
+4. Reject over 30,000 characters (`PostingTooLong`) or nothing left (`EmptyPosting`). Text is never silently cut.
 
 `text_hash(text)` is the sha256 of the normalized text. See [ADR 0002](adr/0002-posting-whitespace-and-normalization-order.md) for the reasoning.
 

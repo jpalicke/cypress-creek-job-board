@@ -54,7 +54,7 @@ Add `strict=True` to `load_bank` to see the strict mode behavior.
 ## Posting and Requirement
 Both live in `src/cypress_creek/ingest/models.py` and are frozen, extra-forbid pydantic models.
 
-**Posting**: `id`, `source` (paste, link, pdf, feed), `text` (already normalized), `text_hash` (sha256 of the normalized text, from `normalize.text_hash`), `origin_url`, `extractor` (name and version), `warnings[]`, `created_at` (passed in, never read from a clock).
+**Posting**: `id`, `source` (paste, link, pdf, feed), `text` (already normalized), `text_hash` (sha256 of the text, checked against it on construction), `origin_url`, `extractor` (name and version), `warnings[]`, `created_at` (passed in, never read from a clock).
 
 **Requirement**: `id` (`R-n`), `text` (verbatim span), `span` (start, end offsets into the posting text), `kind` (skill, years, education, certification, responsibility, soft), `term` (normalized with the same function as bank tags), `years` (optional positive int), `importance` (required, preferred, unspecified).
 
