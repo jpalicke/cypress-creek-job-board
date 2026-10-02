@@ -3,7 +3,9 @@
 from datetime import date
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from cypress_creek.terms import normalize_term
 
 
 class Kind(StrEnum):
@@ -38,6 +40,14 @@ class Tag(BaseModel):
 
     name: str = Field(min_length=1)
     level: Level
+
+    @field_validator("name")
+    @classmethod
+    def _normalize_name(cls, value: str) -> str:
+        normalized = normalize_term(value)
+        if not normalized:
+            raise ValueError("tag name is empty after normalization")
+        return normalized
 
 
 class Evidence(BaseModel):
