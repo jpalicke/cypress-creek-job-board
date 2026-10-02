@@ -76,7 +76,7 @@ Dotted means not built yet. Extraction, model verdicts, validators, gap reports 
 ## Ideas to know
 - **One source of truth.** The bank file is the only record of facts. Verification is derived from `verified_on` and is never stored as a separate flag. The pipeline only ever sees `Bank.verified_facts()`.
 - **Pure and deterministic.** Scoring functions take everything as arguments, including `today`. Nothing reads the clock or the network.
-- **Data, not code.** Things a person should tune (the alias table) are YAML in `config/`, loaded and validated, never hard coded.
+- **Data, not code.** Things a person should tune (the alias table, the score weights) are YAML in `config/`, loaded and validated, never hard coded.
 - **Typed errors.** Failures are specific exception classes (`PostingTooLong`, `FactValidationError`), so callers and tests can tell them apart. Text is rejected, never silently cut or repaired.
 - **Frozen models.** Pydantic models are frozen and reject unknown fields, so a typo or smuggled field is an error.
 - **Shared normalization.** `terms.normalize_term` is used for bank tags, requirement terms and the alias table, so they always compare under the same rules.
@@ -94,7 +94,7 @@ uv run pre-commit run --all-files  # lint, format, strict types, tests with the 
 How a card goes:
 1. Branch from main, one branch per card. No worktrees.
 2. Write a failing test first and watch it fail. Then write the minimum code to pass, then refactor.
-3. Keep each phase to at most five files, run the gates, then continue.
+3. Keep each phase to at most five files and each PR to about 10 (hard cap 20), run the gates, then continue.
 4. Update docs in the same PR (see the checklist in contributing.md).
 5. Open a PR, get CI green, merge only after review.
 
@@ -109,6 +109,7 @@ Conventions you will trip over if you do not know them:
 - Ports: API 5309, Vite dev server 5150. Infrastructure keeps its defaults.
 
 ## Adding a new thing, by example
+- **Different score weights:** edit `config/weights.yaml`. `tests/component/test_weights_loader.py` shows the rules, and `docs/pipeline.md#score` must match if you change the defaults.
 - **A new tag alias:** add it to `config/aliases.yaml`. The tests in `tests/unit/test_aliases.py` show the rules (an alias belongs to one canonical tag).
 - **A new fact field:** change `facts/models.py`, add a failing test in `tests/unit/test_fact_models.py` first, write an ADR if it is a design decision, and update `docs/data-model.md`.
 - **A new pipeline stage:** a new module under the right package, typed errors beside it, tests in all relevant tiers, and a section in `docs/pipeline.md`.
