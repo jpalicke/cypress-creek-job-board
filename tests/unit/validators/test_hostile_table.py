@@ -1,6 +1,7 @@
 # ABOUTME: One hostile model output per validator, each of which must be rejected.
 # ABOUTME: Cases are added as each validator group lands, the full table covers V1 to V14.
 from collections.abc import Callable
+from dataclasses import dataclass
 
 import pytest
 from builders import POSTING, bank, fact, requirement
@@ -42,7 +43,45 @@ def _v6() -> Verdict:
     return REGISTRY["V6"].check(["F-0001"], private, hosted=True)
 
 
-CASES: list[Case] = [("V1", _v1), ("V2", _v2), ("V3", _v3), ("V4", _v4), ("V5", _v5), ("V6", _v6)]
+@dataclass(frozen=True)
+class _Claim:
+    text: str
+    fact_ids: list[str]
+
+
+def _v7() -> Verdict:
+    mine = fact(1, employer="Initech", role="Backend Engineer")
+    other = fact(2, employer="Hooli", role="Staff Engineer")
+    return REGISTRY["V7"].check("I ran Postgres at Hooli.", [mine], bank(mine, other))
+
+
+def _v8() -> Verdict:
+    return REGISTRY["V8"].check(
+        "Cut query time by 90%", [fact(1, claim="Cut query time by 40%")], ""
+    )
+
+
+def _v9() -> Verdict:
+    return REGISTRY["V9"].check([_Claim("Led a team of ten", [])])
+
+
+def _v10() -> Verdict:
+    cited = fact(1, claim="Ran PostgreSQL in production")
+    return REGISTRY["V10"].check("Ran PostgreSQL and also Terraform", [cited], "")
+
+
+CASES: list[Case] = [
+    ("V1", _v1),
+    ("V2", _v2),
+    ("V3", _v3),
+    ("V4", _v4),
+    ("V5", _v5),
+    ("V6", _v6),
+    ("V7", _v7),
+    ("V8", _v8),
+    ("V9", _v9),
+    ("V10", _v10),
+]
 
 
 @pytest.mark.parametrize(("validator_id", "run"), CASES, ids=[c[0] for c in CASES])

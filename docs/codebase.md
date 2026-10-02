@@ -32,6 +32,8 @@ src/cypress_creek/       The library
     cues.py              The one list of importance cue words, sentence splitting
     extraction.py        V1 schema, V2 verbatim span, V3 importance cues
     citations.py         V4 fact exists, V5 fact verified, V6 fact shareable
+    consistency.py       V7 entity consistency, V8 numeric consistency
+    claims.py            V9 citation required, V10 novel term flag
     registry.py          REGISTRY: id, name, rule and function for each validator
   scoring/               Deterministic scoring, no model calls
     aliases.py           AliasTable, load_aliases
