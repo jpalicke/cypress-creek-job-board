@@ -12,6 +12,7 @@ Nothing the tool outputs may assert a claim that is not backed by a verified fac
 ```
 config/                  Data that behaves like code but is edited by hand
   aliases.yaml           Tag alias table (requirement term to canonical tag)
+  weights.yaml           Score weights and support values
 docs/                    Documentation, indexed in docs/README.md
   adr/                   Decision records, one per design decision
 scripts/                 Repo tooling run by hooks and CI (ABOUTME check, license check)
