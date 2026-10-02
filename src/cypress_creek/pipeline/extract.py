@@ -1,15 +1,30 @@
-# ABOUTME: Accepts proposed requirements from the extraction model: only text found in the posting.
-# ABOUTME: Code sets spans, ids and importance, drops the rest with a reason, and caps the count.
+# ABOUTME: Stage 1 extraction: one model call, then only requirements found in the posting survive.
+# ABOUTME: Code sets spans, ids and importance. A failed call is an incomplete result, not a guess.
+import time
+from collections.abc import Callable
 from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from cypress_creek.ingest.models import Requirement
+from cypress_creek.pipeline.prompt import Stage, build_prompt
 from cypress_creek.pipeline.schemas import ExtractionOutput
+from cypress_creek.providers import (
+    ContextTruncated,
+    ProviderError,
+    ProviderUnavailable,
+    RateLimited,
+    Refusal,
+    SchemaViolation,
+)
+from cypress_creek.providers.base import Capabilities, Provider, Usage
+from cypress_creek.providers.retry import RetryPolicy, call_with_retry
 from cypress_creek.validators.cues import cue_importance
 from cypress_creek.validators.requirements import MAX_REQUIREMENTS
 
 MAX_DROPPED_TEXT = 200
+MAX_OUTPUT_TOKENS = 4000
+SCHEMA_VERSION = 1
 
 
 class DropReason(StrEnum):
@@ -83,3 +98,106 @@ def accept_proposals(posting_text: str, output: ExtractionOutput) -> Acceptance:
         used.append(span)
         requirements.append(requirement)
     return Acceptance(requirements=requirements, dropped=dropped, not_assessed_count=not_assessed)
+
+
+class ExtractionStatus(StrEnum):
+    OK = "ok"
+    INCOMPLETE = "incomplete"
+
+
+class ExtractionResult(BaseModel):
+    """What stage 1 produced. Incomplete means the model call failed and nothing was extracted."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    status: ExtractionStatus
+    requirements: list[Requirement]
+    dropped: list[Dropped]
+    not_assessed_count: int
+    failure: str | None
+    usage: Usage | None
+    prompt_hash: str
+    schema_version: int
+
+
+FAILURE_LABELS: dict[type[ProviderError], str] = {
+    SchemaViolation: "schema_violation",
+    ContextTruncated: "context_truncated",
+    ProviderUnavailable: "provider_unavailable",
+    RateLimited: "rate_limited",
+    Refusal: "refusal",
+}
+
+
+def failure_label(error: ProviderError) -> str | None:
+    """The label for a provider failure that ends as an incomplete result, else None."""
+    return FAILURE_LABELS.get(type(error))
+
+
+def output_cap(capabilities: Capabilities) -> int:
+    """Room for the answer: at most half the window, so a short posting always fits a small one."""
+    return min(MAX_OUTPUT_TOKENS, capabilities.context_tokens // 2)
+
+
+def finish_extraction(
+    posting_text: str, output: ExtractionOutput, prompt_hash: str, usage: Usage
+) -> ExtractionResult:
+    accepted = accept_proposals(posting_text, output)
+    return ExtractionResult(
+        status=ExtractionStatus.OK,
+        requirements=accepted.requirements,
+        dropped=accepted.dropped,
+        not_assessed_count=accepted.not_assessed_count,
+        failure=None,
+        usage=usage,
+        prompt_hash=prompt_hash,
+        schema_version=SCHEMA_VERSION,
+    )
+
+
+def extract_requirements(
+    posting_text: str,
+    provider: Provider,
+    *,
+    sleep: Callable[[float], None] = time.sleep,
+    policy: RetryPolicy | None = None,
+) -> ExtractionResult:
+    """Ask the model for requirements and accept only what the posting supports.
+
+    A typed provider failure gives an incomplete result with no requirements. BudgetExceeded and
+    any other error propagate, because a spent budget must stop the run.
+    """
+    capabilities = provider.capabilities
+    prompt = build_prompt(Stage.EXTRACT, posting_text, [], capabilities, ExtractionOutput)
+
+    def attempt(feedback: str | None) -> tuple[ExtractionOutput, Usage]:
+        used = build_prompt(
+            Stage.EXTRACT,
+            posting_text,
+            [],
+            capabilities,
+            ExtractionOutput,
+            retry_feedback=feedback,
+        )
+        result = provider.complete_structured(
+            used.system, used.data_block, ExtractionOutput, output_cap(capabilities)
+        )
+        return result.parsed, result.usage
+
+    try:
+        output, usage = call_with_retry(attempt, sleep=sleep, policy=policy)
+    except ProviderError as error:
+        label = failure_label(error)
+        if label is None:
+            raise
+        return ExtractionResult(
+            status=ExtractionStatus.INCOMPLETE,
+            requirements=[],
+            dropped=[],
+            not_assessed_count=0,
+            failure=label,
+            usage=None,
+            prompt_hash=prompt.prompt_hash,
+            schema_version=SCHEMA_VERSION,
+        )
+    return finish_extraction(posting_text, output, prompt.prompt_hash, usage)

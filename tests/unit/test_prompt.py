@@ -124,3 +124,22 @@ def test_any_posting_sits_between_exactly_one_opening_and_closing(posting: str) 
     assert prompt.data_block.count(f"<<<END POSTING {token}>>>") == 1
     assert prompt.data_block.startswith(f"<<<POSTING {token}>>>")
     assert prompt.data_block.endswith(f"<<<END POSTING {token}>>>")
+
+
+def test_retry_feedback_is_added_to_the_system_text_and_leaves_the_hash_alone() -> None:
+    plain = _build()
+    retried = build_prompt(
+        Stage.EXTRACT, "Needs Python.", [], LOCAL, Answer, retry_feedback="field required: text"
+    )
+    assert retried.system.startswith(plain.system)
+    assert retried.system.endswith("field required: text")
+    assert retried.prompt_hash == plain.prompt_hash
+    assert retried.data_block.count("Needs Python.") == 1
+
+
+def test_no_feedback_leaves_the_system_text_as_the_template() -> None:
+    assert "field required" not in _build().system
+
+
+def test_the_extraction_wording_asks_for_null_not_a_word_for_an_absent_value() -> None:
+    assert "null" in _build().system
