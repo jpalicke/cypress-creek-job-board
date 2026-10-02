@@ -1,0 +1,9 @@
+{
+  "validator": "V8",
+  "description": "A rationale inflates 40% to 90% and adds a headcount.",
+  "input": {
+    "text": "Cut query time by 90% for a team of twelve.",
+    "cited_ids": ["F-0001"],
+    "requirement_text": "Postgres tuning experience"
+  }
+}

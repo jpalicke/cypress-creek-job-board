@@ -27,6 +27,17 @@ src/cypress_creek/       The library
     normalize.py         normalize(), text_hash()
     hashing.py           The one definition of the text hash
     errors.py            PostingTooLong, EmptyPosting
+  validators/            Grounding validators V1 to V14, pure functions returning Verdicts
+    verdict.py           Verdict, ok(), fail()
+    cues.py              The one list of importance cue words, sentence splitting
+    extraction.py        V1 schema, V2 verbatim span, V3 importance cues
+    citations.py         V4 fact exists, V5 fact verified, V6 fact shareable
+    consistency.py       V7 entity consistency, V8 numeric consistency
+    claims.py            V9 citation required, V10 novel term flag
+    requirements.py      V11 cap and dedupe, V13 cue sentence coverage
+    fact_dates.py        V12 date sanity (wraps facts/dates.py)
+    names.py             V14 company name shape
+    registry.py          REGISTRY: id, name, rule and function for each validator
   scoring/               Deterministic scoring, no model calls
     aliases.py           AliasTable, load_aliases
     support.py           candidate_facts, merged_years, support_ceiling
@@ -36,6 +47,7 @@ tests/
   integration/           Real services (empty so far)
   e2e/                   Whole flows (empty so far)
   fixtures/              Recorded or hand written inputs
+    hostile_outputs/     One bad model output per validator, plus a small bank (see validators.md)
   conftest.py            Fails the run if any test is skipped
 ```
 `facts.private/` is where your own bank lives. It is gitignored and never committed.
@@ -53,6 +65,7 @@ flowchart LR
     verified --> gate
     table --> gate
     gate --> ceiling["support + deciding gate"]
+    reqs -. model output .-> val["validators (V1 to V14)"]
 ```
 Dotted means not built yet. Extraction, model verdicts, validators, gap reports and drafting arrive in later cards (see the issue board and the spec). The pieces that exist are libraries with no app around them yet.
 

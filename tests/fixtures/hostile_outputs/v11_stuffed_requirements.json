@@ -1,0 +1,5 @@
+{
+  "validator": "V11",
+  "description": "The same requirement is extracted many times in different spellings to inflate a score.",
+  "input": {"terms": ["Python", "python", " PYTHON. ", "python", "Python"]}
+}

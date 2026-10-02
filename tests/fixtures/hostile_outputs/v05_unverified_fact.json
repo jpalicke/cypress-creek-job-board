@@ -1,0 +1,5 @@
+{
+  "validator": "V5",
+  "description": "A mapping cites a fact that is in the bank but has not been verified.",
+  "input": {"cited_ids": ["F-0003"]}
+}

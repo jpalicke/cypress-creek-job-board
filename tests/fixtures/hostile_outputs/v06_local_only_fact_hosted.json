@@ -1,0 +1,5 @@
+{
+  "validator": "V6",
+  "description": "A local_only fact is cited from a hosted backend.",
+  "input": {"cited_ids": ["F-0004"], "hosted": true}
+}

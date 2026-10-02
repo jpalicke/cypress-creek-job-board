@@ -1,0 +1,11 @@
+{
+  "description": "A faithful rationale that must pass V7 to V10, so the corpus tests cannot pass by rejecting everything.",
+  "input": {
+    "text": "As a Backend Engineer at Initech from 2019 to 2023, cut query time by 40% on the payments database.",
+    "cited_ids": ["F-0001"],
+    "requirement_text": "Postgres tuning experience",
+    "claims": [
+      {"text": "Cut query time by 40%", "fact_ids": ["F-0001"]}
+    ]
+  }
+}
