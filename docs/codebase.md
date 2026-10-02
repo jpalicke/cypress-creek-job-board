@@ -26,6 +26,7 @@ src/cypress_creek/       The library
     errors.py            BankLoadError, FactValidationError
   pipeline/              Stages that build model prompts (extraction wording lives in prompts/)
     prompt.py            Stage, Prompt, build_prompt, prompt_facts, PromptError
+    retrieve.py          retrieve, RequirementCandidates, MAX_CANDIDATES: tag and alias retrieval, no model
     schemas.py           ExtractionOutput, ProposedRequirement: the shape the model answers in
     extract.py           extract_requirements, ExtractionResult, accept_proposals, Acceptance, Dropped, DropReason
     prompts/             Versioned system texts, one file per stage and version (extract_v2.txt)
@@ -113,6 +114,7 @@ URL validation is a separate library entry point. It rejects unsafe syntax, reso
 - **Spend is capped before it happens.** `BudgetedProvider` checks the worst case (estimate plus output cap) against the run limits before a call and records the server's real usage after it. Real usage above an estimate blocks the next call, so the guard fails closed.
 - **Posting text never leaves its block.** `build_prompt` puts the posting between boundary lines carrying a random 128 bit token, keeps it out of the system message and shows extraction no facts. It is the first layer only, the validators are the control.
 - **The model proposes, code decides.** The extraction model gives text, kind and term. Spans, ids and importance are set by code, and text that is not in the posting is dropped with a reason. See `pipeline.md`.
+- **Retrieval is not a model.** `retrieve` matches tags and aliases, ranks and caps the candidates, and sets the support ceiling. A requirement with no candidate is a gap and costs no model call. See `pipeline.md`.
 - **One retry place.** Providers raise typed errors and `providers.call_with_retry` is the only code that retries them. Adapters never loop on their own.
 - **Frozen models.** Pydantic models are frozen and reject unknown fields, so a typo or smuggled field is an error.
 - **Two stores, on purpose.** The fact bank and config are hand edited YAML (reviewable, diffable, versioned). Mutable app state, which later cards add (postings, drafts, watchlists), is SQLite behind numbered migrations.
