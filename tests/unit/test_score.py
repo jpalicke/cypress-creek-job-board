@@ -8,7 +8,7 @@ from hypothesis import strategies as st
 from pydantic import ValidationError
 
 from cypress_creek.ingest.models import Importance
-from cypress_creek.scoring.score import Match, Weights, downgrade, score
+from cypress_creek.scoring.score import Match, Weights, downgrade, lowest, score
 from cypress_creek.scoring.support import Support
 
 REQUIRED, PREFERRED, UNSPECIFIED = Importance.REQUIRED, Importance.PREFERRED, Importance.UNSPECIFIED
@@ -106,6 +106,13 @@ def test_downgrade_lowers_one_step_and_stops_at_none() -> None:
     assert downgrade(STRONG) == PARTIAL
     assert downgrade(PARTIAL) == NONE
     assert downgrade(NONE) == NONE
+
+
+@pytest.mark.parametrize("a", list(Support))
+@pytest.mark.parametrize("b", list(Support))
+def test_lowest_is_the_lower_of_two_and_never_the_higher(a: Support, b: Support) -> None:
+    order = [NONE, PARTIAL, STRONG]
+    assert lowest(a, b) == order[min(order.index(a), order.index(b))]
 
 
 def test_a_raised_support_is_refused() -> None:
