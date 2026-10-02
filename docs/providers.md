@@ -1,6 +1,6 @@
 # Providers
 
-The provider layer is how the pipeline talks to a model. Every backend (local or hosted) implements one interface, so the pipeline and the eval harness never know which one they use. Code is `src/cypress_creek/providers/`. This page covers the interface, the typed errors and the retry policy. Real adapters, the config that selects a backend and the factory arrive in later cards (see the issue board).
+The provider layer is how the pipeline talks to a model. Every backend (local or hosted) implements one interface, so the pipeline and the eval harness never know which one they use. Code is `src/cypress_creek/providers/`. This page covers the interface, the typed errors, the retry policy and the config that selects a backend. Real adapters arrive in later cards (see the issue board).
 
 ## The interface
 `Provider` is a `typing.Protocol` in `providers/base.py`:
@@ -36,9 +36,37 @@ The two counters are separate. `sleep` is injectable so tests never wait.
 
 Known limits: there is no jitter in the backoff, and `count_tokens_estimate` is an estimate that each adapter defines.
 
+## Configuration
+Code is `src/cypress_creek/config/settings.py`. The format is TOML, see [ADR 0007](adr/0007-provider-config-toml-and-loopback.md). Copy this to `config/provider.toml` (or point `CYPRESS_CREEK_CONFIG` at another file):
+```toml
+provider = "ollama"
+model = "llama3.1"
+base_url = "http://localhost:11434"
+# allow_remote = true              # required for any host that is not loopback
+# api_key_env = "OPENAI_API_KEY"   # the NAME of an environment variable, never the key  # pragma: allowlist secret
+# request_timeout_seconds = 120
+# connect_timeout_seconds = 5
+```
+- `provider` and `model` are required. The other fields are optional.
+- Any field can be overridden by `CYPRESS_CREEK_<FIELD>`, for example `CYPRESS_CREEK_MODEL=qwen3`. Blank values are ignored.
+- The loopback rule: a `base_url` must be http or https. A `base_url` with a user name or password in it is rejected. A host that is not `localhost` or a loopback address (`127.0.0.1`, `::1`) is rejected unless `allow_remote = true`. This keeps a posting and your facts from going to a remote host by accident.
+- Keys: the file holds `api_key_env`, and `resolve_api_key(settings)` reads that variable when an adapter needs it. A missing variable is an error that names the variable, never a value.
+- Every failure is a `ConfigError`. Messages carry field names and rules only, so a key pasted into a URL is not echoed back.
+
+`get_provider(settings)` (in `providers/factory.py`) finds the adapter registered under `settings.provider`. An unknown name raises `UnknownProvider`, a `ConfigError` listing the known names. No adapter is registered yet, so every name is unknown until card C2.
+
+Known limits: the loopback check reads the URL text, so a name that resolves elsewhere or a redirect is not caught (adapters must not follow redirects off the configured host). A backend with a built in remote default URL must demand `allow_remote` itself, because an empty `base_url` passes.
+
 ## Try it locally
 ```bash
 uv run python -c "from cypress_creek.providers import ProviderUnavailable; print(ProviderUnavailable('openai', 'bad key sk-123', secrets=['sk-123']))"
 uv run python -c "from cypress_creek.providers import RateLimited, call_with_retry; outcomes = [RateLimited(retry_after_seconds=0.1)]; call = lambda feedback: (_ for _ in ()).throw(outcomes.pop()) if outcomes else 'done'; print(call_with_retry(call))"
 ```
 The first prints `openai unavailable: bad key [redacted]`. The second waits a tenth of a second after one rate limit and prints `done`.
+
+Load the config and see the loopback rule (no file needed, the environment is enough):
+```bash
+CYPRESS_CREEK_PROVIDER=ollama CYPRESS_CREEK_MODEL=llama3.1 uv run python -c "from cypress_creek.config import load_settings; print(load_settings())"
+CYPRESS_CREEK_PROVIDER=ollama CYPRESS_CREEK_MODEL=m CYPRESS_CREEK_BASE_URL=https://api.example.com uv run python -c "from cypress_creek.config import load_settings; load_settings()"
+```
+The first prints the settings. The second fails with a `ConfigError` telling you to set `allow_remote`. In Windows PowerShell set each variable first, for example `$env:CYPRESS_CREEK_PROVIDER = "ollama"`, then run the `uv run python` part.
