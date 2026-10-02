@@ -17,3 +17,11 @@ Why: B4 landed as a roughly 40 file PR that was too big to review.
 ## Audit every doc before reporting a card done
 Before reporting, grep README.md, docs/README.md, docs/codebase.md, docs/contributing.md and the owning doc for each new module, config file, command, rule and ADR, and update every place that should mention it (layout, flow, "Ideas to know", "How to change X", config listings, index, process rules). Run each doc command. Stale docs are a shame upon the house.
 Why: on B5 the weights config and the PR size rule were missing from several docs until Joe P asked whether all docs were current.
+
+## Never write implementation before its failing test
+Write the test, run it, see it fail for the right reason, then write the code. The rule also covers a design change in the middle of a card: change the tests first, watch them fail, then change the code. Never rewrite the implementation and fix the tests afterwards.
+Why: on B6a the implementation was rewritten for the full Unicode confusables data before the tests were updated.
+
+## Post the merge summary on the issue too
+When asking Joe P to merge, post the same summary as a comment on the card's issue so the ticket records the completed work.
+Why: Joe P asked for it on B6a.

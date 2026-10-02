@@ -119,4 +119,6 @@ Conventions you will trip over if you do not know them:
 - **A new pipeline stage:** a new module under the right package, typed errors beside it, tests in all relevant tiers, and a section in `docs/pipeline.md`.
 
 ## Where to look when something is unclear
+Picking up a card from the board? [handoff.md](handoff.md) is the step by step routine.
+
 The spec (linked from the issue board) is the design. The card's issue is the task. `CLAUDE.md` is the binding rules. `gotchas.md` is the list of past mistakes turned into rules. `docs/adr/` explains why things are the way they are.

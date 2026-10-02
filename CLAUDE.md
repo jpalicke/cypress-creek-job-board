@@ -10,7 +10,10 @@ in the fact bank. This is enforced by deterministic validators, never by prompti
 No auto apply. Ever. A human reviews every draft.
 
 ## How we work
-- TDD. Write a failing test, see it fail, write the minimum code, see it pass, refactor.
+- TDD. Write a failing test, see it fail, write the minimum code, see it pass, refactor. This applies to every design change mid card too: change the tests first and watch them fail before touching the implementation.
+- When asking Joe P to merge, post the same summary as a comment on the card's issue.
+- Before reporting a card done, audit every doc (docs/handoff.md has the list) and run each doc command.
+- A new contributor or assistant starts at docs/handoff.md, which is the full card routine.
 - Branch per task. Open a PR. Merge to main after review. No worktrees.
 - PRs aim for at most 10 changed files, hard cap 20. Split big cards into several PRs, each with its own docs. Propose the split before starting.
 - At most 5 files per phase. Run verification, then wait for approval.
