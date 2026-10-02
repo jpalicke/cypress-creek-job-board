@@ -1,2 +1,2 @@
-# ABOUTME: Storage helpers: the single company name normalizer used by every company comparison.
-# ABOUTME: Database code is added here by later cards.
+# ABOUTME: Storage helpers: the company name normalizer and the SQLite connection and migrations.
+# ABOUTME: Cards that need tables add a numbered .sql file to the migrations folder.

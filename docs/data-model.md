@@ -103,3 +103,27 @@ To update the data, download the latest `confusables.txt` from the URL in `NOTIC
 ```bash
 uv run python -c "from cypress_creek.storage.company_key import company_key; print(company_key('Аcme, L.L.C.'), company_key('ACME Incorporated'))"
 ```
+
+## Storage: SQLite and migrations
+Two stores, on purpose. The fact bank and config (`config/*.yaml`) are hand edited YAML: reviewable, diffable and the source of truth for what the tool may claim. Everything that changes while the app runs (postings, drafts, watchlists, later cards) is SQLite, one file, no server, in the standard library. See [ADR 0005](adr/0005-sqlite-and-migrations.md).
+
+Code is `src/cypress_creek/storage/db.py`:
+- `data_dir()` is `CYPRESS_CREEK_DATA_DIR` or `data/` (gitignored). `database_path()` is `<data dir>/cypress_creek.sqlite3`.
+- `connect(path)` creates the file and its folders, turns foreign keys on and leaves transactions explicit.
+- `migrate(conn)` applies the numbered files in `src/cypress_creek/storage/migrations/` that the database has not seen, in order, and returns the versions it applied. A second run applies nothing.
+- `schema_version(conn)` is the highest applied version (0 for a new database).
+
+Migration rules:
+- Files are named `NNNN_short_name.sql` (four digits, lower case letters, digits and underscores). Numbers start at 1 and have no gaps or duplicates.
+- Each file runs in one transaction together with its row in `schema_version`. If it fails, nothing from that file is kept and `MigrationError` names the file. Do not put `BEGIN` or `COMMIT` in a migration.
+- A whole folder is checked before anything runs, so a bad name, a gap or a file that is not utf-8 changes nothing.
+- A database newer than the code, or one whose applied name differs from the file of that number, is refused. Never edit or rename a migration that has been applied; add a new one.
+- `0001_schema_version.sql` creates the version table and holds no domain data. Each card that needs tables adds its own file.
+
+Known limits: there are no checksums, so an edited applied migration is not detected (only a renamed one is). There is no downgrade path. The database file is not encrypted.
+
+## Try the database
+```bash
+uv run python -c "from cypress_creek.storage.db import connect, database_path, migrate, schema_version; c = connect(database_path()); print('applied', migrate(c), 'now at version', schema_version(c)); print('again', migrate(c))"
+```
+The first run prints `applied [1]` and creates `data/cypress_creek.sqlite3`. Running it again prints `applied []`. Delete the `data/` folder to start over.

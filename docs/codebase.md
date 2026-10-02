@@ -40,8 +40,10 @@ src/cypress_creek/       The library
     fact_dates.py        V12 date sanity (wraps facts/dates.py)
     names.py             V14 company name shape
     registry.py          REGISTRY: id, name, rule and function for each validator
-  storage/               Mutable state helpers (database code arrives in card B6b)
+  storage/               Mutable state: the company name key and the SQLite database
     company_key.py       company_key, load_confusables: the one company name normalizer
+    db.py                data_dir, connect, migrate, schema_version, MigrationError
+    migrations/          Numbered .sql files, one per schema change (0001_schema_version.sql)
   scoring/               Deterministic scoring, no model calls
     aliases.py           AliasTable, load_aliases
     support.py           candidate_facts, merged_years, support_ceiling
@@ -63,6 +65,8 @@ flowchart LR
     raw[Raw posting text] --> norm["ingest.normalize()"]
     norm --> posting[Posting]
     posting -. later cards .-> reqs[Requirements]
+    migs[(storage/migrations/*.sql)] --> migrate["storage.migrate()"]
+    migrate --> db[(data/cypress_creek.sqlite3)]
     bank[(facts.private/bank.yaml)] --> load["facts.load_bank()"]
     load --> verified["Bank.verified_facts()"]
     aliases[(config/aliases.yaml)] --> table[AliasTable]
@@ -82,6 +86,7 @@ Dotted means not built yet. Extraction, model verdicts, validators, gap reports 
 - **Data, not code.** Things a person should tune (the alias table, the score weights) or bundled third party data (the Unicode confusables) are YAML in `config/`, loaded and validated, never hard coded.
 - **Typed errors.** Failures are specific exception classes (`PostingTooLong`, `FactValidationError`), so callers and tests can tell them apart. Text is rejected, never silently cut or repaired.
 - **Frozen models.** Pydantic models are frozen and reject unknown fields, so a typo or smuggled field is an error.
+- **Two stores, on purpose.** The fact bank and config are hand edited YAML (reviewable, diffable, versioned). Mutable app state, which later cards add (postings, drafts, watchlists), is SQLite behind numbered migrations.
 - **Shared normalization.** `terms.normalize_term` is used for bank tags, requirement terms and the alias table, so they always compare under the same rules. Company names have their own single normalizer, `company_key`, which every blacklist, denied list and watchlist comparison must use.
 
 ## Working in the repo
@@ -114,6 +119,7 @@ Conventions you will trip over if you do not know them:
 ## Adding a new thing, by example
 - **Different score weights:** edit `config/weights.yaml`. `tests/component/test_weights_loader.py` shows the rules, and `docs/pipeline.md#score` must match if you change the defaults.
 - **A new legal suffix for company names:** add it to `LEGAL_SUFFIXES` in `storage/company_key.py`, with a row in `tests/unit/test_company_key.py` first. **Newer Unicode confusables:** see the update steps in `docs/data-model.md`.
+- **A new table or column:** add the next numbered file to `src/cypress_creek/storage/migrations/` (for example `0002_postings.sql`, with `-- ABOUTME: ` header lines), never edit an applied one, and add a test in `tests/component/test_migrations.py` or beside the new code. See `docs/data-model.md#storage-sqlite-and-migrations`.
 - **A new tag alias:** add it to `config/aliases.yaml`. The tests in `tests/unit/test_aliases.py` show the rules (an alias belongs to one canonical tag).
 - **A new fact field:** change `facts/models.py`, add a failing test in `tests/unit/test_fact_models.py` first, write an ADR if it is a design decision, and update `docs/data-model.md`.
 - **A new pipeline stage:** a new module under the right package, typed errors beside it, tests in all relevant tiers, and a section in `docs/pipeline.md`.
