@@ -270,6 +270,73 @@ print(r.entailment.value, r.failure, r.match.support.value, r.fact_ids, r.ration
 ```
 It prints the entailment status, the failure label or `None`, the final support, the validated citations and the rationale. A small model may disagree with the rule ceiling. The support is never above `strong` here, and a failed call prints `not_run` with the ceiling kept.
 
+## Stages 4 and 5: score and report
+The numbering in this file is one scheme: 0 normalize, 1 extract, 2 retrieve, 3 entail, 4 score and report assembly, 5 render. The spec table also lists a stage 6, drafting, which is post v1 and not built. The card titles that say "stages 4 to 6" use an older count.
+
+`build_report(posting, extraction, candidates, entailed, bank, provenance)` in `pipeline/report.py` is stage 4. It scores the final matches (see [Score](#score)), lists the gaps and returns a `GapReport`. `render_text(report)` in `pipeline/render.py` is stage 5. The report is a data structure first (JSON through `model_dump_json`) and the text is a view of it.
+
+| `GapReport` field | Meaning |
+| --- | --- |
+| `posting_id`, `status` | `complete` or `incomplete`. |
+| `incomplete_reasons` | Why the report is incomplete: an extraction failure label, or the requirements whose entailment did not run. |
+| `rows` | One `ReportRow` per requirement: text, importance, ceiling, final support, gate, cited `fact_ids`, the rationale that passed the grounding checks, the `entailment` status and `not_model_checked`. |
+| `gaps` | Ids of requirements whose support is partial or none. |
+| `not_assessed_count`, `dropped` | Requirements over the cap, and proposals extraction dropped. |
+| `warnings` | The posting's own warnings. |
+| `score`, `score_disclaimer` | The `ScoreResult` (or `None`) and the text `triage only, not a probability`. |
+| `rule_only_ids` | Requirements whose score rests on the rule ceiling alone because entailment did not run. |
+| `provenance` | Backend, model, run id, prompt hashes and total usage. |
+
+- **Fail closed.** If extraction failed there are no rows and no score, and the reason is stated. If entailment failed for some requirements the score still uses their rule ceilings, their rows are flagged `not_model_checked` and the report is `incomplete`. No requirements gives a complete report with no score.
+- **Every claim cites.** `build_report` ends by calling `verify_report`, which runs V4, V5 and V9 over every citation and raises `ReportRefused` for a fabricated, unverified or missing one. A row that is not support `none` must cite facts. A requirement whose entailment did not run cites its candidate facts, the basis of its ceiling.
+- **One score.** `build_report` computes the score from the matches it is given, so a score that disagrees with the rows cannot be passed in.
+- **The stage outputs must line up.** The requirements, the candidates and the entailment results must have the same ids in the same order, otherwise `build_report` raises `ValueError`.
+- **Text is flattened.** `render_text` puts posting and model text on one line, so a line break cannot forge a row. HTML escaping is the future UI's job, from the same data.
+- Known limit: hitting the requirement cap does not make a report incomplete. It is shown as `not_assessed_count`. The cue coverage check (V13) is a later card.
+
+### Try the report
+No model is called. A gap needs no call, and the other two answers are written by hand and judged by the real validators.
+```bash
+uv run python -c "
+from datetime import UTC, date, datetime
+from cypress_creek.config import parse_settings
+from cypress_creek.facts import parse_bank
+from cypress_creek.ingest.hashing import text_hash
+from cypress_creek.ingest.models import Extractor, Importance, Posting, PostingSource, Requirement, RequirementKind
+from cypress_creek.pipeline.entail import entail, judge
+from cypress_creek.pipeline.extract import ExtractionResult, ExtractionStatus
+from cypress_creek.pipeline.render import render_text
+from cypress_creek.pipeline.report import Provenance, build_report
+from cypress_creek.pipeline.retrieve import retrieve
+from cypress_creek.pipeline.schemas import EntailmentOutput, EntailmentVerdict
+from cypress_creek.providers import OllamaProvider
+from cypress_creek.providers.base import Usage
+from cypress_creek.scoring.aliases import load_aliases
+
+def fact(n, claim, tag, level, extra={}):
+    return {'id': f'F-000{n}', 'claim': claim, 'kind': 'project', 'tags': [{'name': tag, 'level': level}], 'verified_on': '2024-01-01', 'evidence': {'type': 'repo', 'pointer': 'https://example.invalid/x'}, 'share': 'shareable', **extra}
+bank = parse_bank({'facts': [fact(1, 'Ran a fictional Python data service for 4 years.', 'python', 'expert', {'start': '2019-01-01', 'end': '2023-01-01'}), fact(2, 'Operated a fictional PostgreSQL cluster.', 'postgresql', 'familiar')]})
+def need(n, term, importance, years=None):
+    return Requirement(id=f'R-{n}', text=f'Needs {term}.', span=(0, 10), kind=RequirementKind.SKILL, term=term, years=years, importance=importance)
+reqs = [need(1, 'python', Importance.REQUIRED, 3), need(2, 'postgresql', Importance.REQUIRED), need(3, 'kubernetes', Importance.PREFERRED)]
+provider = OllamaProvider(parse_settings({'provider': 'ollama', 'model': 'qwen3.5:0.8b'}))
+caps = provider.capabilities
+cands = retrieve(reqs, bank, caps, date(2024, 6, 1), load_aliases())
+said = {'R-1': (EntailmentVerdict.SUPPORTS, 'F-0001', 'F-0001 shows Python work.'), 'R-2': (EntailmentVerdict.PARTIAL, 'F-0002', 'F-0002 shows PostgreSQL work.')}
+def settle(r, c):
+    if c.is_gap:
+        return entail(r, c, bank, provider)
+    v, f, why = said[r.id]
+    return judge(EntailmentOutput(schema_version=1, verdict=v, fact_ids=[f], rationale=why), r, c.fact_ids, c.support, bank, caps)
+entailed = [settle(r, c) for r, c in zip(reqs, cands)]
+text = 'Needs python, postgresql and kubernetes.'
+posting = Posting(id='P-1', source=PostingSource.PASTE, text=text, text_hash=text_hash(text), extractor=Extractor(name='paste', version='1'), created_at=datetime(2024, 6, 1, tzinfo=UTC))
+extraction = ExtractionResult(status=ExtractionStatus.OK, requirements=reqs, dropped=[], not_assessed_count=0, failure=None, usage=None, prompt_hash='a' * 64, schema_version=1)
+prov = Provenance(backend='ollama', model='qwen3.5:0.8b', run_id='demo', prompt_hashes={}, usage=Usage(input_tokens=0, output_tokens=0))
+print(render_text(build_report(posting, extraction, cands, entailed, bank, prov)))"
+```
+It prints a complete report with the score `64.3` (3 for a strong required, 1.5 for a partial required, 0 for an unmet preferred, over a weight of 7), each requirement with its cited facts and rationale, and `Gaps: R-2, R-3`. Change a hand written answer to cite `F-9999` and `build_report` raises `ReportRefused`.
+
 ## Try it locally
 ```bash
 uv run python -c "
