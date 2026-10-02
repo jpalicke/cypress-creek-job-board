@@ -24,6 +24,11 @@ def downgrade(support: Support) -> Support:
     return _ORDER[max(_rank(support) - 1, 0)]
 
 
+def lowest(first: Support, second: Support) -> Support:
+    """The lower of two supports, so a proposal can be held to a ceiling and never exceed it."""
+    return _ORDER[min(_rank(first), _rank(second))]
+
+
 class Weights(BaseModel):
     """Importance weights and support values. The defaults are the published ones."""
 
