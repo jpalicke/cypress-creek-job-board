@@ -80,3 +80,23 @@ Rules:
 ```bash
 uv run python -c "from cypress_creek.scoring.aliases import load_aliases; print(load_aliases().resolve('Postgres'))"
 ```
+
+## Company names: `company_key`
+Blacklists, the denied list and the watchlist all compare companies on one key from `company_key(name)` in `src/cypress_creek/storage/company_key.py`. It is a security control (a blacklist bypass by case, spacing, homoglyphs or suffix games must not work), so there is exactly one function and nothing else normalizes a company name.
+
+Steps, in order:
+1. Reject names over 1,000 characters (`CompanyNameError`).
+2. NFKD, which splits accents off and turns full-width and styled letters into plain ones. Accent marks and zero-width and other format characters are dropped.
+3. Casefold, then fold homoglyphs onto the ASCII letter they imitate, using `config/confusables.yaml` (Cyrillic and Greek lookalikes, for example Cyrillic `а` becomes `a`).
+4. Periods and apostrophes are dropped without splitting a word (`L.L.C.` becomes `llc`, `O'Reilly` becomes `oreilly`). Any other non letter, non digit character separates words.
+5. Trailing legal suffixes are stripped repeatedly: `inc`, `incorporated`, `llc`, `llp`, `ltd`, `limited`, `corp`, `corporation`, `gmbh`, `plc`. A suffix in the middle of a name stays, and a name that is only a suffix keeps it. Every addition to `LEGAL_SUFFIXES` needs a test row.
+6. Words are joined with no spaces, so `Ac me` and `Acme` match. A name with no letters or digits raises `CompanyNameError`.
+
+`Acme, Inc.`, `ACME Incorporated`, `Ac me`, `A.C.M.E.`, a full-width spelling and a Cyrillic lookalike spelling all give `acme`. The result is idempotent, which a Hypothesis test checks.
+
+Known limits: the homoglyph table is hand curated and covers Cyrillic and Greek (extend it in `config/confusables.yaml`, with a test, when you meet a new lookalike). ASCII lookalikes of each other (`rn` versus `m`, `l` versus `I` versus `1`, `0` versus `O`) are not folded. Homoglyph folding also applies inside genuinely Cyrillic names, which is fine because keys are only compared, never shown. Slug and domain matching is a later card (H1). See [ADR 0004](adr/0004-company-key-rules.md).
+
+## Try company_key
+```bash
+uv run python -c "from cypress_creek.storage.company_key import company_key; print(company_key('Аcme, L.L.C.'), company_key('ACME Incorporated'))"
+```

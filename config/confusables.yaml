@@ -1,0 +1,27 @@
+# Homoglyphs folded onto the ASCII letter they imitate before company names are compared.
+# Format: ASCII letter or digit, then the lookalike characters from other scripts (lowercase,
+# because names are casefolded first). Hand curated for Cyrillic and Greek. Edit freely, it is data.
+# Not covered: ASCII lookalikes of each other (rn versus m, l versus I versus 1, 0 versus O).
+confusables:
+  a: ["а", "α", "ɑ"]   # Cyrillic a, Greek alpha, Latin alpha
+  b: ["в", "Ƅ"]             # Cyrillic ve, tone six
+  c: ["с", "ϲ", "ᴄ"]   # Cyrillic es, Greek lunate sigma, small cap c
+  d: ["ԁ"]                       # Cyrillic komi de
+  e: ["е", "є", "ε"]   # Cyrillic ie, Ukrainian ie, Greek epsilon
+  g: ["ɡ"]                       # Latin script g
+  h: ["һ"]                       # Cyrillic shha
+  i: ["і", "ı", "ι"]   # Cyrillic i, dotless i, Greek iota
+  j: ["ј"]                       # Cyrillic je
+  k: ["κ", "к"]             # Greek kappa, Cyrillic ka
+  l: ["ӏ", "ǀ"]             # Cyrillic palochka, dental click
+  m: ["м"]                       # Cyrillic em
+  o: ["о", "ο", "օ"]   # Cyrillic o, Greek omicron, Armenian oh
+  p: ["р", "ρ"]             # Cyrillic er, Greek rho
+  q: ["ԛ"]                       # Cyrillic qa
+  s: ["ѕ"]                       # Cyrillic dze
+  t: ["τ", "т"]             # Greek tau, Cyrillic te
+  u: ["υ", "ս"]             # Greek upsilon, Armenian seh
+  v: ["ν", "ѵ"]             # Greek nu, Cyrillic izhitsa
+  w: ["ԝ"]                       # Cyrillic we
+  x: ["х", "χ"]             # Cyrillic ha, Greek chi
+  y: ["у", "γ"]             # Cyrillic u, Greek gamma
