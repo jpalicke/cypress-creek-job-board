@@ -56,8 +56,9 @@ def test_rate_limited_carries_the_retry_after_hint() -> None:
 
 
 def test_budget_exceeded_carries_the_amounts() -> None:
-    error = BudgetExceeded(limit_usd=1.0, spent_usd=1.25)
-    assert (error.limit_usd, error.spent_usd) == (1.0, 1.25)
+    error = BudgetExceeded(limit_name="usd", limit=1.0, would_reach=1.25)
+    assert (error.limit_name, error.limit, error.would_reach) == ("usd", 1.0, 1.25)
+    assert "usd" in str(error)
 
 
 def test_refusal_names_the_provider() -> None:

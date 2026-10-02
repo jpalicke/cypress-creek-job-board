@@ -61,7 +61,7 @@ def test_a_second_schema_violation_is_raised() -> None:
     "error",
     [
         ContextTruncated(input_tokens=2, context_tokens=1),
-        BudgetExceeded(limit_usd=1.0, spent_usd=2.0),
+        BudgetExceeded(limit_name="usd", limit=1.0, would_reach=2.0),
         Refusal(provider="p"),
         ProviderUnavailable(provider="p", reason="down"),
     ],
