@@ -7,6 +7,7 @@ from cypress_creek.providers.base import (
     StructuredResult,
     Usage,
 )
+from cypress_creek.providers.budget import Budget, BudgetedProvider, BudgetTracker
 from cypress_creek.providers.errors import (
     BudgetExceeded,
     ContextTruncated,
@@ -27,7 +28,10 @@ from cypress_creek.providers.retry import RetryPolicy, call_with_retry
 
 __all__ = [
     "REGISTRY",
+    "Budget",
     "BudgetExceeded",
+    "BudgetTracker",
+    "BudgetedProvider",
     "Capabilities",
     "ContextTruncated",
     "CostPerMtok",

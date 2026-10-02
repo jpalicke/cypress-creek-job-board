@@ -1,5 +1,6 @@
 # ABOUTME: The interface every model backend implements, and the plain data it exchanges.
 # ABOUTME: System text and the untrusted data block are separate arguments, so they never merge.
+import json
 from typing import Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -51,3 +52,11 @@ class Provider(Protocol):
     ) -> StructuredResult[T]: ...
 
     def count_tokens_estimate(self, text: str) -> int: ...
+
+
+def estimate_input_tokens[T: BaseModel](
+    provider: Provider, system: str, data_block: str, schema: type[T]
+) -> int:
+    """The provider's own estimate for everything a call sends: system, data and schema text."""
+    schema_text = json.dumps(schema.model_json_schema())
+    return sum(provider.count_tokens_estimate(t) for t in (system, data_block, schema_text))

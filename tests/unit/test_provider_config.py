@@ -198,3 +198,18 @@ def test_credentials_in_the_url_are_rejected_even_with_allow_remote() -> None:
     with pytest.raises(ConfigError, match="credentials") as caught:
         _settings(base_url=f"https://user:{KEY}@api.example.com/v1", allow_remote=True)
     assert KEY not in str(caught.value)
+
+
+def test_budget_limits_are_optional_and_validated() -> None:
+    assert _settings().max_input_tokens is None
+    assert _settings(max_usd=0.5).max_usd == 0.5
+    with pytest.raises(ConfigError, match="max_requests"):
+        _settings(max_requests=0)
+
+
+def test_budget_limits_can_come_from_the_environment() -> None:
+    environ = {
+        **{"CYPRESS_CREEK_PROVIDER": "ollama", "CYPRESS_CREEK_MODEL": "m"},
+        "CYPRESS_CREEK_MAX_OUTPUT_TOKENS": "777",
+    }
+    assert load_settings(environ=environ).max_output_tokens == 777

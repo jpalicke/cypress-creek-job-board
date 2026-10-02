@@ -21,7 +21,7 @@ All in `providers/errors.py`, all subclasses of `ProviderError`. Callers branch 
 | `SchemaViolation` | `schema_name`, `detail` | Once, with only the schema error |
 | `ProviderUnavailable` | `provider`, `reason` | No |
 | `RateLimited` | `retry_after_seconds` (optional) | Bounded backoff |
-| `BudgetExceeded` | `limit_usd`, `spent_usd` | Never |
+| `BudgetExceeded` | `limit_name`, `limit`, `would_reach` | Never |
 | `Refusal` | `provider` | Never |
 
 Keeping keys out of errors: `SchemaViolation.detail` and `ProviderUnavailable.reason` are free text, so both take an optional list of key values to hide and replace every non-empty one with `[redacted]` before storing it or building the message. An adapter passes its API key there. Keys are never logged and never put in an error.
@@ -58,6 +58,22 @@ Local setup: install [Ollama](https://ollama.com), then pull a model. Approved f
 ollama pull qwen3.5:4b
 ```
 
+## The budget guard
+Code is `src/cypress_creek/providers/budget.py`. A run has four limits, and a call that could pass any of them is refused before it is sent.
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `max_input_tokens` | 500000 | Input tokens for the whole run |
+| `max_output_tokens` | 100000 | Output tokens for the whole run |
+| `max_requests` | 500 | Number of calls |
+| `max_usd` | 2.0 | Dollars, from the backend's `cost_per_mtok`. Local backends cost nothing, so only the three token and request caps bite there |
+
+- `BudgetTracker(budget, cost_per_mtok)` keeps the totals. `check_before(input_tokens, max_output_tokens)` raises `BudgetExceeded` when the estimate plus the output cap (the worst case) would pass a limit. `record(usage)` adds what the server reported and never raises, so real usage above an estimate blocks the next call. The guard fails closed.
+- `BudgetedProvider(inner, tracker)` wraps any provider. Each call is estimated with `estimate_input_tokens` (the same estimate the Ollama pre-flight check uses), checked, sent, then recorded. A call that fails is not recorded.
+- `BudgetExceeded` carries `limit_name` (`input_tokens`, `output_tokens`, `requests` or `usd`), `limit` and `would_reach`. It is never retried.
+- `dry_run_estimate(provider, budget, plan)` takes a list of `PlannedCall` (system text, data block, `output_schema`, output cap) and returns a `CostEstimate` with the projected input tokens, output tokens (every call at its cap), requests and dollars. A plan that does not fit raises `BudgetExceeded`, with no call made.
+- The limits are optional settings, see Configuration. `budget_from_settings(settings)` turns them into a `Budget`, with the defaults above for anything unset.
+
 ## Configuration
 Code is `src/cypress_creek/config/settings.py`. The format is TOML, see [ADR 0007](adr/0007-provider-config-toml-and-loopback.md). Copy this to `config/provider.toml` (or point `CYPRESS_CREEK_CONFIG` at another file):
 ```toml
@@ -69,6 +85,10 @@ base_url = "http://localhost:11434"
 # request_timeout_seconds = 120
 # connect_timeout_seconds = 5
 # context_tokens = 8192            # the window sent as num_ctx, at least 2048 for ollama
+# max_input_tokens = 500000        # budget limits for a run, see the budget guard
+# max_output_tokens = 100000
+# max_requests = 500
+# max_usd = 2.0
 ```
 - `provider` and `model` are required. The other fields are optional.
 - Any field can be overridden by `CYPRESS_CREEK_<FIELD>`, for example `CYPRESS_CREEK_MODEL=qwen3`. Blank values are ignored.
@@ -113,3 +133,21 @@ It prints a greeting and the token usage. Change `'Say hi'` to `'word ' * 6000` 
 uv run pytest tests/integration -m live -q
 ```
 The `live` GitHub Actions workflow (`.github/workflows/live.yml`) does this on a schedule and on demand with a fresh Ollama and `qwen3.5:0.8b`.
+
+Print the projected cost of a plan (three small calls) with the budget from the same settings. No call is made, so no server needs to be running:
+```bash
+CYPRESS_CREEK_PROVIDER=ollama CYPRESS_CREEK_MODEL=qwen3.5:0.8b uv run python -c "
+from pydantic import BaseModel
+from cypress_creek.config import load_settings
+from cypress_creek.providers import get_provider
+from cypress_creek.providers.budget import PlannedCall, budget_from_settings, dry_run_estimate
+
+class Greeting(BaseModel):
+    text: str
+
+settings = load_settings()
+call = PlannedCall(system='Reply with a short greeting.', data_block='Say hi', output_schema=Greeting, max_output_tokens=100)
+print(dry_run_estimate(get_provider(settings), budget_from_settings(settings), [call] * 3))
+"
+```
+It prints `input_tokens=159 output_tokens=300 requests=3 usd=0.0`. Set `CYPRESS_CREEK_MAX_REQUESTS=2` in front of it and it fails with `BudgetExceeded: requests limit 2 would be exceeded, reaching 3`.

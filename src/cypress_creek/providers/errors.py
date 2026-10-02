@@ -54,12 +54,16 @@ class RateLimited(ProviderError):
 
 
 class BudgetExceeded(ProviderError):
-    """A spend limit was reached. Never retried."""
+    """A run limit would be passed. `limit_name` is input_tokens, output_tokens, requests or usd.
+    Never retried."""
 
-    def __init__(self, limit_usd: float, spent_usd: float) -> None:
-        super().__init__(f"spent ${spent_usd:.4f} of a ${limit_usd:.4f} limit")
-        self.limit_usd = limit_usd
-        self.spent_usd = spent_usd
+    def __init__(self, limit_name: str, limit: float, would_reach: float) -> None:
+        super().__init__(
+            f"{limit_name} limit {limit:g} would be exceeded, reaching {would_reach:g}"
+        )
+        self.limit_name = limit_name
+        self.limit = limit
+        self.would_reach = would_reach
 
 
 class Refusal(ProviderError):
