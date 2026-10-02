@@ -27,6 +27,11 @@ src/cypress_creek/       The library
     normalize.py         normalize(), text_hash()
     hashing.py           The one definition of the text hash
     errors.py            PostingTooLong, EmptyPosting
+  validators/            Grounding validators V1 to V14, pure functions returning Verdicts
+    verdict.py           Verdict, ok(), fail()
+    cues.py              The one list of importance cue words, sentence splitting
+    extraction.py        V1 schema, V2 verbatim span, V3 importance cues
+    registry.py          REGISTRY: id, name, rule and function for each validator
   scoring/               Deterministic scoring, no model calls
     aliases.py           AliasTable, load_aliases
     support.py           candidate_facts, merged_years, support_ceiling
@@ -53,6 +58,7 @@ flowchart LR
     verified --> gate
     table --> gate
     gate --> ceiling["support + deciding gate"]
+    reqs -. model output .-> val["validators (V1 to V14)"]
 ```
 Dotted means not built yet. Extraction, model verdicts, validators, gap reports and drafting arrive in later cards (see the issue board and the spec). The pieces that exist are libraries with no app around them yet.
 

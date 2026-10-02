@@ -7,6 +7,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [codebase.md](codebase.md) | Start here if you are new: layout, how the pieces fit, ideas to know, how a card goes |
 | [data-model.md](data-model.md) | The fact bank, Posting and Requirement, and the tag alias table (`config/aliases.yaml`) |
 | [pipeline.md](pipeline.md) | Each pipeline stage and its rules: posting normalization, the support gate |
+| [validators.md](validators.md) | The grounding validators V1 to V14: what each rejects and its known limits |
 | [contributing.md](contributing.md) | How we work, quality gates, dependency audit, ABOUTME headers, docs checklist |
 
 ## Decision records
