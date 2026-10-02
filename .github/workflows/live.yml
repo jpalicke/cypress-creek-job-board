@@ -1,0 +1,34 @@
+name: live
+# Runs the live tests against a real Ollama with the small CI model. Not on every push.
+on:
+  schedule:
+    - cron: "0 8 * * 1"
+  workflow_dispatch:
+jobs:
+  ollama:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+      - run: uv sync --locked
+      - name: Install Ollama
+        run: curl -fsSL https://ollama.com/install.sh | sh
+      - name: Cache the model directory
+        uses: actions/cache@v4
+        with:
+          path: ~/.ollama/models
+          key: ollama-qwen3.5-0.8b
+      - name: Start Ollama
+        run: |
+          ollama serve > ollama.log 2>&1 &
+          for attempt in $(seq 1 30); do
+            curl -fs http://localhost:11434/api/version && exit 0
+            sleep 2
+          done
+          cat ollama.log
+          exit 1
+      - run: ollama pull qwen3.5:0.8b
+      - run: ollama --version
+      - name: Live tests
+        run: uv run --locked pytest tests/integration -m live -q

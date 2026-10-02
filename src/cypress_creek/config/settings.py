@@ -47,6 +47,7 @@ class ProviderSettings(BaseModel):
     api_key_env: NonBlank | None = None
     request_timeout_seconds: float = Field(default=120.0, gt=0)
     connect_timeout_seconds: float = Field(default=5.0, gt=0)
+    context_tokens: int = Field(default=8192, gt=0)
 
     @model_validator(mode="after")
     def _check_base_url(self) -> "ProviderSettings":
@@ -69,7 +70,7 @@ class ProviderSettings(BaseModel):
         return self
 
 
-def _describe(error: ValidationError) -> str:
+def describe_validation_error(error: ValidationError) -> str:
     """Field names and rule messages only. Pydantic's own text would echo the submitted values."""
     lines = []
     for item in error.errors(include_input=False, include_url=False, include_context=False):
@@ -82,7 +83,9 @@ def parse_settings(data: Mapping[str, Any]) -> ProviderSettings:
     try:
         return ProviderSettings.model_validate(dict(data))
     except ValidationError as error:
-        raise ConfigError(f"invalid provider settings: {_describe(error)}") from None
+        raise ConfigError(
+            f"invalid provider settings: {describe_validation_error(error)}"
+        ) from None
 
 
 def _read_toml(path: Path, must_exist: bool) -> dict[str, Any]:

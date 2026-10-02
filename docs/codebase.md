@@ -46,6 +46,7 @@ src/cypress_creek/       The library
     errors.py            ContextTruncated, SchemaViolation, ProviderUnavailable, RateLimited, BudgetExceeded, Refusal
     retry.py             call_with_retry, RetryPolicy
     factory.py           get_provider, ProviderRegistry, UnknownProvider
+    ollama.py            OllamaProvider and its pre-flight and post-flight truncation checks
   config/                Backend settings (not the repo level config/ data folder)
     settings.py          ProviderSettings, load_settings, resolve_api_key, ConfigError
   storage/               Mutable state: the company name key and the SQLite database
@@ -59,7 +60,7 @@ src/cypress_creek/       The library
 tests/
   unit/                  Pure functions and models, no I/O beyond tmp files
   component/             Real files and real environment, several modules together
-  integration/           URL validation with real public DNS, marked needs_network
+  integration/           Real public DNS (needs_network) and real Ollama requests (live)
   e2e/                   URL guard consumed from a separate Python process
   fixtures/              Recorded or hand written inputs
     hostile_outputs/     One bad model output per validator, plus a small bank (see validators.md)
@@ -101,6 +102,7 @@ URL validation is a separate library entry point. It rejects unsafe syntax, reso
 - **Typed errors.** Failures are specific exception classes (`PostingTooLong`, `FactValidationError`), so callers and tests can tell them apart. Text is rejected, never silently cut or repaired.
 - **Public URL targets.** `validate_url` raises `UrlGuardError` with a stable `reason_code` and a generic message. It never echoes the URL or resolver error. Every DNS answer must pass the address checks before any one is selected; one private answer rejects the entire result.
 - **Safe by default config.** Backends default to loopback only, going remote needs `allow_remote`, and keys come from the environment alone. Config errors never echo a submitted value.
+- **Truncation is refused, not tolerated.** The Ollama adapter estimates before the call and checks the reported count after it, so a prompt the server would silently cut never produces an answer.
 - **One retry place.** Providers raise typed errors and `providers.call_with_retry` is the only code that retries them. Adapters never loop on their own.
 - **Frozen models.** Pydantic models are frozen and reject unknown fields, so a typo or smuggled field is an error.
 - **Two stores, on purpose.** The fact bank and config are hand edited YAML (reviewable, diffable, versioned). Mutable app state, which later cards add (postings, drafts, watchlists), is SQLite behind numbered migrations.

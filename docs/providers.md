@@ -1,6 +1,6 @@
 # Providers
 
-The provider layer is how the pipeline talks to a model. Every backend (local or hosted) implements one interface, so the pipeline and the eval harness never know which one they use. Code is `src/cypress_creek/providers/`. This page covers the interface, the typed errors, the retry policy and the config that selects a backend. Real adapters arrive in later cards (see the issue board).
+The provider layer is how the pipeline talks to a model. Every backend (local or hosted) implements one interface, so the pipeline and the eval harness never know which one they use. Code is `src/cypress_creek/providers/`. This page covers the interface, the typed errors, the retry policy, the config that selects a backend and the Ollama adapter. The other adapters arrive in later cards (see the issue board).
 
 ## The interface
 `Provider` is a `typing.Protocol` in `providers/base.py`:
@@ -36,6 +36,28 @@ The two counters are separate. `sleep` is injectable so tests never wait.
 
 Known limits: there is no jitter in the backoff, and `count_tokens_estimate` is an estimate that each adapter defines.
 
+## The Ollama adapter
+Code is `src/cypress_creek/providers/ollama.py`, registered as provider `ollama`. It uses Ollama's native `/api/chat` endpoint, not the OpenAI compatible one, because only the native one sets the context window per request. Decisions and measurements are in [ADR 0008](adr/0008-ollama-truncation-signature-and-window-floor.md).
+
+Why it matters: when a prompt is longer than the window, Ollama does not fail. It silently drops most of the start of the prompt, which is where the trusted instructions live, and answers anyway. The adapter guards against that twice:
+1. **Before the call.** It estimates tokens for the system text, the data block and the schema, adds the output cap, and raises `ContextTruncated` without calling the model if the total exceeds `context_tokens`. The estimate is the character count divided by 3, rounded up. Real text averages nearer 4 characters per token, so the estimate runs high and the guard errs toward refusing.
+2. **After the call.** It compares the `prompt_eval_count` the server reports with the estimate. A count near the full window, or a count of about half the window (what a truncating server reports, measured on Ollama 0.34), that the estimate did not predict raises `ContextTruncated`. A response with no usage counts is an error.
+
+Every request sets `num_ctx` from `context_tokens` (default 8192, minimum 2048 because the server raises smaller windows), temperature 0, the JSON schema as `format` and `think: false`. Model output is data: it is parsed with the schema and a mismatch is `SchemaViolation`, which carries the schema error and never the output.
+
+| Situation | Error |
+| --- | --- |
+| Server unreachable or timed out | `ProviderUnavailable` |
+| HTTP 429 | `RateLimited` (with `Retry-After` if sent) |
+| Any other HTTP status, including a redirect (never followed) | `ProviderUnavailable` with the status |
+| Output cut off or not matching the schema | `SchemaViolation` |
+| Prompt too long, or truncation detected | `ContextTruncated` |
+
+Local setup: install [Ollama](https://ollama.com), then pull a model. Approved for local runs are `qwen3.5:4b` and `qwen3.5:9b`. CI and the live tests use the tiny `qwen3.5:0.8b`, which proves the plumbing and the guard but says nothing about quality.
+```bash
+ollama pull qwen3.5:4b
+```
+
 ## Configuration
 Code is `src/cypress_creek/config/settings.py`. The format is TOML, see [ADR 0007](adr/0007-provider-config-toml-and-loopback.md). Copy this to `config/provider.toml` (or point `CYPRESS_CREEK_CONFIG` at another file):
 ```toml
@@ -46,6 +68,7 @@ base_url = "http://localhost:11434"
 # api_key_env = "OPENAI_API_KEY"   # the NAME of an environment variable, never the key  # pragma: allowlist secret
 # request_timeout_seconds = 120
 # connect_timeout_seconds = 5
+# context_tokens = 8192            # the window sent as num_ctx, at least 2048 for ollama
 ```
 - `provider` and `model` are required. The other fields are optional.
 - Any field can be overridden by `CYPRESS_CREEK_<FIELD>`, for example `CYPRESS_CREEK_MODEL=qwen3`. Blank values are ignored.
@@ -53,7 +76,7 @@ base_url = "http://localhost:11434"
 - Keys: the file holds `api_key_env`, and `resolve_api_key(settings)` reads that variable when an adapter needs it. A missing variable is an error that names the variable, never a value.
 - Every failure is a `ConfigError`. Messages carry field names and rules only, so a key pasted into a URL is not echoed back.
 
-`get_provider(settings)` (in `providers/factory.py`) finds the adapter registered under `settings.provider`. An unknown name raises `UnknownProvider`, a `ConfigError` listing the known names. No adapter is registered yet, so every name is unknown until card C2.
+`get_provider(settings)` (in `providers/factory.py`) finds the adapter registered under `settings.provider`. An unknown name raises `UnknownProvider`, a `ConfigError` listing the known names. `ollama` is the only adapter registered so far.
 
 Known limits: the loopback check reads the URL text, so a name that resolves elsewhere or a redirect is not caught (adapters must not follow redirects off the configured host). A backend with a built in remote default URL must demand `allow_remote` itself, because an empty `base_url` passes.
 
@@ -70,3 +93,23 @@ CYPRESS_CREEK_PROVIDER=ollama CYPRESS_CREEK_MODEL=llama3.1 uv run python -c "fro
 CYPRESS_CREEK_PROVIDER=ollama CYPRESS_CREEK_MODEL=m CYPRESS_CREEK_BASE_URL=https://api.example.com uv run python -c "from cypress_creek.config import load_settings; load_settings()"
 ```
 The first prints the settings. The second fails with a `ConfigError` telling you to set `allow_remote`. In Windows PowerShell set each variable first, for example `$env:CYPRESS_CREEK_PROVIDER = "ollama"`, then run the `uv run python` part.
+
+Run the Ollama adapter against a real server (start `ollama serve` and run `ollama pull qwen3.5:0.8b` first):
+```bash
+CYPRESS_CREEK_PROVIDER=ollama CYPRESS_CREEK_MODEL=qwen3.5:0.8b uv run python -c "
+from pydantic import BaseModel
+from cypress_creek.config import load_settings
+from cypress_creek.providers import get_provider
+
+class Greeting(BaseModel):
+    text: str
+
+result = get_provider(load_settings()).complete_structured('Reply with a short greeting.', 'Say hi', Greeting, 100)
+print(result.parsed, result.usage)
+"
+```
+It prints a greeting and the token usage. Change `'Say hi'` to `'word ' * 6000` and it raises `ContextTruncated` before any request is made. The live tests run the same checks, including a real overflow, and fail (never skip) if Ollama or the model is missing:
+```bash
+uv run pytest tests/integration -m live -q
+```
+The `live` GitHub Actions workflow (`.github/workflows/live.yml`) does this on a schedule and on demand with a fresh Ollama and `qwen3.5:0.8b`.
