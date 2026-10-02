@@ -24,7 +24,7 @@ class Stage(StrEnum):
     EXTRACT = "extract"
 
 
-TEMPLATES = {Stage.EXTRACT: "extract_v1.txt"}
+TEMPLATES = {Stage.EXTRACT: "extract_v2.txt"}
 
 
 class Prompt(BaseModel):
@@ -72,11 +72,14 @@ def build_prompt(
     capabilities: Capabilities,
     output_schema: type[BaseModel],
     token_source: Callable[[], str] = _new_token,
+    retry_feedback: str | None = None,
 ) -> Prompt:
     """Wrap the posting in a fresh boundary and keep it out of the system message.
 
     Every stage shares one signature, so `facts` is accepted always. The extraction stage shows
     the model no facts and ignores it. Stages that do show facts use `prompt_facts` first.
+    `retry_feedback` is the schema error text from a failed first try. It joins the trusted system
+    message, never the data block, and it does not change the prompt hash.
     """
     for _ in range(MAX_TOKEN_ATTEMPTS):
         token = token_source()
@@ -85,10 +88,13 @@ def build_prompt(
     else:
         raise PromptError("the posting kept containing the boundary token")
     system = _system_text(stage)
+    hashed_system = system
+    if retry_feedback:
+        system = f"{system}\n\nYour previous answer was rejected. Fix this: {retry_feedback}"
     return Prompt(
         system=system,
         data_block=f"<<<POSTING {token}>>>\n{posting_text}\n<<<END POSTING {token}>>>",
         facts_block="",
         boundary_token=token,
-        prompt_hash=_prompt_hash(system, output_schema),
+        prompt_hash=_prompt_hash(hashed_system, output_schema),
     )
