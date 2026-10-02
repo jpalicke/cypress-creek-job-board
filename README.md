@@ -11,8 +11,12 @@ License: MIT.
 ## Quick start (developers)
 
 ```bash
-uv sync
-uv run pytest
+uv sync                          # install pinned dependencies (Python 3.13)
+uv run pre-commit install        # install the git hooks once per clone
+uv run pytest                    # run all tests
+uv run pre-commit run --all-files  # run every quality gate by hand
 ```
+
+What is runnable today: the test suite and the quality gates. There is no app to start yet. This section grows with each card.
 
 See [docs/contributing.md](docs/contributing.md) for how we work.

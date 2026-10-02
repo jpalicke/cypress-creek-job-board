@@ -30,6 +30,9 @@ No auto apply. Ever. A human reviews every draft.
 - When renaming, search separately for calls, types, string literals, dynamic imports,
   re-exports and tests.
 
+## Local docs
+- Every card leaves the local run docs current. Joe P must be able to clone, run and use whatever exists so far from README.md and docs/ alone, without asking. If a card changes how to install, run, test or configure anything, it updates those docs in the same PR.
+
 ## Testing
 - Unit, component, integration and e2e all exist. No tier is ever marked not applicable.
 - No mock mode, no fake providers, no stubbed HTTP in any call path.
