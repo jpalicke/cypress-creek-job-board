@@ -13,7 +13,7 @@ Nothing the tool outputs may assert a claim that is not backed by a verified fac
 config/                  Data that behaves like code but is edited by hand
   aliases.yaml           Tag alias table (requirement term to canonical tag)
   weights.yaml           Score weights and support values
-  confusables.yaml       Homoglyph table folded onto ASCII letters for company names
+  confusables.txt        Unicode confusables data (UTS #39), unmodified, used by company_key
 docs/                    Documentation, indexed in docs/README.md
   adr/                   Decision records, one per design decision
 scripts/                 Repo tooling run by hooks and CI (ABOUTME check, license check)
@@ -79,7 +79,7 @@ Dotted means not built yet. Extraction, model verdicts, validators, gap reports 
 ## Ideas to know
 - **One source of truth.** The bank file is the only record of facts. Verification is derived from `verified_on` and is never stored as a separate flag. The pipeline only ever sees `Bank.verified_facts()`.
 - **Pure and deterministic.** Scoring functions take everything as arguments, including `today`. Nothing reads the clock or the network.
-- **Data, not code.** Things a person should tune (the alias table, the score weights, the homoglyph table) are YAML in `config/`, loaded and validated, never hard coded.
+- **Data, not code.** Things a person should tune (the alias table, the score weights) or bundled third party data (the Unicode confusables) are YAML in `config/`, loaded and validated, never hard coded.
 - **Typed errors.** Failures are specific exception classes (`PostingTooLong`, `FactValidationError`), so callers and tests can tell them apart. Text is rejected, never silently cut or repaired.
 - **Frozen models.** Pydantic models are frozen and reject unknown fields, so a typo or smuggled field is an error.
 - **Shared normalization.** `terms.normalize_term` is used for bank tags, requirement terms and the alias table, so they always compare under the same rules. Company names have their own single normalizer, `company_key`, which every blacklist, denied list and watchlist comparison must use.
@@ -113,7 +113,7 @@ Conventions you will trip over if you do not know them:
 
 ## Adding a new thing, by example
 - **Different score weights:** edit `config/weights.yaml`. `tests/component/test_weights_loader.py` shows the rules, and `docs/pipeline.md#score` must match if you change the defaults.
-- **A new homoglyph or legal suffix for company names:** add the character to `config/confusables.yaml` or the suffix to `LEGAL_SUFFIXES` in `storage/company_key.py`, with a row in `tests/unit/test_company_key.py` first.
+- **A new legal suffix for company names:** add it to `LEGAL_SUFFIXES` in `storage/company_key.py`, with a row in `tests/unit/test_company_key.py` first. **Newer Unicode confusables:** see the update steps in `docs/data-model.md`.
 - **A new tag alias:** add it to `config/aliases.yaml`. The tests in `tests/unit/test_aliases.py` show the rules (an alias belongs to one canonical tag).
 - **A new fact field:** change `facts/models.py`, add a failing test in `tests/unit/test_fact_models.py` first, write an ADR if it is a design decision, and update `docs/data-model.md`.
 - **A new pipeline stage:** a new module under the right package, typed errors beside it, tests in all relevant tiers, and a section in `docs/pipeline.md`.

@@ -1,15 +1,15 @@
 # ABOUTME: company_key, the one function every company name comparison goes through.
-# ABOUTME: Folds case, accents, homoglyphs, punctuation, spacing and legal suffixes to one key.
+# ABOUTME: Folds case, accents, Unicode confusables, punctuation, spacing and legal suffixes.
 import unicodedata
-from collections.abc import Mapping
 from functools import cache
 from pathlib import Path
-from typing import Any
 
-import yaml
-
-DEFAULT_CONFUSABLES_PATH = Path(__file__).resolve().parents[3] / "config" / "confusables.yaml"
+DEFAULT_CONFUSABLES_PATH = Path(__file__).resolve().parents[3] / "config" / "confusables.txt"
 MAX_NAME_LENGTH = 1000
+# Confusable targets can themselves be confusable (a percent sign folds to a zero, a zero to o).
+# The fold is applied this many times, and a test checks every character in the shipped data
+# is stable by then.
+FOLD_PASSES = 8
 # Dropped without splitting a word, so "L.L.C." and "O'Reilly" stay whole.
 JOINING_PUNCTUATION = frozenset(".'’")
 
@@ -28,32 +28,28 @@ class ConfusablesError(Exception):
 
 
 def load_confusables(path: Path = DEFAULT_CONFUSABLES_PATH) -> dict[str, str]:
-    """Map each lookalike character to the ASCII letter or digit it imitates."""
+    """Read the Unicode confusables data (UTS 39 format) into source character -> skeleton."""
     if not path.is_file():
-        raise ConfusablesError(f"confusables table not found: {path}")
-    try:
-        data: Any = yaml.safe_load(path.read_text(encoding="utf8"))
-    except yaml.YAMLError as error:
-        raise ConfusablesError(f"invalid YAML in confusables table: {error}") from error
-    if not isinstance(data, Mapping) or not isinstance(data.get("confusables"), Mapping):
-        raise ConfusablesError("confusables table needs a top level 'confusables' mapping")
+        raise ConfusablesError(f"confusables data not found: {path}")
     table: dict[str, str] = {}
-    for letter, variants in data["confusables"].items():
-        if not (
-            isinstance(letter, str) and len(letter) == 1 and letter.isascii() and letter.isalnum()
-        ):
-            raise ConfusablesError(f"{letter!r} must be a single ASCII letter or digit")
-        if not (isinstance(variants, list) and all(isinstance(v, str) for v in variants)):
-            raise ConfusablesError(f"variants for {letter!r} must be a list of strings")
-        for variant in variants:
-            if len(variant) != 1:
-                raise ConfusablesError(f"{variant!r} under {letter!r} must be a single character")
-            if variant.isascii():
-                raise ConfusablesError(f"{variant!r} under {letter!r} must not be ASCII")
-            if table.setdefault(variant, letter) != letter:
-                raise ConfusablesError(
-                    f"{variant!r} is listed under both {table[variant]!r} and {letter!r}"
-                )
+    for number, raw in enumerate(path.read_text(encoding="utf-8-sig").splitlines(), start=1):
+        line = raw.split("#", 1)[0].strip()
+        if not line:
+            continue
+        fields = [field.strip() for field in line.split(";")]
+        if len(fields) != 3:
+            raise ConfusablesError(f"line {number}: expected 'source ; target ; type'")
+        try:
+            sources = [chr(int(code, 16)) for code in fields[0].split()]
+            target = "".join(chr(int(code, 16)) for code in fields[1].split())
+        except (ValueError, OverflowError) as error:
+            raise ConfusablesError(f"line {number}: invalid code point") from error
+        if len(sources) != 1 or not target:
+            raise ConfusablesError(f"line {number}: needs one source and a non empty target")
+        if table.setdefault(sources[0], target) != target:
+            raise ConfusablesError(f"line {number}: {fields[0]} is listed twice")
+    if not table:
+        raise ConfusablesError("confusables data has no entries")
     return table
 
 
@@ -65,13 +61,16 @@ def _confusables() -> dict[str, str]:
 def _fold(name: str) -> list[str]:
     """Words made only of letters and digits: accents, case and homoglyphs folded away."""
     table = _confusables()
+    skeleton = unicodedata.normalize("NFKD", name).casefold()
+    for _ in range(FOLD_PASSES):
+        mapped = "".join(table.get(char, char) for char in skeleton)
+        skeleton = unicodedata.normalize("NFKD", mapped).casefold()
     words: list[str] = []
     word: list[str] = []
-    for char in unicodedata.normalize("NFKD", name).casefold():
-        char = table.get(char, char)
+    for char in skeleton:
         category = unicodedata.category(char)
         if category[0] in "LN":
-            word.append(char)
+            word.append("l" if char == "i" else char)
         elif category in ("Mn", "Cf") or char in JOINING_PUNCTUATION:
             continue
         elif word:
@@ -82,12 +81,18 @@ def _fold(name: str) -> list[str]:
     return words
 
 
+@cache
+def _suffix_keys() -> frozenset[str]:
+    """Legal suffixes in key space, since folding rewrites letters such as i."""
+    return frozenset("".join(_fold(suffix)) for suffix in LEGAL_SUFFIXES)
+
+
 def company_key(name: str) -> str:
     """The comparison key for a company name. Raises CompanyNameError when none can be made."""
     if len(name) > MAX_NAME_LENGTH:
         raise CompanyNameError(f"company name too long ({len(name)} characters)")
     words = _fold(name)
-    while len(words) > 1 and words[-1] in LEGAL_SUFFIXES:
+    while len(words) > 1 and words[-1] in _suffix_keys():
         words.pop()
     key = unicodedata.normalize("NFKC", "".join(words))
     if not key:

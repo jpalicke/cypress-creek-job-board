@@ -1,6 +1,14 @@
 Cypress Creek Job Board
 Copyright (c) 2026 jpalicke. Licensed under the MIT License (see LICENSE).
 
+Third-party data
+----------------
+config/confusables.txt is the Unicode Security Mechanisms confusables data (UTS #39),
+version 18.0.0, dated 2026-08-06, copyright 2026 Unicode, Inc. Source:
+https://www.unicode.org/Public/security/latest/confusables.txt
+Terms of use: https://www.unicode.org/terms_of_use.html
+The file is included unmodified.
+
 Third-party fixtures
 --------------------
 None yet. Any recorded real posting or other third-party material added under

@@ -86,15 +86,18 @@ Blacklists, the denied list and the watchlist all compare companies on one key f
 
 Steps, in order:
 1. Reject names over 1,000 characters (`CompanyNameError`).
-2. NFKD, which splits accents off and turns full-width and styled letters into plain ones. Accent marks and zero-width and other format characters are dropped.
-3. Casefold, then fold homoglyphs onto the ASCII letter they imitate, using `config/confusables.yaml` (Cyrillic and Greek lookalikes, for example Cyrillic `а` becomes `a`).
-4. Periods and apostrophes are dropped without splitting a word (`L.L.C.` becomes `llc`, `O'Reilly` becomes `oreilly`). Any other non letter, non digit character separates words.
-5. Trailing legal suffixes are stripped repeatedly: `inc`, `incorporated`, `llc`, `llp`, `ltd`, `limited`, `corp`, `corporation`, `gmbh`, `plc`. A suffix in the middle of a name stays, and a name that is only a suffix keeps it. Every addition to `LEGAL_SUFFIXES` needs a test row.
-6. Words are joined with no spaces, so `Ac me` and `Acme` match. A name with no letters or digits raises `CompanyNameError`.
+2. NFKD, which splits accents off and turns full-width and styled letters into plain ones, then casefold.
+3. Fold confusables with the Unicode confusables data in `config/confusables.txt` (the UTS #39 skeleton table, about 6,700 entries). Examples: Cyrillic `а` becomes `a`, `0` becomes `o`, `1` becomes `l`, `m` becomes `rn`. The table is applied several times because a target can itself be confusable (`%` becomes `0`, which becomes `o`).
+4. Accent marks and zero-width and other format characters are dropped. Periods and apostrophes are dropped without splitting a word (`L.L.C.` becomes `llc`, `O'Reilly` becomes `oreilly`). Any other non letter, non digit character separates words.
+5. `i` becomes `l`. Casefolding turns a capital `I` into `i` before the table can map it to `l`, so without this `IBM` and `lBM` would differ.
+6. Trailing legal suffixes are stripped repeatedly: `inc`, `incorporated`, `llc`, `llp`, `ltd`, `limited`, `corp`, `corporation`, `gmbh`, `plc` (compared in folded form). A suffix in the middle of a name stays, and a name that is only a suffix keeps it. Every addition to `LEGAL_SUFFIXES` needs a test row.
+7. Words are joined with no spaces, so `Ac me` and `Acme` match. A name with no letters or digits raises `CompanyNameError`.
 
-`Acme, Inc.`, `ACME Incorporated`, `Ac me`, `A.C.M.E.`, a full-width spelling and a Cyrillic lookalike spelling all give `acme`. The result is idempotent, which a Hypothesis test checks.
+`Acme, Inc.`, `ACME Incorporated`, `Ac me`, `A.C.M.E.`, `Acrne`, a full-width spelling and a Cyrillic lookalike spelling all give the same key. `IBM`, `lBM` and `1BM` match, and so do `Oracle` and `0racle`. Keys are for comparison only and are not readable (`Acme` becomes `acrne`), so never show one to a person. The result is idempotent, which a Hypothesis test checks, and a component test checks every character in the shipped data.
 
-Known limits: the homoglyph table is hand curated and covers Cyrillic and Greek (extend it in `config/confusables.yaml`, with a test, when you meet a new lookalike). ASCII lookalikes of each other (`rn` versus `m`, `l` versus `I` versus `1`, `0` versus `O`) are not folded. Homoglyph folding also applies inside genuinely Cyrillic names, which is fine because keys are only compared, never shown. Slug and domain matching is a later card (H1). See [ADR 0004](adr/0004-company-key-rules.md).
+Known limits: the table is the Unicode data, so a lookalike it does not list is not folded, and `w` versus `vv` is one such pair. Folding also applies inside genuinely non Latin names, which is fine because keys are only compared. Different companies that differ only by lookalike letters or spacing collide, which for a blacklist fails safe. Slug and domain matching is a later card (H1).
+
+To update the data, download the latest `confusables.txt` from the URL in `NOTICE`, replace the file, update the version line in `NOTICE`, and run the tests. See [ADR 0004](adr/0004-company-key-rules.md).
 
 ## Try company_key
 ```bash

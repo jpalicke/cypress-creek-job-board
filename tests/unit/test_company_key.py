@@ -36,37 +36,45 @@ CYRILLIC_ACME = "асmе"
     ],
 )
 def test_variants_of_one_company_produce_one_key(variant: str) -> None:
-    assert company_key(variant) == "acme"
+    assert company_key(variant) == company_key("Acme")
 
 
 @pytest.mark.parametrize(
-    ("name", "key"),
+    ("name", "same_company"),
     [
-        ("Rolls-Royce", "rollsroyce"),
-        ("O'Reilly Media", "oreillymedia"),
-        ("AT&T", "att"),
-        ("3M Company", "3mcompany"),
-        ("Nestlé S.A.", "nestlesa"),
-        # Homoglyph letters fold even inside a genuinely Cyrillic name. Keys are only compared.
-        ("Яндекс", "яндekc"),
+        ("Rolls-Royce", "Rolls Royce"),
+        ("O'Reilly Media", "OReilly Media Inc"),
+        ("AT&T", "A T T"),
+        ("3M Corp", "3M"),
+        ("Nestlé S.A.", "Nestle SA"),
+        ("Яндекс", "Яндекс Inc"),
+        ("Acme", "Acrne"),
+        ("Acme", "ACRNE Ltd"),
+        ("IBM", "lBM"),
+        ("IBM", "1BM"),
+        ("Oracle", "0racle"),
+        ("Oracle", "Orac1e"),
+        ("PayPal", "Paypa1"),
+        ("Acme", "ɑcme"),
     ],
 )
-def test_keys_for_real_looking_names(name: str, key: str) -> None:
-    assert company_key(name) == key
+def test_lookalike_spellings_produce_one_key(name: str, same_company: str) -> None:
+    assert company_key(name) == company_key(same_company)
 
 
 @pytest.mark.parametrize("suffix", sorted(LEGAL_SUFFIXES))
 def test_each_legal_suffix_is_stripped(suffix: str) -> None:
-    assert company_key(f"Acme {suffix}") == "acme"
-    assert company_key(f"Acme, {suffix.upper()}.") == "acme"
+    assert company_key(f"Acme {suffix}") == company_key("Acme")
+    assert company_key(f"Acme, {suffix.upper()}.") == company_key("Acme")
 
 
 def test_a_suffix_in_the_middle_of_a_name_is_kept() -> None:
-    assert company_key("Inc Acme") == "incacme"
+    assert company_key("Inc Acme") == company_key("IncAcme")
+    assert company_key("Inc Acme") != company_key("Acme")
 
 
 def test_a_name_that_is_only_a_suffix_keeps_it() -> None:
-    assert company_key("Inc.") == "inc"
+    assert company_key("Inc.") == company_key("INC")
 
 
 def test_different_companies_have_different_keys() -> None:

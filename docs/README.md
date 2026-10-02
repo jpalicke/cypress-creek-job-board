@@ -16,10 +16,10 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [0001](adr/0001-fact-bank-enums-and-defaults.md) | Fact bank enums, defaults and the bank location |
 | [0002](adr/0002-posting-whitespace-and-normalization-order.md) | Posting whitespace rules and normalization order |
 | [0003](adr/0003-score-formula-and-downgrade-only.md) | Score formula, what supported means, downgrade only |
-| [0004](adr/0004-company-key-rules.md) | Company key rules, curated homoglyph table, spaces removed |
+| [0004](adr/0004-company-key-rules.md) | Company key rules, Unicode confusables data, spaces removed |
 
 ## Configuration
 - `config/aliases.yaml`: tag alias table, described in [data-model.md](data-model.md#tag-alias-table).
 - `config/weights.yaml`: score weights and support values, described in [pipeline.md](pipeline.md#score).
-- `config/confusables.yaml`: homoglyph table for company names, described in [data-model.md](data-model.md#company-names-company_key).
+- `config/confusables.txt`: Unicode confusables data (do not hand edit), used for company names and described in [data-model.md](data-model.md#company-names-company_key).
 - `facts.private/bank.yaml` (gitignored) or the path in `CYPRESS_CREEK_BANK`: your fact bank.
