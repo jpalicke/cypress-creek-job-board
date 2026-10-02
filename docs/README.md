@@ -5,7 +5,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | Doc | What it covers |
 | --- | --- |
 | [codebase.md](codebase.md) | Start here if you are new: layout, how the pieces fit, ideas to know, how a card goes |
-| [data-model.md](data-model.md) | The fact bank, Posting and Requirement, and the tag alias table (`config/aliases.yaml`) |
+| [data-model.md](data-model.md) | The fact bank, Posting and Requirement, and the tag alias table (`config/aliases.yaml`) and the company name key (`company_key`) |
 | [pipeline.md](pipeline.md) | Each pipeline stage and its rules: posting normalization, the support gate, the score |
 | [validators.md](validators.md) | The grounding validators V1 to V14: what each rejects and its known limits |
 | [contributing.md](contributing.md) | How we work, quality gates, dependency audit, ABOUTME headers, docs checklist |
@@ -16,8 +16,10 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [0001](adr/0001-fact-bank-enums-and-defaults.md) | Fact bank enums, defaults and the bank location |
 | [0002](adr/0002-posting-whitespace-and-normalization-order.md) | Posting whitespace rules and normalization order |
 | [0003](adr/0003-score-formula-and-downgrade-only.md) | Score formula, what supported means, downgrade only |
+| [0004](adr/0004-company-key-rules.md) | Company key rules, Unicode confusables data, spaces removed |
 
 ## Configuration
 - `config/aliases.yaml`: tag alias table, described in [data-model.md](data-model.md#tag-alias-table).
 - `config/weights.yaml`: score weights and support values, described in [pipeline.md](pipeline.md#score).
+- `config/confusables.txt`: Unicode confusables data (do not hand edit), used for company names and described in [data-model.md](data-model.md#company-names-company_key).
 - `facts.private/bank.yaml` (gitignored) or the path in `CYPRESS_CREEK_BANK`: your fact bank.

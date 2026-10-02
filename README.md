@@ -4,7 +4,7 @@ Tailors a job application to a posting without ever stating a claim the author h
 
 It reads a posting, extracts requirements, maps each requirement to facts in a curated bank, reports gaps honestly, and only then helps draft. Every claim cites verified fact IDs, enforced by deterministic validators rather than prompting. There is no auto apply, and a human reviews every draft.
 
-Status: early implementation. The fact bank, the posting normalizer, the tag alias table, the deterministic support gate, the score formula and the grounding validators exist as libraries. There is no app to start yet. Work is tracked as a kanban in this repo's issues (one issue per card, labeled by lane). Cards marked `core` are the smallest set that makes the repo credible and demoable on its own.
+Status: early implementation. The fact bank, the posting normalizer, the tag alias table, the deterministic support gate, the score formula, the company name normalizer and the grounding validators exist as libraries. There is no app to start yet. Work is tracked as a kanban in this repo's issues (one issue per card, labeled by lane). Cards marked `core` are the smallest set that makes the repo credible and demoable on its own.
 
 License: MIT.
 
@@ -29,6 +29,7 @@ Each command is copy and paste, and lives with its documentation:
 | Normalize posting text | [docs/pipeline.md](docs/pipeline.md#stage-0-normalize-the-posting) |
 | Run the support gate on a requirement | [docs/pipeline.md](docs/pipeline.md#try-it-locally) |
 | Compute a score from requirement supports | [docs/pipeline.md](docs/pipeline.md#score) |
+| Normalize a company name to its comparison key | [docs/data-model.md](docs/data-model.md#try-company_key) |
 | Run a grounding validator on model output | [docs/validators.md](docs/validators.md#try-it-locally) |
 
 ## What the score means
