@@ -12,6 +12,7 @@ from cypress_creek.pipeline.extract import (
     extract_requirements,
     failure_label,
     finish_extraction,
+    output_cap,
 )
 from cypress_creek.pipeline.schemas import ExtractionOutput
 from cypress_creek.providers import (
@@ -59,6 +60,26 @@ def test_a_posting_that_cannot_fit_the_context_gives_an_incomplete_result() -> N
     result = extract_requirements("Needs Python. " * 3000, _provider(), sleep=_no_sleep)
     assert result.status is ExtractionStatus.INCOMPLETE
     assert result.failure == "context_truncated"
+
+
+def test_a_short_posting_fits_a_4096_token_window_and_reaches_the_backend() -> None:
+    settings = parse_settings(
+        {
+            "provider": "ollama",
+            "model": "qwen3.5:0.8b",
+            "base_url": NOTHING_LISTENING,
+            "context_tokens": 4096,
+        }
+    )
+    result = extract_requirements(POSTING, OllamaProvider(settings), sleep=_no_sleep)
+    assert result.failure == "provider_unavailable"
+
+
+def test_the_output_cap_never_takes_more_than_half_the_window() -> None:
+    assert output_cap(_provider().capabilities.model_copy(update={"context_tokens": 4096})) == 2048
+    assert (
+        output_cap(_provider().capabilities.model_copy(update={"context_tokens": 200_000})) == 4000
+    )
 
 
 def test_a_budget_stop_is_not_swallowed() -> None:

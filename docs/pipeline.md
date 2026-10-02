@@ -83,7 +83,7 @@ print(score(matches, load_weights()).model_dump_json(indent=1))"
 
 | Field | Content |
 | --- | --- |
-| `system` | The trusted, static, versioned text from `pipeline/prompts/` (`extract_v1.txt` for extraction). Never any posting text or facts. |
+| `system` | The trusted, static, versioned text from `pipeline/prompts/` (`extract_v2.txt` for extraction). Never any posting text or facts. |
 | `data_block` | The posting, verbatim, between `<<<POSTING token>>>` and `<<<END POSTING token>>>` lines. This is the only untrusted part. |
 | `facts_block` | The trusted facts for stages that show them. Always empty for extraction, because the model never sees the bank while extracting. |
 | `boundary_token` | 128 bits from `secrets`, new on every call. |
@@ -93,7 +93,7 @@ print(score(matches, load_weights()).model_dump_json(indent=1))"
 - `prompt_facts(facts, capabilities)` is the fact filter. A fact needs `verified_on`, and a `local_only` fact is dropped unless the backend is local. It does not trust that the caller passed only verified facts.
 - The data block is passed to the provider as `data_block` and the system text as `system`, so the two never merge. How a stage joins the facts block to the data block is decided by the stage that uses facts.
 - The prompt is the first layer only. The validators after the model are the real control, see [threat-model.md](threat-model.md#prompt-structure-t1-to-t4).
-- To change the extraction wording, add `extract_v2.txt`, point `TEMPLATES` at it and update the tests. Do not edit a released version, so old hashes stay meaningful.
+- Extraction uses `extract_v2.txt`. To change the wording, add `extract_v3.txt`, point `TEMPLATES` at it and update the tests. Do not edit a released version, so old hashes stay meaningful.
 
 ## Accepting extraction output
 The extraction model proposes requirements. `accept_proposals(posting_text, output)` in `src/cypress_creek/pipeline/extract.py` decides which ones are kept. The model's answer must fit `ExtractionOutput` in `pipeline/schemas.py` (V1: no unknown fields, `schema_version` 1). The model gives no offsets and no ids.
@@ -128,6 +128,34 @@ print([(q.id, q.span, q.importance.value) for q in r.requirements])
 print([(x.text, x.reason.value) for x in r.dropped], r.not_assessed_count)"
 ```
 It prints two requirements with their spans and `required`, then the invented clearance line dropped as `text_not_in_posting`, and `0`.
+
+## Stage 1: extraction
+`extract_requirements(posting_text, provider)` in `pipeline/extract.py` is the stage. It builds the extraction prompt (v2), makes one structured call through `call_with_retry`, and passes the answer to the accept step above. It returns an `ExtractionResult`: `status` (`ok` or `incomplete`), `requirements`, `dropped`, `not_assessed_count`, `failure`, `usage`, `prompt_hash` and `schema_version`.
+
+- A typed provider failure gives `incomplete`, no requirements and a `failure` label (`schema_violation`, `context_truncated`, `provider_unavailable`, `rate_limited` or `refusal`). A report built on one must say it is incomplete.
+- `BudgetExceeded` is not caught. It stops the run.
+- The model may answer at most half the context window (never more than 4000 tokens), so a short posting fits a small window.
+- The one schema retry sends the schema error text, never model output, in the system message.
+- Why it is built this way, and its limits: [ADR 0010](adr/0010-extraction-stage-design.md).
+
+### Try extraction against a local model
+Needs Ollama running with `qwen3.5:0.8b` (see [providers.md](providers.md#try-it-locally)). A missing server shows up as `provider_unavailable`.
+```bash
+uv run python -c "
+from pathlib import Path
+from cypress_creek.config import parse_settings
+from cypress_creek.pipeline.extract import extract_requirements
+from cypress_creek.providers import OllamaProvider
+
+posting = Path('tests/fixtures/extraction/posting.txt').read_text(encoding='utf-8')
+provider = OllamaProvider(parse_settings({'provider': 'ollama', 'model': 'qwen3.5:0.8b', 'context_tokens': 4096}))
+r = extract_requirements(posting, provider)
+print(r.status.value, r.failure, r.usage)
+for q in r.requirements:
+    print(q.id, q.span, q.importance.value, q.text)
+print([(d.text, d.reason.value) for d in r.dropped])"
+```
+It prints `ok None` with the token counts, then each accepted requirement with the span and the importance the cue words give, then any dropped proposals. A small model may find only some of the requirements. Stop Ollama and run it again to see `incomplete provider_unavailable None`.
 
 ## Try it locally
 ```bash

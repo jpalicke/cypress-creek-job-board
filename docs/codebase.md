@@ -27,8 +27,8 @@ src/cypress_creek/       The library
   pipeline/              Stages that build model prompts (extraction wording lives in prompts/)
     prompt.py            Stage, Prompt, build_prompt, prompt_facts, PromptError
     schemas.py           ExtractionOutput, ProposedRequirement: the shape the model answers in
-    extract.py           accept_proposals, Acceptance, Dropped, DropReason
-    prompts/             Versioned system texts, one file per stage and version (extract_v1.txt)
+    extract.py           extract_requirements, ExtractionResult, accept_proposals, Acceptance, Dropped, DropReason
+    prompts/             Versioned system texts, one file per stage and version (extract_v2.txt)
   ingest/                Untrusted posting text in, clean models out
     models.py            Posting, Requirement, typed warnings
     normalize.py         normalize(), text_hash()

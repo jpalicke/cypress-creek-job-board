@@ -17,7 +17,7 @@ from cypress_creek.providers import (
     Refusal,
     SchemaViolation,
 )
-from cypress_creek.providers.base import Provider, Usage
+from cypress_creek.providers.base import Capabilities, Provider, Usage
 from cypress_creek.providers.retry import RetryPolicy, call_with_retry
 from cypress_creek.validators.cues import cue_importance
 from cypress_creek.validators.requirements import MAX_REQUIREMENTS
@@ -134,6 +134,11 @@ def failure_label(error: ProviderError) -> str | None:
     return FAILURE_LABELS.get(type(error))
 
 
+def output_cap(capabilities: Capabilities) -> int:
+    """Room for the answer: at most half the window, so a short posting always fits a small one."""
+    return min(MAX_OUTPUT_TOKENS, capabilities.context_tokens // 2)
+
+
 def finish_extraction(
     posting_text: str, output: ExtractionOutput, prompt_hash: str, usage: Usage
 ) -> ExtractionResult:
@@ -175,7 +180,7 @@ def extract_requirements(
             retry_feedback=feedback,
         )
         result = provider.complete_structured(
-            used.system, used.data_block, ExtractionOutput, MAX_OUTPUT_TOKENS
+            used.system, used.data_block, ExtractionOutput, output_cap(capabilities)
         )
         return result.parsed, result.usage
 
