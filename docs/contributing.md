@@ -8,6 +8,7 @@ The binding rules live in [CLAUDE.md](../CLAUDE.md). This page is the short, pla
 - Test first (TDD): write a failing test, watch it fail, write the minimum code to pass, then refactor.
 - Git hooks are never bypassed. If a hook fails, fix the cause.
 - Commit messages and PR text carry no attribution lines.
+- Documentation ships in the same PR as the implementation, always. Splitting docs into a later PR needs Joe P's explicit approval.
 
 ## Code
 - Every code file starts with two comment lines, each beginning with `ABOUTME: `.
@@ -15,7 +16,16 @@ The binding rules live in [CLAUDE.md](../CLAUDE.md). This page is the short, pla
 - No mocks or fake providers. An unreachable backend fails the test loudly, it is never skipped.
 
 ## Tests
-Four tiers exist: unit, component, integration and e2e. Markers `live` (needs a real model backend) and `needs_network` (needs the internet) select tests.
+Four tiers exist: unit, component, integration and e2e. Markers `live` (needs a real model backend) and `needs_network` (needs the internet) select tests. Property tests use Hypothesis, and they run with the rest of the suite.
+
+## Documentation checklist
+Before a PR is ready, in the same PR:
+- The doc the card owns is updated, and any copy and paste command in it was run.
+- README.md status and "Try what exists" reflect what now works.
+- The docs index (docs/README.md) lists any new doc or decision record.
+- docs/codebase.md matches the code: layout, the flow diagram and the module list.
+- A new design decision has an ADR in `docs/adr/`.
+- Configuration files (for example `config/aliases.yaml`) are described in the doc that owns them.
 
 ## Setup
 ```bash
@@ -35,7 +45,7 @@ On every commit the hooks run, and CI (`.github/workflows/deterministic.yml`) ru
 - **detect-secrets**: blocks committed secrets (baseline in `.secrets.baseline`).
 - **ruff lint** and **ruff format check**: style and common errors.
 - **ABOUTME header check**: every code file starts with the two line header (see below).
-- **mypy --strict**: strict type check over `src` and `tests`.
+- **mypy --strict**: strict type check over `src`, `tests` and `scripts`.
 - **pytest** over the unit and component tiers with `--cov-fail-under=80`. Only `src/cypress_creek` counts toward coverage.
 
 Warnings are errors, and a skipped test fails the whole run, so a missing service can never hide as a skip. Tool versions are pinned by `uv.lock`. Run everything by hand with `uv run pre-commit run --all-files`. Never use `--no-verify`.

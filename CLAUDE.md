@@ -31,6 +31,7 @@ No auto apply. Ever. A human reviews every draft.
   re-exports and tests.
 
 ## Local docs
+- Documentation always ships in the same PR as the implementation. Never defer docs to a later PR. Splitting needs Joe P's explicit approval.
 - Every card leaves the local run docs current. Joe P must be able to clone, run and use whatever exists so far from README.md and docs/ alone, without asking. If a card changes how to install, run, test or configure anything, it updates those docs in the same PR.
 
 ## Testing

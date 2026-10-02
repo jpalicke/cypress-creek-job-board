@@ -51,6 +51,17 @@ uv run python -c "from cypress_creek.facts import load_bank; b = load_bank(); pr
 ```
 Add `strict=True` to `load_bank` to see the strict mode behavior.
 
+## Posting and Requirement
+Both live in `src/cypress_creek/ingest/models.py` and are frozen, extra-forbid pydantic models.
+
+**Posting**: `id`, `source` (paste, link, pdf, feed), `text` (already normalized), `text_hash` (sha256 of the text, checked against it on construction), `origin_url`, `extractor` (name and version), `warnings[]`, `created_at` (passed in, never read from a clock).
+
+**Requirement**: `id` (`R-n`), `text` (verbatim span), `span` (start, end offsets into the posting text), `kind` (skill, years, education, certification, responsibility, soft), `term` (normalized with the same function as bank tags), `years` (optional positive int), `importance` (required, preferred, unspecified).
+
+The models only describe shape. Checking that `text` really is the posting's text at `span`, and that `importance` fits the cue words, is the job of validators V2 and V3 (card B4). A `Requirement` can be passed straight to the support gate.
+
+**Warnings** are typed (`PostingWarning`: kind and count). The only kind so far is `control_chars_stripped`.
+
 ## Tag alias table
 Requirement terms rarely match a bank tag word for word ("postgres" versus "postgresql"). The alias table in `config/aliases.yaml` maps each canonical tag name to the other terms that mean the same thing. It is data, not code, so you can extend it without touching Python.
 
