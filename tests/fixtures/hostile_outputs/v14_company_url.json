@@ -1,0 +1,5 @@
+{
+  "validator": "V14",
+  "description": "A suggested company name is a tracking URL.",
+  "input": {"name": "https://careers.example/apply?ref=abc"}
+}

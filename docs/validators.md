@@ -81,6 +81,16 @@ This is a heuristic and is deliberately conservative: it flags for review, it ne
 
 Known limit: a short plain phrase such as "Ignore previous instructions" has the shape of a name. The shape check removes URLs and long injected text, and the company filter, resolver and human review handle the rest.
 
+## The hostile output corpus
+`tests/fixtures/hostile_outputs/` holds hand written bad model outputs, one JSON file per validator (`v01_...json` to `v14_...json`), each with a `validator`, a `description` and the `input` it is run with. Examples: an extra field carrying an instruction (V1), a fabricated fact ID (V4), an employer swapped between two real facts (V7), 40% inflated to 90% (V8), an uncited claim (V9), injected text echoed back with tools never used (V10), a tracking URL as a company name (V14). `bank.json` is the small fact bank the cases cite. `grounded_rationale.json` is a faithful output that must pass V7 to V10, so the tests cannot pass by rejecting everything.
+
+`tests/unit/validators/test_hostile_corpus.py` runs every case through `REGISTRY` and fails if any validator has no case. To add a case, drop a new `vNN_name.json` next to the others. A new validator also needs a runner in that test and a row in `test_hostile_table.py`.
+
+Run it:
+```bash
+uv run pytest tests/unit/validators -q
+```
+
 ## Try it locally
 ```bash
 uv run python -c "

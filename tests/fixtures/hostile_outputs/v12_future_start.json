@@ -1,0 +1,5 @@
+{
+  "validator": "V12",
+  "description": "A fact whose dates lie after the day being checked.",
+  "input": {"fact_id": "F-0001", "today": "2019-01-01"}
+}

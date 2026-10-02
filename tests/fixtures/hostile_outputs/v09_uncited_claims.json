@@ -1,0 +1,10 @@
+{
+  "validator": "V9",
+  "description": "A draft bullet makes a claim and cites nothing.",
+  "input": {
+    "claims": [
+      {"text": "Cut query time by 40%", "fact_ids": ["F-0001"]},
+      {"text": "Holds a security clearance", "fact_ids": []}
+    ]
+  }
+}

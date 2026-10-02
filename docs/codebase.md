@@ -47,6 +47,7 @@ tests/
   integration/           Real services (empty so far)
   e2e/                   Whole flows (empty so far)
   fixtures/              Recorded or hand written inputs
+    hostile_outputs/     One bad model output per validator, plus a small bank (see validators.md)
   conftest.py            Fails the run if any test is skipped
 ```
 `facts.private/` is where your own bank lives. It is gitignored and never committed.

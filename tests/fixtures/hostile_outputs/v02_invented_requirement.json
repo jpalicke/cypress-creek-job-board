@@ -1,0 +1,9 @@
+{
+  "validator": "V2",
+  "description": "The model rewrites a requirement into text the posting never contained.",
+  "input": {
+    "posting": "Requirements:\n- You must have a clearance.\n",
+    "snippet": "You must have a clearance",
+    "text_override": "You must have 10 years of Rust"
+  }
+}

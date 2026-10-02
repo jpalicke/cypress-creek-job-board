@@ -1,0 +1,47 @@
+{
+  "facts": [
+    {
+      "id": "F-0001",
+      "claim": "Cut query time by 40% on the payments database",
+      "kind": "employment",
+      "employer": "Initech",
+      "role": "Backend Engineer",
+      "start": "2019-03-01",
+      "end": "2023-06-30",
+      "tags": [{"name": "postgresql", "level": "expert"}],
+      "verified_on": "2026-01-01",
+      "evidence": {"type": "self_attested", "pointer": "note"},
+      "share": "shareable"
+    },
+    {
+      "id": "F-0002",
+      "claim": "Led the search team",
+      "kind": "employment",
+      "employer": "Hooli",
+      "role": "Staff Engineer",
+      "start": "2015-01-01",
+      "end": "2019-02-28",
+      "tags": [{"name": "python", "level": "expert"}],
+      "verified_on": "2026-01-01",
+      "evidence": {"type": "self_attested", "pointer": "note"},
+      "share": "shareable"
+    },
+    {
+      "id": "F-0003",
+      "claim": "Wrote a compiler",
+      "kind": "project",
+      "tags": [{"name": "rust", "level": "working"}],
+      "evidence": {"type": "repo", "pointer": "note"},
+      "share": "shareable"
+    },
+    {
+      "id": "F-0004",
+      "claim": "Private consulting work",
+      "kind": "project",
+      "tags": [{"name": "go", "level": "working"}],
+      "verified_on": "2026-01-01",
+      "evidence": {"type": "self_attested", "pointer": "note"},
+      "share": "local_only"
+    }
+  ]
+}

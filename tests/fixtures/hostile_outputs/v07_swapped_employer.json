@@ -1,0 +1,8 @@
+{
+  "validator": "V7",
+  "description": "A real accomplishment is attached to a different real employer.",
+  "input": {
+    "text": "Cut query time at Hooli by 40%.",
+    "cited_ids": ["F-0001"]
+  }
+}
