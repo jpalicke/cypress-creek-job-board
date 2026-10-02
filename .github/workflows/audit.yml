@@ -1,0 +1,20 @@
+name: audit
+on:
+  pull_request:
+  schedule:
+    - cron: "0 7 * * 1"
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --locked
+      - name: Vulnerability audit of the locked dependencies
+        run: |
+          uv export --locked --no-emit-project --no-hashes > requirements-audit.txt
+          uv run --locked pip-audit -r requirements-audit.txt --no-deps --disable-pip
+      - name: License allow list
+        run: |
+          uv run --locked pip-licenses --format=json > licenses.json
+          uv run --locked python scripts/check_licenses.py licenses.json

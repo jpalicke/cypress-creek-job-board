@@ -39,3 +39,17 @@ On every commit the hooks run, and CI (`.github/workflows/deterministic.yml`) ru
 
 Warnings are errors, and a skipped test fails the whole run, so a missing service can never hide as a skip. Tool versions are pinned by `uv.lock`. Run everything by hand with `uv run pre-commit run --all-files`. Never use `--no-verify`.
 
+## Dependency audit and licenses
+`.github/workflows/audit.yml` runs on every pull request and weekly. It runs `pip-audit` on the locked dependencies and checks every installed license against an allow list (MIT, BSD, Apache-2.0, ISC, PSF, MPL-2.0). Dependabot proposes weekly updates for Python and GitHub Actions.
+
+Run both locally:
+
+```bash
+uv export --locked --no-emit-project --no-hashes > requirements-audit.txt
+uv run pip-audit -r requirements-audit.txt --no-deps --disable-pip
+uv run pip-licenses --format=json > licenses.json
+uv run python scripts/check_licenses.py licenses.json
+```
+
+If the audit fails, upgrade the dependency to the fixed version shown. If a license check fails, prefer replacing the dependency (copyleft such as AGPL is not acceptable). If an exception is truly justified, add an entry with a written reason to `license-exceptions.toml`. The exception is a reviewed change in the pull request, and an entry without a reason is rejected.
+
