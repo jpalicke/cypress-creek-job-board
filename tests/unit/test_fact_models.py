@@ -129,3 +129,14 @@ def test_fact_without_an_id_is_reported_with_its_position() -> None:
     error = error_for(bank_with(id=None))
     assert error.field == "id"
     assert error.fact_id == "facts[0]"
+
+
+def test_issuer_is_optional_and_kept_as_written() -> None:
+    assert parse_bank(bank_with(), today=TODAY).facts[0].issuer is None
+    bank = parse_bank(bank_with(kind="education", issuer="  Example University "), today=TODAY)
+    assert bank.facts[0].issuer == "Example University"
+
+
+@pytest.mark.parametrize("bad_issuer", ["", "   ", "...", "-- ,,"])
+def test_an_issuer_with_no_letters_or_digits_is_rejected(bad_issuer: str) -> None:
+    assert error_for(bank_with(kind="education", issuer=bad_issuer)).field == "issuer"

@@ -113,3 +113,16 @@ def test_requirement_feeds_the_support_gate() -> None:
     req = requirement()
     found = candidate_facts(req, [fact], aliases)
     assert support_ceiling(req, found, date(2026, 10, 1), aliases)[0] == Support.STRONG
+
+
+def test_requirement_issuer_is_optional_and_kept_as_written() -> None:
+    assert requirement().issuer is None
+    assert requirement(kind=RequirementKind.EDUCATION, issuer=" Example University ").issuer == (
+        "Example University"
+    )
+
+
+@pytest.mark.parametrize("bad_issuer", ["", "   ", "...", "-- ,,"])
+def test_a_requirement_issuer_with_no_letters_or_digits_is_rejected(bad_issuer: str) -> None:
+    with pytest.raises(ValidationError, match="issuer"):
+        requirement(issuer=bad_issuer)

@@ -24,7 +24,7 @@ Wanted'))"
 ## Support rules (the support gate)
 For each requirement the gate decides the most support the fact bank can ever justify. A model verdict later may confirm or downgrade this ceiling, never raise it.
 
-1. **Candidates.** A verified fact is a candidate if one of its tags equals the requirement term or one of its aliases (see the alias table in [data-model.md](data-model.md)). Education and certification requirements only match facts of that kind. Skill requirements ignore those facts.
+1. **Candidates.** A verified fact is a candidate if one of its tags equals the requirement term or one of its aliases (see the alias table in [data-model.md](data-model.md)). Education and certification requirements only match facts of that kind. Skill requirements ignore those facts. If an education or certification requirement names an issuer, only facts whose `issuer` has the same `company_key` are candidates, and a fact with no issuer is not one. A requirement that names no issuer matches any issuer. An issuer on any other kind of requirement is ignored. Limits: abbreviations do not match their long form (`MIT` versus the full name), and the bank must record the issuer for it to count.
 2. **No candidate** means support `none`, gate `no_candidate`, and the requirement goes in the gap list.
 3. **Level.** If every matching tag is `familiar`, support is capped at `partial` (gate `familiar_level`).
 4. **No years stated** (or an education or certification requirement): a candidate gives `strong` (gate `term_match`).

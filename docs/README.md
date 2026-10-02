@@ -19,6 +19,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [0003](adr/0003-score-formula-and-downgrade-only.md) | Score formula, what supported means, downgrade only |
 | [0004](adr/0004-company-key-rules.md) | Company key rules, Unicode confusables data, spaces removed |
 | [0005](adr/0005-sqlite-and-migrations.md) | SQLite for mutable state, numbered SQL migrations, data directory |
+| [0006](adr/0006-issuer-field-and-issuer-matching.md) | Optional issuer on facts and requirements, matched with company_key |
 
 ## Configuration
 - `config/aliases.yaml`: tag alias table, described in [data-model.md](data-model.md#tag-alias-table).

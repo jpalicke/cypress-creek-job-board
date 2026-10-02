@@ -8,7 +8,8 @@ facts:
   - id: F-0001                  # unique, pattern F-0000, never reused
     claim: Built a nightly report generator for a fictional logistics team.   # one sentence, 1 to 300 chars
     kind: project               # employment | project | education | certification | achievement
-    employer: Example Freight Co
+    employer: Example Freight Co  # for employment and projects
+    issuer: null                  # for education and certification: the school or certifying body
     role: Engineer
     start: 2022-01-01
     end: 2023-01-01             # start may not be after end
@@ -31,6 +32,7 @@ erDiagram
 ## Rules
 - Unknown fields, bad ids, duplicate ids, claims over 300 characters, unknown enum values and malformed dates are rejected with a `FactValidationError` naming the fact id and the field.
 - Dates may not be in the future and `start` may not be after `end` (`cypress_creek.facts.dates.date_problems`, the one implementation, also used later by validator V12).
+- `issuer` is optional free text naming the school or certifying body of an education or certification fact. It is trimmed and must contain a letter or digit. Employment and project facts keep using `employer`. See [ADR 0006](adr/0006-issuer-field-and-issuer-matching.md).
 - Verification is derived: a fact with `verified_on` is verified. There is no boolean.
   - Normal mode: a fact without `verified_on` loads as unverified and is listed by `Bank.unverified_ids()`.
   - Strict mode (used by the eval harness): a fact without `verified_on` is rejected.
@@ -56,7 +58,7 @@ Both live in `src/cypress_creek/ingest/models.py` and are frozen, extra-forbid p
 
 **Posting**: `id`, `source` (paste, link, pdf, feed), `text` (already normalized), `text_hash` (sha256 of the text, checked against it on construction), `origin_url`, `extractor` (name and version), `warnings[]`, `created_at` (passed in, never read from a clock).
 
-**Requirement**: `id` (`R-n`), `text` (verbatim span), `span` (start, end offsets into the posting text), `kind` (skill, years, education, certification, responsibility, soft), `term` (normalized with the same function as bank tags), `years` (optional positive int), `importance` (required, preferred, unspecified).
+**Requirement**: `id` (`R-n`), `text` (verbatim span), `span` (start, end offsets into the posting text), `kind` (skill, years, education, certification, responsibility, soft), `term` (normalized with the same function as bank tags), `years` (optional positive int), `issuer` (optional school or certifying body the posting names, same rules as the fact field), `importance` (required, preferred, unspecified).
 
 The models only describe shape. Checking that `text` really is the posting's text at `span`, and that `importance` fits the cue words, is the job of validators V2 and V3 (card B4). A `Requirement` can be passed straight to the support gate.
 

@@ -7,6 +7,7 @@ from typing import Protocol
 
 from cypress_creek.facts.models import Fact, Kind, Level
 from cypress_creek.scoring.aliases import AliasTable
+from cypress_creek.storage.company_key import company_key
 
 DAYS_PER_YEAR = 365.25
 _NO_ALIASES = AliasTable({})
@@ -38,6 +39,8 @@ class SupportRequirement(Protocol):
     def kind(self) -> str: ...
     @property
     def years(self) -> int | None: ...
+    @property
+    def issuer(self) -> str | None: ...
 
 
 # Education and certification requirements only match facts of that kind.
@@ -54,8 +57,15 @@ def _matching_levels(
 def _kind_allowed(requirement: SupportRequirement, fact: Fact) -> bool:
     required_kind = _ENTITY_KINDS.get(requirement.kind)
     if required_kind is not None:
-        return fact.kind == required_kind
+        return fact.kind == required_kind and _issuer_allowed(requirement, fact)
     return fact.kind not in _ENTITY_KINDS.values()
+
+
+def _issuer_allowed(requirement: SupportRequirement, fact: Fact) -> bool:
+    """A requirement that names an issuer is met only by a fact from the same issuer."""
+    if requirement.issuer is None:
+        return True
+    return fact.issuer is not None and company_key(fact.issuer) == company_key(requirement.issuer)
 
 
 def candidate_facts(

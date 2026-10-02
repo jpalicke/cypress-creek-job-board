@@ -26,6 +26,7 @@ class Req:
     term: str
     kind: str = "skill"
     years: int | None = None
+    issuer: str | None = None
 
 
 def fact(
@@ -35,11 +36,13 @@ def fact(
     start: date | None = None,
     end: date | None = None,
     kind: Kind = Kind.EMPLOYMENT,
+    issuer: str | None = None,
 ) -> Fact:
     return Fact(
         id=f"F-{n:04d}",
         claim="Did a thing",
         kind=kind,
+        issuer=issuer,
         start=start,
         end=end,
         tags=[Tag(name=tag, level=level)],
@@ -108,6 +111,44 @@ def test_certification_matches_only_certification_facts() -> None:
     job = fact(2, "cka")
     found = candidate_facts(Req("CKA", kind="certification"), [cert, job], ALIASES)
     assert [f.id for f in found] == ["F-0001"]
+
+
+def test_education_requirement_naming_an_issuer_matches_only_that_issuer() -> None:
+    mine = fact(1, "computer science", kind=Kind.EDUCATION, issuer="Example University")
+    other = fact(2, "computer science", kind=Kind.EDUCATION, issuer="Other College")
+    req = Req("computer science", kind="education", issuer="EXAMPLE UNIVERSITY")
+    assert [f.id for f in candidate_facts(req, [mine, other], ALIASES)] == ["F-0001"]
+
+
+def test_certification_requirement_naming_an_issuer_matches_only_that_issuer() -> None:
+    mine = fact(1, "cloud architect", kind=Kind.CERTIFICATION, issuer="Example Cloud, Inc.")
+    other = fact(2, "cloud architect", kind=Kind.CERTIFICATION, issuer="Other Cloud")
+    req = Req("cloud architect", kind="certification", issuer="Example Cloud")
+    assert [f.id for f in candidate_facts(req, [mine, other], ALIASES)] == ["F-0001"]
+
+
+def test_a_fact_with_no_issuer_cannot_satisfy_a_named_issuer() -> None:
+    anonymous = fact(1, "computer science", kind=Kind.EDUCATION)
+    req = Req("computer science", kind="education", issuer="Example University")
+    assert candidate_facts(req, [anonymous], ALIASES) == []
+
+
+def test_a_requirement_without_an_issuer_matches_any_issuer() -> None:
+    mine = fact(1, "computer science", kind=Kind.EDUCATION, issuer="Example University")
+    plain = fact(2, "computer science", kind=Kind.EDUCATION)
+    req = Req("computer science", kind="education")
+    assert [f.id for f in candidate_facts(req, [mine, plain], ALIASES)] == ["F-0001", "F-0002"]
+
+
+def test_a_lookalike_issuer_still_matches() -> None:
+    mine = fact(1, "computer science", kind=Kind.EDUCATION, issuer="Example University")
+    req = Req("computer science", kind="education", issuer="Ехаmple Univеrsity")
+    assert [f.id for f in candidate_facts(req, [mine], ALIASES)] == ["F-0001"]
+
+
+def test_an_issuer_on_a_skill_requirement_is_ignored() -> None:
+    job = fact(1, "python")
+    assert candidate_facts(Req("python", issuer="Example University"), [job], ALIASES) == [job]
 
 
 def test_skill_requirement_ignores_education_facts() -> None:

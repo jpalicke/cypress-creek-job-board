@@ -5,6 +5,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from cypress_creek.facts.models import clean_issuer
 from cypress_creek.ingest.hashing import text_hash as compute_text_hash
 from cypress_creek.terms import normalize_term
 
@@ -82,6 +83,7 @@ class Requirement(BaseModel):
     kind: RequirementKind
     term: str
     years: int | None = Field(default=None, ge=1)
+    issuer: str | None = None
     importance: Importance
 
     @field_validator("term")
@@ -91,6 +93,11 @@ class Requirement(BaseModel):
         if not normalized:
             raise ValueError("term is empty after normalization")
         return normalized
+
+    @field_validator("issuer")
+    @classmethod
+    def _clean_issuer(cls, value: str | None) -> str | None:
+        return clean_issuer(value)
 
     @field_validator("span")
     @classmethod
