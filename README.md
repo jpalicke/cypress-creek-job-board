@@ -4,7 +4,7 @@ Tailors a job application to a posting without ever stating a claim the author h
 
 It reads a posting, extracts requirements, maps each requirement to facts in a curated bank, reports gaps honestly, and only then helps draft. Every claim cites verified fact IDs, enforced by deterministic validators rather than prompting. There is no auto apply, and a human reviews every draft.
 
-Status: early implementation. The fact bank, the posting normalizer, the tag alias table, the deterministic support gate, the score formula, the company name normalizer, the SQLite migration runner, the grounding validators, the provider interface, the provider config, the Ollama adapter, the budget guard, the prompt builder, the extraction stage, candidate retrieval and URL target validation exist as libraries. URL validation does not fetch a page; the guarded HTTP transport is still pending. There is no app to start yet. Work is tracked as a kanban in this repo's issues (one issue per card, labeled by lane). Cards marked `core` are the smallest set that makes the repo credible and demoable on its own.
+Status: early implementation. The fact bank, the posting normalizer, the tag alias table, the deterministic support gate, the score formula, the company name normalizer, the SQLite migration runner, the grounding validators, the provider interface, the provider config, the Ollama adapter, the budget guard, the prompt builder (extraction and entailment prompts), the extraction stage, candidate retrieval and URL target validation exist as libraries. URL validation does not fetch a page; the guarded HTTP transport is still pending. There is no app to start yet. Work is tracked as a kanban in this repo's issues (one issue per card, labeled by lane). Cards marked `core` are the smallest set that makes the repo credible and demoable on its own.
 
 License: MIT.
 
@@ -30,6 +30,7 @@ Each command is copy and paste, and lives with its documentation:
 | Look up a tag alias | [docs/data-model.md](docs/data-model.md#try-the-alias-table) |
 | Normalize posting text | [docs/pipeline.md](docs/pipeline.md#stage-0-normalize-the-posting) |
 | Build an extraction prompt with a random boundary | [docs/pipeline.md](docs/pipeline.md#try-the-prompt-builder) |
+| Build an entailment prompt that shows only verified facts | [docs/pipeline.md](docs/pipeline.md#try-the-entailment-prompt) |
 | Accept proposed requirements from a recorded model output | [docs/pipeline.md](docs/pipeline.md#try-the-accept-step) |
 | Extract requirements from a posting with a local model | [docs/pipeline.md](docs/pipeline.md#try-extraction-against-a-local-model) |
 | Find candidate facts for requirements, with no model | [docs/pipeline.md](docs/pipeline.md#try-retrieval) |

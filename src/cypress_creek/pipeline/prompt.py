@@ -22,9 +22,11 @@ class PromptError(Exception):
 
 class Stage(StrEnum):
     EXTRACT = "extract"
+    ENTAIL = "entail"
 
 
-TEMPLATES = {Stage.EXTRACT: "extract_v2.txt"}
+TEMPLATES = {Stage.EXTRACT: "extract_v2.txt", Stage.ENTAIL: "entail_v1.txt"}
+STAGES_SHOWING_FACTS = {Stage.ENTAIL}
 
 
 class Prompt(BaseModel):
@@ -37,6 +39,13 @@ class Prompt(BaseModel):
     facts_block: str
     boundary_token: str
     prompt_hash: str
+
+    @property
+    def user_message(self) -> str:
+        """The untrusted data block, then the trusted facts when the stage shows any."""
+        if not self.facts_block:
+            return self.data_block
+        return f"{self.data_block}\n\n{self.facts_block}"
 
 
 def _new_token() -> str:
@@ -60,6 +69,11 @@ def prompt_facts(facts: Sequence[Fact], capabilities: Capabilities) -> list[Fact
     ]
 
 
+def _facts_block(facts: Sequence[Fact]) -> str:
+    lines = [f"{fact.id}: {fact.claim}" for fact in facts]
+    return "VERIFIED FACTS\n" + "\n".join(lines)
+
+
 def _prompt_hash(system: str, output_schema: type[BaseModel]) -> str:
     schema_text = json.dumps(output_schema.model_json_schema(), sort_keys=True)
     return hashlib.sha256((system + "\n" + schema_text).encode("utf-8")).hexdigest()
@@ -77,7 +91,9 @@ def build_prompt(
     """Wrap the posting in a fresh boundary and keep it out of the system message.
 
     Every stage shares one signature, so `facts` is accepted always. The extraction stage shows
-    the model no facts and ignores it. Stages that do show facts use `prompt_facts` first.
+    the model no facts and ignores it. Stages that do show facts list only `prompt_facts` of them,
+    after the data block, so a fact never sits inside the boundary and never reaches the system
+    message. The "posting text" of such a stage is the untrusted requirement text.
     `retry_feedback` is the schema error text from a failed first try. It joins the trusted system
     message, never the data block, and it does not change the prompt hash.
     """
@@ -94,7 +110,9 @@ def build_prompt(
     return Prompt(
         system=system,
         data_block=f"<<<POSTING {token}>>>\n{posting_text}\n<<<END POSTING {token}>>>",
-        facts_block="",
+        facts_block=_facts_block(prompt_facts(facts, capabilities))
+        if stage in STAGES_SHOWING_FACTS
+        else "",
         boundary_token=token,
         prompt_hash=_prompt_hash(hashed_system, output_schema),
     )

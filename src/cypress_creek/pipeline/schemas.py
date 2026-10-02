@@ -1,5 +1,6 @@
-# ABOUTME: The shape the extraction model must answer in: proposed requirements, no offsets.
+# ABOUTME: The shapes the models must answer in: proposed requirements and an entailment verdict.
 # ABOUTME: Strict, so an unknown field or another schema version fails the V1 schema check.
+from enum import StrEnum
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
@@ -25,3 +26,20 @@ class ExtractionOutput(BaseModel):
 
     schema_version: Literal[1]
     requirements: list[ProposedRequirement]
+
+
+class EntailmentVerdict(StrEnum):
+    SUPPORTS = "supports"
+    PARTIAL = "partial"
+    DOES_NOT_SUPPORT = "does_not_support"
+
+
+class EntailmentOutput(BaseModel):
+    """The model's second opinion on one requirement. Code decides what, if anything, it changes."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    schema_version: Literal[1]
+    verdict: EntailmentVerdict
+    fact_ids: list[str]
+    rationale: str

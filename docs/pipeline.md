@@ -50,7 +50,7 @@ score = 100 * sum(weight * value) / sum(weight)
 
 - **Supported** means strong or partial. The result carries `supported` out of `total`, the counts per support level, and every input line (requirement, importance, support, weight, value), so the number can be recomputed by hand.
 - **No requirements gives no score** (`score` is `None`), never 100 and never 0. All requirements at `none` is a real 0.
-- **Support can only go down.** A `Match` holds the `ceiling` from the support gate and the final `support`. Support above the ceiling, or more than one step below it, is refused when the `Match` is built. `downgrade()` is the one way to lower support a step.
+- **Support can only go down.** A `Match` holds the `ceiling` from the support gate and the final `support`. Support above the ceiling is refused when the `Match` is built. A drop of any size is allowed, because an entailment verdict of `does_not_support` takes a `strong` ceiling to `none`. `downgrade()` lowers support one step.
 - **Overriding weights.** The weights live in `config/weights.yaml` (data, not code) and `load_weights()` reads and validates them; a test checks the shipped file equals the published defaults. You can also pass a `Weights` instance to `score()`. Validation: weights above zero, values between 0 and 1, and none <= partial <= strong. The weights used are echoed in `inputs`.
 - The score ranks postings for triage. It is not a probability of getting the job.
 
@@ -83,15 +83,18 @@ print(score(matches, load_weights()).model_dump_json(indent=1))"
 
 | Field | Content |
 | --- | --- |
-| `system` | The trusted, static, versioned text from `pipeline/prompts/` (`extract_v2.txt` for extraction). Never any posting text or facts. |
+| `system` | The trusted, static, versioned text from `pipeline/prompts/` (`extract_v2.txt` for extraction, `entail_v1.txt` for entailment). Never any posting text or facts. |
 | `data_block` | The posting, verbatim, between `<<<POSTING token>>>` and `<<<END POSTING token>>>` lines. This is the only untrusted part. |
-| `facts_block` | The trusted facts for stages that show them. Always empty for extraction, because the model never sees the bank while extracting. |
+| `facts_block` | The trusted facts for stages that show them: a `VERIFIED FACTS` line, then one `F-0001: claim` line per fact. Always empty for extraction, because the model never sees the bank while extracting. |
 | `boundary_token` | 128 bits from `secrets`, new on every call. |
 | `prompt_hash` | SHA-256 of the system text plus the schema text, so an eval run can say which prompt produced a result. It does not change between calls. |
+| `user_message` | A property: the data block, then a blank line and the facts block when the stage shows facts. This is the string a stage sends as the provider's data argument. |
 
 - If the posting contains the token (it should not, the odds are negligible) the builder takes a new token, up to 5 times, then raises `PromptError`. A posting that imitates a closing line cannot end the block, because it cannot know the token.
 - `prompt_facts(facts, capabilities)` is the fact filter. A fact needs `verified_on`, and a `local_only` fact is dropped unless the backend is local. It does not trust that the caller passed only verified facts.
-- The data block is passed to the provider as `data_block` and the system text as `system`, so the two never merge. How a stage joins the facts block to the data block is decided by the stage that uses facts.
+- The data block is passed to the provider as `data_block` and the system text as `system`, so the two never merge. A stage that shows facts sends `user_message`, which puts the facts after the closing boundary line, so a fact is never inside the untrusted block and never in the system message.
+- The entailment stage (`Stage.ENTAIL`) passes one requirement's text where the others pass the posting, so that text is untrusted too. It lists only `prompt_facts` of the facts it is given.
+- The model answers in `EntailmentOutput` (`pipeline/schemas.py`): `schema_version` 1, a `verdict` of `supports`, `partial` or `does_not_support`, the cited `fact_ids` and a short `rationale`. The verdict can only lower the support ceiling, see [ADR 0011](adr/0011-entailment-can-only-lower-support.md).
 - The prompt is the first layer only. The validators after the model are the real control, see [threat-model.md](threat-model.md#prompt-structure-t1-to-t4).
 - Extraction uses `extract_v2.txt`. To change the wording, add `extract_v3.txt`, point `TEMPLATES` at it and update the tests. Do not edit a released version, so old hashes stay meaningful.
 
@@ -192,6 +195,25 @@ for r in retrieve([need(1, 'postgres'), need(2, 'haskell')], bank, caps, date(20
     print(r.requirement_id, r.fact_ids, r.support.value, r.gate.value, r.is_gap)"
 ```
 It prints `R-1 ['F-0001'] strong term_match False` (the alias `postgres` finds the `postgresql` fact) and `R-2 [] none no_candidate True` (a gap, with no model call).
+
+### Try the entailment prompt
+```bash
+uv run python -c "
+from cypress_creek.facts import parse_bank
+from cypress_creek.pipeline.prompt import Stage, build_prompt
+from cypress_creek.pipeline.schemas import EntailmentOutput
+from cypress_creek.providers.base import Capabilities, CostPerMtok
+
+def fact(n, extra):
+    return {'id': f'F-000{n}', 'claim': f'Fictional work number {n}.', 'kind': 'project', 'evidence': {'type': 'repo', 'pointer': 'https://example.invalid/x'}, 'share': 'shareable', **extra}
+
+bank = parse_bank({'facts': [fact(1, {'verified_on': '2024-01-01'}), fact(2, {})]})
+caps = Capabilities(context_tokens=8192, strict_schema=True, local=True, cost_per_mtok=CostPerMtok(input=0, output=0))
+p = build_prompt(Stage.ENTAIL, 'Needs Python.', bank.facts, caps, EntailmentOutput)
+print(p.facts_block)
+print(p.boundary_token in p.system, 'F-0002' in p.user_message)"
+```
+It prints the facts block with only the verified fact, `F-0001: Fictional work number 1.`, then `False False`: the token is not in the system text and the unverified fact is not shown.
 
 ## Try it locally
 ```bash
