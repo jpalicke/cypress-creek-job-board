@@ -17,6 +17,6 @@ uv run pytest                    # run all tests
 uv run pre-commit run --all-files  # run every quality gate by hand
 ```
 
-What is runnable today: the test suite and the quality gates. There is no app to start yet. This section grows with each card.
+What is runnable today: the test suite, the quality gates and the fact bank loader (see [docs/data-model.md](docs/data-model.md), including a copy and paste command to validate your own bank). There is no app to start yet. This section grows with each card.
 
 See [docs/contributing.md](docs/contributing.md) for how we work.
