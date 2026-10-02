@@ -157,6 +157,42 @@ print([(d.text, d.reason.value) for d in r.dropped])"
 ```
 It prints `ok None` with the token counts, then each accepted requirement with the span and the importance the cue words give, then any dropped proposals. A small model may find only some of the requirements. Stop Ollama and run it again to see `incomplete provider_unavailable None`.
 
+## Stage 2: candidate retrieval
+`retrieve(requirements, bank, capabilities, today, aliases)` in `pipeline/retrieve.py` finds, for each requirement, the facts that could support it. It uses tags and the alias table only. No model is called, and the module imports no provider code, so posting text cannot influence it.
+
+Each requirement gets a `RequirementCandidates`:
+
+| Field | Meaning |
+| --- | --- |
+| `requirement_id` | The requirement it answers. Results keep the input order. |
+| `fact_ids` | At most 5 candidate fact ids, strongest tag level first, then most recent (an open role counts as most recent, undated last), then fact id. |
+| `dropped_count` | How many more matched but were left out by the cap. |
+| `support`, `gate` | The ceiling and the rule that set it, from the [support gate](#support-rules-the-support-gate). Later stages may confirm or lower it, never raise it. |
+| `is_gap` | True when nothing matched. The requirement is a gap and no model is asked about it. |
+
+- Only verified facts count, and a `local_only` fact is left out when the backend is hosted. The rule is `prompt_facts`, the same one the prompt builder uses.
+- The ceiling uses every matching fact, because years are merged across all of them. The cap only limits what the entailment stage sees.
+- Known limit: a requirement worded in terms the tags and aliases do not cover is reported as a gap even when a fact supports it. This favors honesty over recall. The evals measure it as missed support, and `config/aliases.yaml` is the lever for improving it.
+
+### Try retrieval
+```bash
+uv run python -c "
+from datetime import date
+from cypress_creek.facts import parse_bank
+from cypress_creek.ingest.models import Importance, Requirement, RequirementKind
+from cypress_creek.pipeline.retrieve import retrieve
+from cypress_creek.providers.base import Capabilities, CostPerMtok
+from cypress_creek.scoring.aliases import load_aliases
+
+bank = parse_bank({'facts': [{'id': 'F-0001', 'claim': 'Operated a fictional PostgreSQL cluster.', 'kind': 'project', 'start': '2021-01-01', 'tags': [{'name': 'postgresql', 'level': 'working'}], 'verified_on': '2024-01-01', 'evidence': {'type': 'repo', 'pointer': 'https://example.invalid/b'}, 'share': 'shareable'}]})
+caps = Capabilities(context_tokens=8192, strict_schema=True, local=True, cost_per_mtok=CostPerMtok(input=0, output=0))
+def need(n, term):
+    return Requirement(id=f'R-{n}', text=f'Needs {term}.', span=(0, 10), kind=RequirementKind.SKILL, term=term, importance=Importance.REQUIRED)
+for r in retrieve([need(1, 'postgres'), need(2, 'haskell')], bank, caps, date(2024, 6, 1), load_aliases()):
+    print(r.requirement_id, r.fact_ids, r.support.value, r.gate.value, r.is_gap)"
+```
+It prints `R-1 ['F-0001'] strong term_match False` (the alias `postgres` finds the `postgresql` fact) and `R-2 [] none no_candidate True` (a gap, with no model call).
+
 ## Try it locally
 ```bash
 uv run python -c "
