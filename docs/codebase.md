@@ -92,7 +92,7 @@ flowchart LR
 ```
 Dotted means not built yet. Extraction, model verdicts, real provider adapters, validators, gap reports and drafting arrive in later cards (see the issue board and the spec). The pieces that exist are libraries with no app around them yet.
 
-URL validation is a separate library entry point. It rejects unsafe syntax, resolves a hostname once, checks every address, and returns connection coordinates without fetching anything. The future transport must connect to the returned IP while using the hostname for Host and TLS verification; validation alone does not enforce this. See [the SSRF rules and limits](threat-model.md) and [ADR 0008](adr/0008-url-target-validation.md). The transport architecture and its import restriction are part of F1b.
+URL validation is a separate library entry point. It rejects unsafe syntax, resolves a hostname once, checks every address, and returns connection coordinates without fetching anything. The future transport must connect to the returned IP while using the hostname for Host and TLS verification; validation alone does not enforce this. See [the SSRF rules and limits](threat-model.md) and [ADR 0009](adr/0009-url-target-validation.md). The transport architecture and its import restriction are part of F1b.
 
 ## Ideas to know
 - **One source of truth.** The bank file is the only record of facts. Verification is derived from `verified_on` and is never stored as a separate flag. The pipeline only ever sees `Bank.verified_facts()`.

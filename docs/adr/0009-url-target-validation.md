@@ -1,4 +1,4 @@
-# ADR 0008: Public URL targets and strict authority parsing
+# ADR 0009: Public URL targets and strict authority parsing
 
 Status: proposed (F1a, pending PR review)
 

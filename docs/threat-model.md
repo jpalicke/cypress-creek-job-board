@@ -48,7 +48,7 @@ Every rejection raises `UrlGuardError`. Branch on `reason_code`, not the message
 - DNS uses the real operating system resolver, whose timeout is not bounded by this function. F1b must account for resolution in its timeout design.
 - The result is not an HTTP response. Pinned connections, TLS verification, redirects, response limits and rebinding resistance remain unverified until F1b lands.
 
-The choices are recorded in [ADR 0008](adr/0008-url-target-validation.md). Python's [URL parser documentation](https://docs.python.org/3.13/library/urllib.parse.html#url-parsing-security) explains why parsing needs additional validation. The all-address check follows [OWASP's SSRF guidance](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html).
+The choices are recorded in [ADR 0009](adr/0009-url-target-validation.md). Python's [URL parser documentation](https://docs.python.org/3.13/library/urllib.parse.html#url-parsing-security) explains why parsing needs additional validation. The all-address check follows [OWASP's SSRF guidance](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html).
 
 ## Try it locally
 

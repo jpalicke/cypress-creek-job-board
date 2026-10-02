@@ -25,7 +25,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [0005](adr/0005-sqlite-and-migrations.md) | SQLite for mutable state, numbered SQL migrations, data directory |
 | [0006](adr/0006-issuer-field-and-issuer-matching.md) | Optional issuer on facts and requirements, matched with company_key |
 | [0007](adr/0007-provider-config-toml-and-loopback.md) | Provider config as TOML plus environment overrides, remote hosts are opt in |
-| [0008](adr/0008-url-target-validation.md) | Public URL targets, strict hostname syntax and validation of every resolved address |
+| [0009](adr/0009-url-target-validation.md) | Public URL targets, strict hostname syntax and validation of every resolved address |
 
 ## Configuration
 - `config/aliases.yaml`: tag alias table, described in [data-model.md](data-model.md#tag-alias-table).
