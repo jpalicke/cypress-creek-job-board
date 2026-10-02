@@ -1,5 +1,5 @@
 # ABOUTME: The provider layer: one interface every model backend implements, plus typed errors.
-# ABOUTME: Adapters for real backends and the config that selects one are added by later cards.
+# ABOUTME: get_provider builds one from settings. Adapters for real backends arrive in later cards.
 from cypress_creek.providers.base import (
     Capabilities,
     CostPerMtok,
@@ -16,21 +16,31 @@ from cypress_creek.providers.errors import (
     Refusal,
     SchemaViolation,
 )
+from cypress_creek.providers.factory import (
+    REGISTRY,
+    ProviderRegistry,
+    UnknownProvider,
+    get_provider,
+)
 from cypress_creek.providers.retry import RetryPolicy, call_with_retry
 
 __all__ = [
+    "REGISTRY",
     "BudgetExceeded",
     "Capabilities",
     "ContextTruncated",
     "CostPerMtok",
     "Provider",
     "ProviderError",
+    "ProviderRegistry",
     "ProviderUnavailable",
     "RateLimited",
     "Refusal",
     "RetryPolicy",
     "SchemaViolation",
     "StructuredResult",
+    "UnknownProvider",
     "Usage",
     "call_with_retry",
+    "get_provider",
 ]
