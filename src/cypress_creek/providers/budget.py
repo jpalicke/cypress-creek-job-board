@@ -2,7 +2,14 @@
 # ABOUTME: Fails closed. Real usage above an estimate blocks every later call.
 from pydantic import BaseModel, ConfigDict, Field
 
-from cypress_creek.providers.base import CostPerMtok, Usage
+from cypress_creek.providers.base import (
+    Capabilities,
+    CostPerMtok,
+    Provider,
+    StructuredResult,
+    Usage,
+    estimate_input_tokens,
+)
 from cypress_creek.providers.errors import BudgetExceeded
 
 TOKENS_PER_MTOK = 1_000_000
@@ -55,3 +62,27 @@ class BudgetTracker:
         self.output_tokens += usage.output_tokens
         self.requests += 1
         self.usd += self.cost_usd(usage.input_tokens, usage.output_tokens)
+
+
+class BudgetedProvider:
+    """Wraps any provider so each call is checked against the budget and its usage recorded."""
+
+    def __init__(self, inner: Provider, tracker: BudgetTracker) -> None:
+        self._inner = inner
+        self.tracker = tracker
+
+    @property
+    def capabilities(self) -> Capabilities:
+        return self._inner.capabilities
+
+    def count_tokens_estimate(self, text: str) -> int:
+        return self._inner.count_tokens_estimate(text)
+
+    def complete_structured[T: BaseModel](
+        self, system: str, data_block: str, schema: type[T], max_output_tokens: int
+    ) -> StructuredResult[T]:
+        estimate = estimate_input_tokens(self._inner, system, data_block, schema)
+        self.tracker.check_before(estimate, max_output_tokens)
+        result = self._inner.complete_structured(system, data_block, schema, max_output_tokens)
+        self.tracker.record(result.usage)
+        return result

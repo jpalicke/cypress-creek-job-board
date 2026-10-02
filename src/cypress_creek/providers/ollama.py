@@ -1,6 +1,5 @@
 # ABOUTME: The Ollama adapter, built on the native /api/chat endpoint so num_ctx is set per request.
 # ABOUTME: A pre-flight and a post-flight check refuse prompts the server would silently truncate.
-import json
 import math
 from typing import Any
 
@@ -8,7 +7,13 @@ import httpx
 from pydantic import BaseModel, ValidationError
 
 from cypress_creek.config import ConfigError, ProviderSettings, describe_validation_error
-from cypress_creek.providers.base import Capabilities, CostPerMtok, StructuredResult, Usage
+from cypress_creek.providers.base import (
+    Capabilities,
+    CostPerMtok,
+    StructuredResult,
+    Usage,
+    estimate_input_tokens,
+)
 from cypress_creek.providers.errors import (
     ContextTruncated,
     ProviderUnavailable,
@@ -88,8 +93,7 @@ class OllamaProvider:
     def complete_structured[T: BaseModel](
         self, system: str, data_block: str, schema: type[T], max_output_tokens: int
     ) -> StructuredResult[T]:
-        schema_text = json.dumps(schema.model_json_schema())
-        input_tokens = sum(self.count_tokens_estimate(t) for t in (system, data_block, schema_text))
+        input_tokens = estimate_input_tokens(self, system, data_block, schema)
         check_pre_flight(input_tokens, max_output_tokens, self._num_ctx)
         body = self._chat(system, data_block, schema, max_output_tokens)
         reported = usage_count(body, "prompt_eval_count")
