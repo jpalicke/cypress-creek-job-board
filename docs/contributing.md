@@ -20,7 +20,7 @@ New here or handing a card to someone else? [handoff.md](handoff.md) is the comp
 - No mocks or fake providers. An unreachable backend fails the test loudly, it is never skipped.
 
 ## Tests
-Four tiers exist: unit, component, integration and e2e. Markers `live` (needs a real model backend) and `needs_network` (needs the internet) select tests. Property tests use Hypothesis, and they run with the rest of the suite.
+Four tiers exist: unit, component, integration and e2e. Markers `live` (needs a real model backend) and `needs_network` (needs the internet) select tests. The `live` tests need a running Ollama with `qwen3.5:0.8b` (see [providers.md](providers.md#try-it-locally)) and are not in the gated unit and component run. Property tests use Hypothesis, and they run with the rest of the suite.
 
 ## Documentation checklist
 Before a PR is ready, in the same PR:
