@@ -9,6 +9,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [pipeline.md](pipeline.md) | Each pipeline stage and its rules: posting normalization, the support gate, the score |
 | [validators.md](validators.md) | The grounding validators V1 to V14: what each rejects and its known limits |
 | [providers.md](providers.md) | The provider interface, typed errors, retry policy, backend config, the loopback rule, the Ollama adapter and the budget guard |
+| [threat-model.md](threat-model.md) | URL target validation, SSRF rules and test coverage, compatibility limits and the pending HTTP transport |
 | [spec.md](spec.md) | The full design spec: goals, architecture, data model, pipeline, providers, validators, evals, threat model, discovery, ingestion, UI, testing and the card plan |
 | [lanes.md](lanes.md) | How the lanes depend on each other and which can be worked in parallel |
 | [handoff.md](handoff.md) | The card routine step by step, for a new contributor or assistant picking up a card |
@@ -25,6 +26,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [0006](adr/0006-issuer-field-and-issuer-matching.md) | Optional issuer on facts and requirements, matched with company_key |
 | [0007](adr/0007-provider-config-toml-and-loopback.md) | Provider config as TOML plus environment overrides, remote hosts are opt in |
 | [0008](adr/0008-ollama-truncation-signature-and-window-floor.md) | How the Ollama adapter detects silent truncation, and the 2048 window floor |
+| [0009](adr/0009-url-target-validation.md) | Public URL targets, strict hostname syntax and validation of every resolved address |
 
 ## Configuration
 - `config/aliases.yaml`: tag alias table, described in [data-model.md](data-model.md#tag-alias-table).
@@ -33,3 +35,5 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 - `CYPRESS_CREEK_DATA_DIR` (default `data/`, gitignored): where the SQLite database lives, described in [data-model.md](data-model.md#storage-sqlite-and-migrations).
 - `config/provider.toml` (or the file named by `CYPRESS_CREEK_CONFIG`) and `CYPRESS_CREEK_<FIELD>` variables: which model backend to use and the run budget limits, described in [providers.md](providers.md#configuration). API keys are read only from the environment variable the file names.
 - `facts.private/bank.yaml` (gitignored) or the path in `CYPRESS_CREEK_BANK`: your fact bank.
+
+URL target validation has no configuration or environment override. In particular, the provider's `allow_remote` setting does not relax the URL guard's public-address rule.

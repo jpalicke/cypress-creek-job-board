@@ -29,6 +29,7 @@ src/cypress_creek/       The library
     normalize.py         normalize(), text_hash()
     hashing.py           The one definition of the text hash
     errors.py            PostingTooLong, EmptyPosting
+    url_guard.py         validate_url, immutable ValidatedTarget, UrlGuardError with reason codes
   validators/            Grounding validators V1 to V14, pure functions returning Verdicts
     verdict.py           Verdict, ok(), fail()
     cues.py              The one list of importance cue words, sentence splitting
@@ -60,8 +61,8 @@ src/cypress_creek/       The library
 tests/
   unit/                  Pure functions and models, no I/O beyond tmp files
   component/             Real files and real environment, several modules together
-  integration/           Real services (empty so far)
-  e2e/                   Whole flows (empty so far)
+  integration/           Real public DNS (needs_network) and real Ollama requests (live)
+  e2e/                   URL guard consumed from a separate Python process
   fixtures/              Recorded or hand written inputs
     hostile_outputs/     One bad model output per validator, plus a small bank (see validators.md)
   conftest.py            Fails the run if any test is skipped
@@ -71,6 +72,10 @@ tests/
 ## How the pieces fit today
 ```mermaid
 flowchart LR
+    url[Untrusted URL] --> guard["ingest.url_guard.validate_url()"]
+    resolver[Operating system DNS] --> guard
+    guard --> target["ValidatedTarget: scheme, host, ip, port"]
+    target -. F1b .-> transport[Guarded HTTP transport]
     raw[Raw posting text] --> norm["ingest.normalize()"]
     norm --> posting[Posting]
     posting -. later cards .-> reqs[Requirements]
@@ -89,11 +94,14 @@ flowchart LR
 ```
 Dotted means not built yet. Extraction, model verdicts, real provider adapters, validators, gap reports and drafting arrive in later cards (see the issue board and the spec). The pieces that exist are libraries with no app around them yet.
 
+URL validation is a separate library entry point. It rejects unsafe syntax, resolves a hostname once, checks every address, and returns connection coordinates without fetching anything. The future transport must connect to the returned IP while using the hostname for Host and TLS verification; validation alone does not enforce this. See [the SSRF rules and limits](threat-model.md) and [ADR 0009](adr/0009-url-target-validation.md). The transport architecture and its import restriction are part of F1b.
+
 ## Ideas to know
 - **One source of truth.** The bank file is the only record of facts. Verification is derived from `verified_on` and is never stored as a separate flag. The pipeline only ever sees `Bank.verified_facts()`.
 - **Pure and deterministic.** Scoring functions take everything as arguments, including `today`. Nothing reads the clock or the network.
 - **Data, not code.** Things a person should tune (the alias table, the score weights) or bundled third party data (the Unicode confusables) are YAML in `config/`, loaded and validated, never hard coded.
 - **Typed errors.** Failures are specific exception classes (`PostingTooLong`, `FactValidationError`), so callers and tests can tell them apart. Text is rejected, never silently cut or repaired.
+- **Public URL targets.** `validate_url` raises `UrlGuardError` with a stable `reason_code` and a generic message. It never echoes the URL or resolver error. Every DNS answer must pass the address checks before any one is selected; one private answer rejects the entire result.
 - **Safe by default config.** Backends default to loopback only, going remote needs `allow_remote`, and keys come from the environment alone. Config errors never echo a submitted value.
 - **Truncation is refused, not tolerated.** The Ollama adapter estimates before the call and checks the reported count after it, so a prompt the server would silently cut never produces an answer.
 - **Spend is capped before it happens.** `BudgetedProvider` checks the worst case (estimate plus output cap) against the run limits before a call and records the server's real usage after it. Real usage above an estimate blocks the next call, so the guard fails closed.
@@ -136,6 +144,7 @@ Conventions you will trip over if you do not know them:
 - **A new tag alias:** add it to `config/aliases.yaml`. The tests in `tests/unit/test_aliases.py` show the rules (an alias belongs to one canonical tag).
 - **A new fact field:** change `facts/models.py`, add a failing test in `tests/unit/test_fact_models.py` first, write an ADR if it is a design decision, and update `docs/data-model.md`.
 - **A new pipeline stage:** a new module under the right package, typed errors beside it, tests in all relevant tiers, and a section in `docs/pipeline.md`.
+- **A change to URL policy:** start with a hostile or accepted input in `tests/unit/test_url_guard.py`, then change `ingest/url_guard.py`. Keep the real-resolver, public-DNS and process tests passing and update [threat-model.md](threat-model.md). Never add an environment or config switch that permits private URLs.
 
 ## Where to look when something is unclear
 Picking up a card from the board? [handoff.md](handoff.md) is the step by step routine.
