@@ -79,7 +79,7 @@ def _name_pattern(name: str) -> re.Pattern[str]:
 def _entity_names(fact: Fact) -> set[str]:
     names = {fact.employer, fact.role}
     if fact.kind in (Kind.CERTIFICATION, Kind.EDUCATION):
-        names |= {tag.name for tag in fact.tags}
+        names |= {tag.name for tag in fact.tags} | {fact.issuer}
     return {normalize_term(name) for name in names if name and normalize_term(name)}
 
 
@@ -204,7 +204,13 @@ def _strip_iso_dates(text: str) -> str:
 
 
 def _fact_numbers(fact: Fact) -> set[str]:
-    texts = [fact.claim, fact.employer or "", fact.role or "", *(tag.name for tag in fact.tags)]
+    texts = [
+        fact.claim,
+        fact.employer or "",
+        fact.role or "",
+        fact.issuer or "",
+        *(tag.name for tag in fact.tags),
+    ]
     numbers = {number for text in texts for number in extract_numbers(text)}
     return numbers | {str(moment.year) for moment in (fact.start, fact.end) if moment is not None}
 

@@ -151,7 +151,13 @@ def test_every_validator_has_a_corpus_case() -> None:
 
 
 def test_the_corpus_bank_loads_and_has_each_fact_shape_the_cases_need() -> None:
-    assert [fact.id for fact in BANK.verified_facts()] == ["F-0001", "F-0002", "F-0004"]
+    assert [fact.id for fact in BANK.verified_facts()] == [
+        "F-0001",
+        "F-0002",
+        "F-0004",
+        "F-0005",
+        "F-0006",
+    ]
 
 
 def test_a_faithful_rationale_passes_the_grounding_checks() -> None:

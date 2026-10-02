@@ -42,6 +42,26 @@
       "verified_on": "2026-01-01",
       "evidence": {"type": "self_attested", "pointer": "note"},
       "share": "local_only"
+    },
+    {
+      "id": "F-0005",
+      "claim": "Holds the CKA certification",
+      "kind": "certification",
+      "issuer": "Linux Foundation",
+      "tags": [{"name": "CKA", "level": "expert"}],
+      "verified_on": "2026-01-01",
+      "evidence": {"type": "self_attested", "pointer": "note"},
+      "share": "shareable"
+    },
+    {
+      "id": "F-0006",
+      "claim": "Holds the CKAD certification",
+      "kind": "certification",
+      "issuer": "Globex Academy",
+      "tags": [{"name": "CKAD", "level": "expert"}],
+      "verified_on": "2026-01-01",
+      "evidence": {"type": "self_attested", "pointer": "note"},
+      "share": "shareable"
     }
   ]
 }

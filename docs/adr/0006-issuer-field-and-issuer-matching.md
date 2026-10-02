@@ -8,7 +8,7 @@ Status: accepted (Joe P, card #57)
 - Both are trimmed and must hold a letter or digit, checked by one function, `clean_issuer`.
 - The support gate compares issuers with `company_key`, the one organization name normalizer, so case, spacing, legal suffix and lookalike variants match.
 - An education or certification requirement that names an issuer is met only by a fact with the same issuer. A fact with no issuer is not a candidate. A requirement without an issuer behaves as before. An issuer on any other requirement kind is ignored.
-- Validators V7, V8 and V10 do not read `issuer` yet. That follows in a separate card so each change stays small.
+- Validators V7, V8 and V10 read `issuer` like the employer: V7 treats the issuer of an uncited certification or education fact as a name that must not appear, V8 and V10 accept the issuer of a cited fact.
 
 ## Why
 Before this, a requirement for a degree or certificate from a named issuer was met by any fact of that kind with the right tag, which overstates support. Storing the issuer in `employer` would label a school as an employer and confuse V7. Renaming `employer` would break existing banks. An optional new field is the smallest honest change. Reusing `company_key` keeps one normalizer for organization names.

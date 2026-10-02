@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 from builders import fact
 
-from cypress_creek.facts.models import Level, Tag
+from cypress_creek.facts.models import Kind, Level, Tag
 from cypress_creek.validators.claims import check_citation_required, check_novel_terms, novel_terms
 
 
@@ -102,3 +102,13 @@ def test_v10_flags_each_novel_term_once_in_order() -> None:
 
 def test_v10_treats_a_new_line_as_a_sentence_start() -> None:
     assert novel_terms("Ran things\nDeployed things", [CITED], "") == []
+
+
+def test_v10_allows_the_issuer_of_a_cited_fact() -> None:
+    issued = fact(8, kind=Kind.CERTIFICATION, issuer="Linux Foundation", employer=None, role=None)
+    assert novel_terms("Certified by the Linux Foundation.", [issued], "") == []
+
+
+def test_v10_flags_an_issuer_that_no_cited_fact_has() -> None:
+    issued = fact(8, kind=Kind.CERTIFICATION, issuer="Linux Foundation", employer=None, role=None)
+    assert "globex" in novel_terms("Certified by Globex.", [issued], "")
