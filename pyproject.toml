@@ -16,8 +16,12 @@ packages = ["src/cypress_creek"]
 
 [dependency-groups]
 dev = [
+    "detect-secrets>=1.5.0",
+    "mypy>=2.4.0",
+    "pre-commit>=4.6.2",
     "pytest>=8",
     "pytest-cov>=6",
+    "ruff>=0.16.10",
 ]
 
 [tool.pytest.ini_options]
@@ -28,3 +32,22 @@ markers = [
     "live: needs a real model backend; an unreachable backend is an error, never a skip",
     "needs_network: needs the real internet; an unreachable network is an error, never a skip",
 ]
+
+[tool.coverage.run]
+source = ["src/cypress_creek"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+
+[tool.mypy]
+strict = true
+files = ["src", "tests"]

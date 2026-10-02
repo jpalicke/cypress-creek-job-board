@@ -1,0 +1,16 @@
+name: deterministic
+on:
+  push:
+  pull_request:
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --locked
+      - run: uv run --locked ruff check
+      - run: uv run --locked ruff format --check
+      - run: uv run --locked mypy
+      - run: uv run --locked pre-commit run detect-secrets --all-files
+      - run: uv run --locked pytest tests/unit tests/component --cov --cov-fail-under=80
