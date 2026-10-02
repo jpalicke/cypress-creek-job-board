@@ -41,7 +41,7 @@ src/cypress_creek/       The library
   scoring/               Deterministic scoring, no model calls
     aliases.py           AliasTable, load_aliases
     support.py           candidate_facts, merged_years, support_ceiling
-    score.py             Weights, Match, downgrade, score, ScoreResult
+    score.py             Weights, load_weights, Match, downgrade, score, ScoreResult
 tests/
   unit/                  Pure functions and models, no I/O beyond tmp files
   component/             Real files and real environment, several modules together

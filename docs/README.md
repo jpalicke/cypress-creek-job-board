@@ -19,4 +19,5 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 
 ## Configuration
 - `config/aliases.yaml`: tag alias table, described in [data-model.md](data-model.md#tag-alias-table).
+- `config/weights.yaml`: score weights and support values, described in [pipeline.md](pipeline.md#score).
 - `facts.private/bank.yaml` (gitignored) or the path in `CYPRESS_CREEK_BANK`: your fact bank.

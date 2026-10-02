@@ -1,11 +1,16 @@
 # ABOUTME: The published score formula: a weighted average of support over all requirements.
 # ABOUTME: Pure arithmetic, no model and no clock, and support can only ever be downgraded.
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
+from pathlib import Path
+from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+import yaml
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from cypress_creek.ingest.models import Importance
 from cypress_creek.scoring.support import Support
+
+DEFAULT_WEIGHTS_PATH = Path(__file__).resolve().parents[3] / "config" / "weights.yaml"
 
 _ORDER = (Support.NONE, Support.PARTIAL, Support.STRONG)
 
@@ -50,6 +55,25 @@ class Weights(BaseModel):
             Support.PARTIAL: self.partial,
             Support.NONE: self.none,
         }[support]
+
+
+class WeightsError(Exception):
+    """The weights file is missing, malformed or holds invalid values."""
+
+
+def load_weights(path: Path = DEFAULT_WEIGHTS_PATH) -> Weights:
+    if not path.is_file():
+        raise WeightsError(f"weights file not found: {path}")
+    try:
+        data: Any = yaml.safe_load(path.read_text(encoding="utf8"))
+    except yaml.YAMLError as error:
+        raise WeightsError(f"invalid YAML in weights file: {error}") from error
+    if not isinstance(data, Mapping) or not isinstance(data.get("weights"), Mapping):
+        raise WeightsError("weights file needs a top level 'weights' mapping")
+    try:
+        return Weights(**data["weights"])
+    except (ValidationError, TypeError) as error:
+        raise WeightsError(f"invalid weights: {error}") from error
 
 
 class Match(BaseModel):

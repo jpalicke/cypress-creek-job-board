@@ -51,7 +51,7 @@ score = 100 * sum(weight * value) / sum(weight)
 - **Supported** means strong or partial. The result carries `supported` out of `total`, the counts per support level, and every input line (requirement, importance, support, weight, value), so the number can be recomputed by hand.
 - **No requirements gives no score** (`score` is `None`), never 100 and never 0. All requirements at `none` is a real 0.
 - **Support can only go down.** A `Match` holds the `ceiling` from the support gate and the final `support`. Support above the ceiling, or more than one step below it, is refused when the `Match` is built. `downgrade()` is the one way to lower support a step.
-- **Overriding weights.** Pass a `Weights` instance. It is validated: weights above zero, values between 0 and 1, and none <= partial <= strong. The weights used are echoed in `inputs`.
+- **Overriding weights.** The weights live in `config/weights.yaml` (data, not code) and `load_weights()` reads and validates them; a test checks the shipped file equals the published defaults. You can also pass a `Weights` instance to `score()`. Validation: weights above zero, values between 0 and 1, and none <= partial <= strong. The weights used are echoed in `inputs`.
 - The score ranks postings for triage. It is not a probability of getting the job.
 
 Worked example: one required strong, one required partial, one unspecified none and one preferred partial.
@@ -64,18 +64,18 @@ score               = 100 * 5.0 / 9 = 55.6
 
 A test computes this example and checks the number printed here, so the docs and the code cannot drift. See [ADR 0003](adr/0003-score-formula-and-downgrade-only.md).
 
-Try the score:
+Try the score (weights come from `config/weights.yaml`):
 ```bash
 uv run python -c "
 from cypress_creek.ingest.models import Importance
-from cypress_creek.scoring.score import Match, score
+from cypress_creek.scoring.score import Match, load_weights, score
 from cypress_creek.scoring.support import Support
 rows = [('R-1', Importance.REQUIRED, Support.STRONG, Support.STRONG),
         ('R-2', Importance.REQUIRED, Support.STRONG, Support.PARTIAL),
         ('R-3', Importance.UNSPECIFIED, Support.NONE, Support.NONE),
         ('R-4', Importance.PREFERRED, Support.PARTIAL, Support.PARTIAL)]
 matches = [Match(requirement_id=i, importance=m, ceiling=c, support=s) for i, m, c, s in rows]
-print(score(matches).model_dump_json(indent=1))"
+print(score(matches, load_weights()).model_dump_json(indent=1))"
 ```
 
 ## Try it locally
