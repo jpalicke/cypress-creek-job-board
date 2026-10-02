@@ -35,6 +35,49 @@ For each requirement the gate decides the most support the fact bank can ever ju
 
 The functions live in `src/cypress_creek/scoring/support.py`: `candidate_facts`, `merged_years` and `support_ceiling`. They read a requirement through a small protocol (`term`, `kind`, `years`), which the `Requirement` model from card B3 will satisfy.
 
+## Score
+`score(matches, weights)` in `src/cypress_creek/scoring/score.py` turns the final support of every requirement into one number for triage.
+
+```
+score = 100 * sum(weight * value) / sum(weight)
+```
+
+| Importance | Weight | | Support | Value |
+| --- | --- | --- | --- | --- |
+| required | 3 | | strong | 1.0 |
+| unspecified | 2 | | partial | 0.5 |
+| preferred | 1 | | none | 0.0 |
+
+- **Supported** means strong or partial. The result carries `supported` out of `total`, the counts per support level, and every input line (requirement, importance, support, weight, value), so the number can be recomputed by hand.
+- **No requirements gives no score** (`score` is `None`), never 100 and never 0. All requirements at `none` is a real 0.
+- **Support can only go down.** A `Match` holds the `ceiling` from the support gate and the final `support`. Support above the ceiling, or more than one step below it, is refused when the `Match` is built. `downgrade()` is the one way to lower support a step.
+- **Overriding weights.** Pass a `Weights` instance. It is validated: weights above zero, values between 0 and 1, and none <= partial <= strong. The weights used are echoed in `inputs`.
+- The score ranks postings for triage. It is not a probability of getting the job.
+
+Worked example: one required strong, one required partial, one unspecified none and one preferred partial.
+
+```
+sum(weight * value) = 3*1.0 + 3*0.5 + 2*0.0 + 1*0.5 = 5.0
+sum(weight)         = 3 + 3 + 2 + 1 = 9
+score               = 100 * 5.0 / 9 = 55.6
+```
+
+A test computes this example and checks the number printed here, so the docs and the code cannot drift. See [ADR 0003](adr/0003-score-formula-and-downgrade-only.md).
+
+Try the score:
+```bash
+uv run python -c "
+from cypress_creek.ingest.models import Importance
+from cypress_creek.scoring.score import Match, score
+from cypress_creek.scoring.support import Support
+rows = [('R-1', Importance.REQUIRED, Support.STRONG, Support.STRONG),
+        ('R-2', Importance.REQUIRED, Support.STRONG, Support.PARTIAL),
+        ('R-3', Importance.UNSPECIFIED, Support.NONE, Support.NONE),
+        ('R-4', Importance.PREFERRED, Support.PARTIAL, Support.PARTIAL)]
+matches = [Match(requirement_id=i, importance=m, ceiling=c, support=s) for i, m, c, s in rows]
+print(score(matches).model_dump_json(indent=1))"
+```
+
 ## Try it locally
 ```bash
 uv run python -c "

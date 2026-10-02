@@ -41,6 +41,7 @@ src/cypress_creek/       The library
   scoring/               Deterministic scoring, no model calls
     aliases.py           AliasTable, load_aliases
     support.py           candidate_facts, merged_years, support_ceiling
+    score.py             Weights, Match, downgrade, score, ScoreResult
 tests/
   unit/                  Pure functions and models, no I/O beyond tmp files
   component/             Real files and real environment, several modules together
@@ -65,6 +66,8 @@ flowchart LR
     verified --> gate
     table --> gate
     gate --> ceiling["support + deciding gate"]
+    ceiling --> score["scoring.score()"]
+    score --> result["score, supported of total, inputs"]
     reqs -. model output .-> val["validators (V1 to V14)"]
 ```
 Dotted means not built yet. Extraction, model verdicts, validators, gap reports and drafting arrive in later cards (see the issue board and the spec). The pieces that exist are libraries with no app around them yet.

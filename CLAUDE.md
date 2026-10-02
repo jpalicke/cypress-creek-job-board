@@ -12,6 +12,7 @@ No auto apply. Ever. A human reviews every draft.
 ## How we work
 - TDD. Write a failing test, see it fail, write the minimum code, see it pass, refactor.
 - Branch per task. Open a PR. Merge to main after review. No worktrees.
+- PRs aim for at most 10 changed files, hard cap 20. Split big cards into several PRs, each with its own docs. Propose the split before starting.
 - At most 5 files per phase. Run verification, then wait for approval.
 - Development goes through the subagent development skill.
 - Never use --no-verify, --no-hooks or any hook bypass. If a hook fails, fix the cause.
