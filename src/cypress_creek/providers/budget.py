@@ -1,7 +1,10 @@
 # ABOUTME: Run limits and the tracker that enforces them: checked before a call, updated after it.
 # ABOUTME: Fails closed. Real usage above an estimate blocks every later call.
+from collections.abc import Sequence
+
 from pydantic import BaseModel, ConfigDict, Field
 
+from cypress_creek.config import ProviderSettings
 from cypress_creek.providers.base import (
     Capabilities,
     CostPerMtok,
@@ -24,6 +27,16 @@ class Budget(BaseModel):
     max_output_tokens: int = Field(default=100_000, gt=0)
     max_requests: int = Field(default=500, gt=0)
     max_usd: float = Field(default=2.0, gt=0)
+
+
+def budget_from_settings(settings: ProviderSettings) -> Budget:
+    """The settings' limits where set, the Budget defaults for the rest."""
+    limits = {
+        name: getattr(settings, name)
+        for name in Budget.model_fields
+        if getattr(settings, name) is not None
+    }
+    return Budget(**limits)
 
 
 class BudgetTracker:
@@ -86,3 +99,38 @@ class BudgetedProvider:
         result = self._inner.complete_structured(system, data_block, schema, max_output_tokens)
         self.tracker.record(result.usage)
         return result
+
+
+class PlannedCall(BaseModel):
+    """One call a run intends to make, described before anything is sent."""
+
+    system: str
+    data_block: str
+    output_schema: type[BaseModel]
+    max_output_tokens: int
+
+
+class CostEstimate(BaseModel):
+    """What a plan would use at most: estimated input and the output cap for every call."""
+
+    input_tokens: int
+    output_tokens: int
+    requests: int
+    usd: float
+
+
+def dry_run_estimate(
+    provider: Provider, budget: Budget, plan: Sequence[PlannedCall]
+) -> CostEstimate:
+    """Total a plan with the checks a real run applies. Raises BudgetExceeded if it won't fit."""
+    tracker = BudgetTracker(budget, provider.capabilities.cost_per_mtok)
+    for call in plan:
+        estimate = estimate_input_tokens(provider, call.system, call.data_block, call.output_schema)
+        tracker.check_before(estimate, call.max_output_tokens)
+        tracker.record(Usage(input_tokens=estimate, output_tokens=call.max_output_tokens))
+    return CostEstimate(
+        input_tokens=tracker.input_tokens,
+        output_tokens=tracker.output_tokens,
+        requests=tracker.requests,
+        usd=tracker.usd,
+    )

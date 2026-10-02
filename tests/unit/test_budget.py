@@ -1,15 +1,27 @@
-# ABOUTME: Tests the budget limits and tracker: caps checked before a call, usage recorded after it.
+# ABOUTME: Tests the budget limits, tracker, dry run and settings: caps checked, usage recorded.
 # ABOUTME: Local backends cost no dollars but still honour the token and request caps.
 from typing import Any
 
 import pytest
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
-from cypress_creek.providers import BudgetExceeded, CostPerMtok, Usage
-from cypress_creek.providers.budget import Budget, BudgetTracker
+from cypress_creek.config import parse_settings
+from cypress_creek.providers import BudgetExceeded, CostPerMtok, OllamaProvider, Usage
+from cypress_creek.providers.base import estimate_input_tokens
+from cypress_creek.providers.budget import (
+    Budget,
+    BudgetTracker,
+    PlannedCall,
+    budget_from_settings,
+    dry_run_estimate,
+)
 
 FREE = CostPerMtok(input=0, output=0)
 PAID = CostPerMtok(input=3.0, output=15.0)
+
+
+class Answer(BaseModel):
+    text: str
 
 
 def _tracker(cost: CostPerMtok = FREE, **limits: Any) -> BudgetTracker:
@@ -120,3 +132,40 @@ def test_the_defaults_are_conservative_and_documented() -> None:
 def test_bad_limits_are_rejected(bad: dict[str, Any]) -> None:
     with pytest.raises(ValidationError):
         Budget(**bad)
+
+
+def _plan(data: str = "data", cap: int = 100) -> PlannedCall:
+    return PlannedCall(system="sys", data_block=data, output_schema=Answer, max_output_tokens=cap)
+
+
+def test_a_dry_run_totals_the_plan_with_the_worst_case_output() -> None:
+    provider = OllamaProvider(parse_settings({"provider": "ollama", "model": "m"}))
+    plan = [_plan("a" * 300), _plan("b" * 300)]
+    estimate = dry_run_estimate(provider, Budget(), plan)
+    per_call = estimate_input_tokens(provider, "sys", "a" * 300, Answer)
+    assert estimate.requests == 2
+    assert estimate.input_tokens == 2 * per_call
+    assert estimate.output_tokens == 200
+    assert estimate.usd == 0
+
+
+def test_a_plan_that_cannot_fit_the_budget_raises_before_any_call() -> None:
+    provider = OllamaProvider(parse_settings({"provider": "ollama", "model": "m"}))
+    with pytest.raises(BudgetExceeded) as caught:
+        dry_run_estimate(provider, Budget(max_requests=1), [_plan(), _plan()])
+    assert caught.value.limit_name == "requests"
+
+
+def test_budget_settings_become_the_budget() -> None:
+    settings = parse_settings(
+        {"provider": "ollama", "model": "m", "max_input_tokens": 1234, "max_usd": 0.5}
+    )
+    budget = budget_from_settings(settings)
+    assert budget.max_input_tokens == 1234
+    assert budget.max_usd == 0.5
+    assert budget.max_requests == Budget().max_requests
+
+
+def test_no_budget_settings_means_the_defaults() -> None:
+    settings = parse_settings({"provider": "ollama", "model": "m"})
+    assert budget_from_settings(settings) == Budget()
