@@ -36,6 +36,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [0013](adr/0013-pinned-http-transport.md) | Pinned HTTP connections, deadline isolation and bounded response decoding |
 | [0014](adr/0014-run-id-is-derived-from-the-inputs.md) | The run id is a hash of the posting, the fact bank, the backend and the model |
 | [0015](adr/0015-link-fetch-browser-signals.md) | Only clear HTTP authentication signals need browser guidance during raw link fetching |
+| [0016](adr/0016-tombstones-are-removed-only-by-a-human-call.md) | Denied companies are tombstoned by key and board, and only an explicit call lifts one |
 
 ## Configuration
 - `config/aliases.yaml`: tag alias table, described in [data-model.md](data-model.md#tag-alias-table).
