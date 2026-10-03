@@ -76,3 +76,89 @@ facts:
     verified_on: 2024-03-01
     evidence: {type: public_url, pointer: "https://example.invalid/sample/csv-checker"}
     share: shareable
+
+  - id: F-0009
+    claim: Wrote the Airflow DAGs that scheduled the nightly extracts.
+    kind: project
+    start: 2020-02-01
+    end: 2021-06-30
+    tags: [{name: airflow, level: working}, {name: python, level: expert}]
+    verified_on: 2024-03-01
+    evidence: {type: repo, pointer: "https://example.invalid/sample/nightly-dags"}
+    share: shareable
+
+  - id: F-0010
+    claim: Contractor at Waffle Iron Consulting, writing SQL reports for a client.
+    kind: employment
+    employer: Waffle Iron Consulting
+    role: Contractor
+    start: 2018-01-01
+    end: 2018-06-30
+    tags: [{name: sql, level: working}]
+    verified_on: 2024-03-01
+    evidence: {type: employer_doc, pointer: "Fictional invoice record, Waffle Iron Consulting"}
+    share: shareable
+
+  - id: F-0011
+    claim: Summer intern at Pogo Stick Software, fixing small bugs in a Java codebase.
+    kind: employment
+    employer: Pogo Stick Software
+    role: Intern
+    start: 2014-06-01
+    end: 2014-08-31
+    tags: [{name: java, level: familiar}]
+    verified_on: 2024-03-01
+    evidence: {type: employer_doc, pointer: "Fictional internship letter, Pogo Stick Software"}
+    share: shareable
+
+  - id: F-0012
+    claim: Built internal REST APIs with FastAPI for the reporting team.
+    kind: project
+    start: 2020-03-01
+    end: 2021-03-31
+    tags: [{name: fastapi, level: working}]
+    verified_on: 2024-03-01
+    evidence: {type: repo, pointer: "https://example.invalid/sample/report-api"}
+    share: shareable
+
+  - id: F-0013
+    claim: Set up continuous integration for the warehouse code so every change ran its tests.
+    kind: project
+    tags: [{name: ci, level: working}]
+    verified_on: 2024-03-01
+    evidence: {type: repo, pointer: "https://example.invalid/sample/warehouse-ci"}
+    share: shareable
+
+  - id: F-0014
+    claim: Wrote a few dbt models for a side analysis.
+    kind: project
+    tags: [{name: dbt, level: familiar}]
+    verified_on: 2024-03-01
+    evidence: {type: self_attested, pointer: "Fictional personal notes"}
+    share: shareable
+
+  - id: F-0015
+    claim: Mentored three junior engineers through their first year.
+    kind: achievement
+    employer: Turbo Tortoise Systems
+    verified_on: 2024-03-01
+    evidence: {type: self_attested, pointer: "Fictional personal notes"}
+    share: local_only
+
+  - id: F-0016
+    claim: Tuned slow PostgreSQL queries with EXPLAIN output and new indexes.
+    kind: project
+    tags: [{name: postgresql, level: expert}]
+    verified_on: 2024-03-01
+    evidence: {type: repo, pointer: "https://example.invalid/sample/query-tuning"}
+    share: shareable
+
+  - id: F-0017
+    claim: Led a six month effort to replace a tangle of hand run SQL scripts with tested, versioned, reviewed pipelines, writing the runbooks, training four teammates, and cutting failed nightly loads from about one a week to about one a quarter across the whole warehouse, with on call handover notes.
+    kind: project
+    start: 2022-01-01
+    end: 2022-06-30
+    tags: [{name: sql, level: expert}, {name: etl, level: working}]
+    verified_on: 2024-03-01
+    evidence: {type: repo, pointer: "https://example.invalid/sample/pipeline-rewrite"}
+    share: shareable
