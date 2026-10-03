@@ -25,3 +25,5 @@ Why: on B6a the implementation was rewritten for the full Unicode confusables da
 ## Post the merge summary on the issue too
 When asking Joe P to merge, post the same summary as a comment on the card's issue so the ticket records the completed work.
 Why: Joe P asked for it on B6a.
+
+- After resolving a merge, grep every touched file for conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`) before `git add`. A resolver script that asserts and fails must stop the commit, never be chained to it.

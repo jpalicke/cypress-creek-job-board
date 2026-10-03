@@ -7,6 +7,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [codebase.md](codebase.md) | Start here if you are new: layout, how the pieces fit, ideas to know, how a card goes |
 | [data-model.md](data-model.md) | The fact bank, Posting and Requirement, and the tag alias table (`config/aliases.yaml`) the company name key (`company_key`) and the SQLite storage and migrations |
 | [pipeline.md](pipeline.md) | Each pipeline stage and its rules: posting normalization, the prompt builder (extraction and entailment prompts), accepting extraction output, stage 1 extraction, stage 2 retrieval, stage 3 entailment, stages 4 and 5 score and report, running the pipeline and the derived run id, the support gate, the score |
+| [evals.md](evals.md) | The fictional sample fact bank and its planted gaps, which the eval hand labels refer to |
 | [validators.md](validators.md) | The grounding validators V1 to V14: what each rejects and its known limits |
 | [providers.md](providers.md) | The provider interface, typed errors, retry policy, backend config, the loopback rule, the Ollama adapter and the budget guard |
 | [setup.md](setup.md) | Fetch one public posting link, inspect raw bytes and provenance, and understand network behavior and typed failures |
