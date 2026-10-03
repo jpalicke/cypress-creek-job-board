@@ -14,7 +14,13 @@ from urllib.parse import urljoin, urlsplit
 
 import httpx
 
+from cypress_creek import __version__
 from cypress_creek.ingest.url_guard import ReasonCode, UrlGuardError, ValidatedTarget
+
+_USER_AGENT = (
+    f"cypress-creek/{__version__} "
+    "(personal job search tool; +https://github.com/jpalicke/cypress-creek-job-board)"
+)
 
 
 @dataclass(frozen=True)
@@ -118,7 +124,11 @@ def _fetch(
                 client.stream(
                     "GET",
                     wire_url,
-                    headers={"Host": host, "Accept-Encoding": "gzip"},
+                    headers={
+                        "Host": host,
+                        "Accept-Encoding": "gzip",
+                        "User-Agent": _USER_AGENT,
+                    },
                     extensions={"sni_hostname": target.host},
                 ) as response,
             ):
