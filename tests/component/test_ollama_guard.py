@@ -5,12 +5,15 @@ import pytest
 from pydantic import BaseModel
 
 from cypress_creek.config import ConfigError, parse_settings
+from cypress_creek.pipeline.prompt import Stage, build_prompt
+from cypress_creek.pipeline.schemas import ExtractionOutput
 from cypress_creek.providers import (
     ContextTruncated,
     ProviderUnavailable,
     RateLimited,
     get_provider,
 )
+from cypress_creek.providers.base import estimate_input_tokens
 from cypress_creek.providers.ollama import (
     CHARS_PER_TOKEN,
     MIN_NUM_CTX,
@@ -60,6 +63,14 @@ def test_pre_flight_refuses_one_token_over() -> None:
         check_pre_flight(input_tokens=601, max_output_tokens=400, num_ctx=1000)
     assert caught.value.input_tokens == 1001
     assert caught.value.context_tokens == 1000
+
+
+def test_default_window_fits_the_full_posting_cap_with_extraction_output_room() -> None:
+    provider = OllamaProvider(parse_settings({"provider": "ollama", "model": "qwen3.5:0.8b"}))
+    prompt = build_prompt(Stage.EXTRACT, "a" * 50_000, [], provider.capabilities, ExtractionOutput)
+    estimate = estimate_input_tokens(provider, prompt.system, prompt.data_block, ExtractionOutput)
+
+    check_pre_flight(estimate, max_output_tokens=4000, num_ctx=provider.capabilities.context_tokens)
 
 
 def test_post_flight_flags_a_count_at_the_window_when_the_estimate_was_lower() -> None:

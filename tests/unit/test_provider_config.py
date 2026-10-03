@@ -77,7 +77,7 @@ def test_defaults_are_local_and_safe() -> None:
     assert settings.api_key_env is None
     assert settings.request_timeout_seconds > 0
     assert settings.connect_timeout_seconds > 0
-    assert settings.context_tokens == 8192
+    assert settings.context_tokens == 32768
 
 
 @pytest.mark.parametrize(

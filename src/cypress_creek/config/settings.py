@@ -47,7 +47,7 @@ class ProviderSettings(BaseModel):
     api_key_env: NonBlank | None = None
     request_timeout_seconds: float = Field(default=120.0, gt=0)
     connect_timeout_seconds: float = Field(default=5.0, gt=0)
-    context_tokens: int = Field(default=8192, gt=0)
+    context_tokens: int = Field(default=32768, gt=0)
     max_input_tokens: int | None = Field(default=None, gt=0)
     max_output_tokens: int | None = Field(default=None, gt=0)
     max_requests: int | None = Field(default=None, gt=0)

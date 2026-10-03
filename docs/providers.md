@@ -43,7 +43,7 @@ Why it matters: when a prompt is longer than the window, Ollama does not fail. I
 1. **Before the call.** It estimates tokens for the system text, the data block and the schema, adds the output cap, and raises `ContextTruncated` without calling the model if the total exceeds `context_tokens`. The estimate is the character count divided by 3, rounded up. Real text averages nearer 4 characters per token, so the estimate runs high and the guard errs toward refusing.
 2. **After the call.** It compares the `prompt_eval_count` the server reports with the estimate. A count near the full window, or a count of about half the window (what a truncating server reports, measured on Ollama 0.34), that the estimate did not predict raises `ContextTruncated`. A response with no usage counts is an error.
 
-Every request sets `num_ctx` from `context_tokens` (default 8192, minimum 2048 because the server raises smaller windows), temperature 0, the JSON schema as `format` and `think: false`. Model output is data: it is parsed with the schema and a mismatch is `SchemaViolation`, which carries the schema error and never the output.
+Every request sets `num_ctx` from `context_tokens` (default 32768, minimum 2048 because the server raises smaller windows), temperature 0, the JSON schema as `format` and `think: false`. The larger default leaves room for a 50,000-character posting, the extraction instructions, schema and response under the adapter's conservative estimate. The estimate still checks every actual request, and a model or machine that cannot support the configured window needs a smaller `context_tokens` setting. Model output is data: it is parsed with the schema and a mismatch is `SchemaViolation`, which carries the schema error and never the output.
 
 | Situation | Error |
 | --- | --- |
@@ -84,7 +84,7 @@ base_url = "http://localhost:11434"
 # api_key_env = "OPENAI_API_KEY"   # the NAME of an environment variable, never the key  # pragma: allowlist secret
 # request_timeout_seconds = 120
 # connect_timeout_seconds = 5
-# context_tokens = 8192            # the window sent as num_ctx, at least 2048 for ollama
+# context_tokens = 32768           # the window sent as num_ctx, at least 2048 for ollama
 # max_input_tokens = 500000        # budget limits for a run, see the budget guard
 # max_output_tokens = 100000
 # max_requests = 500

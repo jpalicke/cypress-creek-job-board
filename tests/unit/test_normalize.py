@@ -32,6 +32,7 @@ def test_over_the_cap_is_rejected_not_cut() -> None:
 
 
 def test_exactly_the_cap_is_accepted() -> None:
+    assert MAX_CHARS == 50_000
     text, _ = normalize("a" * MAX_CHARS)
     assert len(text) == MAX_CHARS
 
