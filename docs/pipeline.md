@@ -337,6 +337,37 @@ print(render_text(build_report(posting, extraction, cands, entailed, bank, prov)
 ```
 It prints a complete report with the score `64.3` (3 for a strong required, 1.5 for a partial required, 0 for an unmet preferred, over a weight of 7), each requirement with its cited facts and rationale, and `Gaps: R-2, R-3`. Change a hand written answer to cite `F-9999` and `build_report` raises `ReportRefused`.
 
+## Running the pipeline
+`analyze(posting, bank, provider, backend=..., model=...)` in `pipeline/run.py` runs a normalized posting through extraction, retrieval, entailment and report assembly, and returns the `GapReport`. `assess(posting, extraction, bank, provider, ...)` does the same from an extraction you already have, which is how the tests run the stages with no model. Wrap the provider in `BudgetedProvider` to enforce a budget: a spent budget raises `BudgetExceeded` and the run stops, with no report.
+
+- **Provenance.** `report.provenance` has the backend, the model, the prompt hashes (`extract`, and `entail` when a call was made) and the usage summed over every call.
+- **A derived run id.** `run_id` is `run-` and 16 hex characters of a sha256 over the posting hash, the bank hash (`facts/hashing.py`, independent of fact order), the backend and the model. The same inputs give the same id, so a rerun is traceable, and a changed fact, posting, backend or model gives a new one. The prompt hashes are separate on purpose, so a prompt change is visible without changing the id.
+- **No crash on a model failure.** A typed provider failure gives an incomplete report with the reason (see the fail closed rules above). Only a spent budget, or a bug that `build_report` refuses, stops the run.
+
+### Try a whole run against a local model
+Needs Ollama running with `qwen3.5:0.8b` (see [providers.md](providers.md#try-it-locally)) and a run from the repository root. A missing server prints an incomplete report with `provider_unavailable`. The model is small and not deterministic, so the supports and the score vary from run to run, while the run id stays the same.
+```bash
+uv run python -c "
+from datetime import UTC, datetime
+from pathlib import Path
+from cypress_creek.config import parse_settings
+from cypress_creek.facts import parse_bank
+from cypress_creek.ingest.hashing import text_hash
+from cypress_creek.ingest.models import Extractor, Posting, PostingSource
+from cypress_creek.pipeline.render import render_text
+from cypress_creek.pipeline.run import analyze
+from cypress_creek.providers import OllamaProvider
+
+bank = parse_bank({'facts': [{'id': 'F-0001', 'claim': 'Ran a fictional Python data service for 4 years.', 'kind': 'project', 'start': '2019-01-01', 'end': '2023-01-01', 'tags': [{'name': 'python', 'level': 'expert'}], 'verified_on': '2024-01-01', 'evidence': {'type': 'repo', 'pointer': 'https://example.invalid/a'}, 'share': 'shareable'}, {'id': 'F-0002', 'claim': 'Operated a fictional PostgreSQL cluster.', 'kind': 'project', 'tags': [{'name': 'postgresql', 'level': 'familiar'}], 'verified_on': '2024-01-01', 'evidence': {'type': 'repo', 'pointer': 'https://example.invalid/b'}, 'share': 'shareable'}]})
+text = Path('tests/fixtures/extraction/posting.txt').read_text(encoding='utf-8')
+posting = Posting(id='P-1', source=PostingSource.PASTE, text=text, text_hash=text_hash(text), extractor=Extractor(name='paste', version='1'), created_at=datetime(2024, 6, 1, tzinfo=UTC))
+provider = OllamaProvider(parse_settings({'provider': 'ollama', 'model': 'qwen3.5:0.8b', 'context_tokens': 4096}))
+report = analyze(posting, bank, provider, backend='ollama', model='qwen3.5:0.8b')
+print(render_text(report))
+print(report.provenance.run_id)"
+```
+It prints the gap report for the sample posting and then the run id. Every cited fact is verified, a rationale that fails the grounding checks is replaced by `rationale withheld`, and the score is triage only.
+
 ## Try it locally
 ```bash
 uv run python -c "

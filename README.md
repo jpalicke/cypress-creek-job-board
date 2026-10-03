@@ -4,7 +4,7 @@ Tailors a job application to a posting without ever stating a claim the author h
 
 It reads a posting, extracts requirements, maps each requirement to facts in a curated bank, reports gaps honestly, and only then helps draft. Every claim cites verified fact IDs, enforced by deterministic validators rather than prompting. There is no auto apply, and a human reviews every draft.
 
-Status: early implementation. The fact bank, the posting normalizer, the tag alias table, the deterministic support gate, the score formula, the company name normalizer, the SQLite migration runner, the grounding validators, the provider interface, the provider config, the Ollama adapter, the budget guard, the prompt builder (extraction and entailment prompts), the extraction stage, candidate retrieval, the entailment stage, the gap report and URL target validation exist as libraries. URL validation does not fetch a page; the guarded HTTP transport is still pending. There is no app to start yet. Work is tracked as a kanban in this repo's issues (one issue per card, labeled by lane). Cards marked `core` are the smallest set that makes the repo credible and demoable on its own.
+Status: early implementation. The fact bank, the posting normalizer, the tag alias table, the deterministic support gate, the score formula, the company name normalizer, the SQLite migration runner, the grounding validators, the provider interface, the provider config, the Ollama adapter, the budget guard, the prompt builder (extraction and entailment prompts), the extraction stage, candidate retrieval, the entailment stage, the gap report, the pipeline run and URL target validation exist as libraries. URL validation does not fetch a page; the guarded HTTP transport is still pending. There is no app to start yet. Work is tracked as a kanban in this repo's issues (one issue per card, labeled by lane). Cards marked `core` are the smallest set that makes the repo credible and demoable on its own.
 
 License: MIT.
 
@@ -37,6 +37,7 @@ Each command is copy and paste, and lives with its documentation:
 | Judge a model's entailment answer, with no model | [docs/pipeline.md](docs/pipeline.md#try-judging-an-answer) |
 | Ask a local model whether facts support a requirement | [docs/pipeline.md](docs/pipeline.md#try-entailment-against-a-local-model) |
 | Assemble and print a gap report, with no model | [docs/pipeline.md](docs/pipeline.md#try-the-report) |
+| Run a posting through every stage against a local model and print the gap report | [docs/pipeline.md](docs/pipeline.md#try-a-whole-run-against-a-local-model) |
 | Run the support gate on a requirement | [docs/pipeline.md](docs/pipeline.md#try-it-locally) |
 | Compute a score from requirement supports | [docs/pipeline.md](docs/pipeline.md#score) |
 | Normalize a company name to its comparison key | [docs/data-model.md](docs/data-model.md#try-company_key) |
@@ -44,6 +45,21 @@ Each command is copy and paste, and lives with its documentation:
 | Run a grounding validator on model output | [docs/validators.md](docs/validators.md#try-it-locally) |
 | See the provider errors and retry policy, load backend config, run the Ollama adapter, print a projected cost | [docs/providers.md](docs/providers.md#try-it-locally) |
 | Validate a URL and inspect its public connection target | [docs/threat-model.md](docs/threat-model.md#try-it-locally) |
+
+## What a report looks like
+This is a real run of the "whole run against a local model" command in [docs/pipeline.md](docs/pipeline.md#try-a-whole-run-against-a-local-model): the sample posting, a two fact bank and the `qwen3.5:0.8b` model. The model is small, so its answers vary from run to run, and the report shows exactly what it could and could not back up.
+
+```text
+Gap report for P-1: complete
+Score: 25.0 out of 100 (triage only, not a probability). Supported 1 of 2.
+[none] R-1 (required): You must have 3 years of Python experience.
+[partial] R-2 (required): Experience with PostgreSQL is required.
+    facts: F-0002
+    why: rationale withheld: failed grounding check
+Gaps: R-1, R-2
+```
+
+Every supported row cites a verified fact. A model rationale that fails the grounding checks is withheld rather than shown. The report is also available as JSON (`report.model_dump_json()`), with the backend, model, prompt hashes, usage and a run id derived from the inputs.
 
 ## What the score means
 The score (0 to 100) ranks postings so you can triage them. It is a weighted share of requirements your verified facts support. It is not a probability of getting the job, and a posting with no extractable requirements gets no score at all.

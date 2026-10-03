@@ -23,6 +23,7 @@ src/cypress_creek/       The library
     models.py            Fact, Tag, Evidence, Bank and their enums
     loader.py            Safe YAML loading, parse_bank, load_bank
     dates.py             Date sanity rules
+    hashing.py           bank_hash: the one definition of the fact bank hash
     errors.py            BankLoadError, FactValidationError
   pipeline/              Stages that build model prompts (extraction wording lives in prompts/)
     prompt.py            Stage, Prompt (with user_message), build_prompt, prompt_facts, PromptError
@@ -32,6 +33,7 @@ src/cypress_creek/       The library
     entail.py            entail, judge, EntailedMatch, Entailment: stage 3, the verdict only lowers support
     report.py            GapReport, build_report, verify_report, ReportRefused: stage 4, the report as data
     render.py            render_text: stage 5, the plain text view of a report
+    run.py               analyze, assess, run_id: the whole run, with provenance and a run id derived from its inputs
     prompts/             Versioned system texts, one file per stage and version (extract_v2.txt, entail_v1.txt)
   ingest/                Untrusted posting text in, clean models out
     models.py            Posting, Requirement, typed warnings
@@ -102,7 +104,7 @@ flowchart LR
     score --> result["score, supported of total, inputs"]
     reqs -. model output .-> val["validators (V1 to V14)"]
 ```
-Dotted means not built yet. Extraction, model verdicts, real provider adapters, validators, gap reports and drafting arrive in later cards (see the issue board and the spec). The pieces that exist are libraries with no app around them yet.
+Dotted means not built yet. Drafting, more provider adapters, the command line and the app arrive in later cards (see the issue board and the spec). The pieces that exist are libraries with no app around them yet.
 
 URL validation is a separate library entry point. It rejects unsafe syntax, resolves a hostname once, checks every address, and returns connection coordinates without fetching anything. The future transport must connect to the returned IP while using the hostname for Host and TLS verification; validation alone does not enforce this. See [the SSRF rules and limits](threat-model.md) and [ADR 0009](adr/0009-url-target-validation.md). The transport architecture and its import restriction are part of F1b.
 
@@ -119,6 +121,7 @@ URL validation is a separate library entry point. It rejects unsafe syntax, reso
 - **The model proposes, code decides.** The extraction model gives text, kind and term. Spans, ids and importance are set by code, and text that is not in the posting is dropped with a reason. See `pipeline.md`.
 - **Entailment can only lower support.** The model's verdict is clamped to the rule ceiling by code, and `Match` refuses support above its ceiling. A drop of any size is allowed. See [ADR 0011](adr/0011-entailment-can-only-lower-support.md).
 - **A positive verdict must cite.** `judge` counts a `supports` or `partial` verdict with no valid citation (candidate, verified, shareable) as `does_not_support`, and withholds any rationale that fails V7 to V10. See `pipeline.md`.
+- **A run id is derived, not random.** `run_id` hashes the posting, the fact bank, the backend and the model, so the same inputs give the same id and a changed input gives a new one. See `pipeline.md`.
 - **A report cites or is refused.** `build_report` ends with `verify_report` (V4, V5, V9), so a fabricated or unverified fact id never reaches a report. Failed stages make the report incomplete rather than quietly partial. See `pipeline.md`.
 - **Retrieval is not a model.** `retrieve` matches tags and aliases, ranks and caps the candidates, and sets the support ceiling. A requirement with no candidate is a gap and costs no model call. See `pipeline.md`.
 - **One retry place.** Providers raise typed errors and `providers.call_with_retry` is the only code that retries them. Adapters never loop on their own.
