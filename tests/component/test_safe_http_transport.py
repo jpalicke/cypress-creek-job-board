@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 from http_support import http_server, local_target
 
+from cypress_creek import __version__
 from cypress_creek.ingest.safe_http import (
     FetchLimits,
     SafeHttpError,
@@ -19,6 +20,10 @@ from cypress_creek.ingest.safe_http import (
 from cypress_creek.ingest.url_guard import UrlGuardError
 
 WORKER = [sys.executable, str(Path(__file__).parents[1] / "http_support.py"), "--worker"]
+USER_AGENT = (
+    f"cypress-creek/{__version__} "
+    "(personal job search tool; +https://github.com/jpalicke/cypress-creek-job-board)"
+)
 
 
 def test_streamed_content_and_request_identity() -> None:
@@ -32,6 +37,7 @@ def test_streamed_content_and_request_identity() -> None:
     assert path == "/a%2Fb?q=x%20y%0D%0A"
     assert headers["host"] == f"fixture.test:{port}"
     assert headers["accept-encoding"] == "gzip"
+    assert headers["user-agent"] == USER_AGENT
     assert "cookie" not in headers
     assert "authorization" not in headers
 
@@ -45,6 +51,7 @@ def test_three_redirects_work_without_replaying_cookies() -> None:
     assert response.url == f"http://fixture.test:{port}/ok"
     assert len(requests.received) == 4
     assert all("cookie" not in headers for _, headers in requests.received)
+    assert all(headers["user-agent"] == USER_AGENT for _, headers in requests.received)
 
 
 @pytest.mark.parametrize(
