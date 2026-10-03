@@ -41,6 +41,8 @@ src/cypress_creek/       The library
     hashing.py           The one definition of the text hash
     errors.py            PostingTooLong, EmptyPosting
     url_guard.py         validate_url, immutable ValidatedTarget, UrlGuardError with reason codes
+    safe_http.py         fetch_url, FetchLimits, FetchResponse, SafeHttpError; pinned, bounded HTTP
+    _fetch_worker.py     Disposable fetch process that bounds blocking DNS by a whole-fetch deadline
   validators/            Grounding validators V1 to V14, pure functions returning Verdicts
     verdict.py           Verdict, ok(), fail()
     cues.py              The one list of importance cue words, sentence splitting
@@ -73,7 +75,8 @@ tests/
   unit/                  Pure functions and models, no I/O beyond tmp files
   component/             Real files and real environment, several modules together
   integration/           Real public DNS (needs_network) and real Ollama requests (live)
-  e2e/                   URL guard consumed from a separate Python process
+  e2e/                   URL guard and transport consumed from separate Python processes
+  http_support.py        Test-only real HTTP and UDP DNS servers, with a loopback resolver
   fixtures/              Recorded or hand written inputs
     extraction/          A posting and a recorded real model output for the accept step
     hostile_outputs/     One bad model output per validator, plus a small bank (see validators.md)
@@ -87,10 +90,11 @@ flowchart LR
     url[Untrusted URL] --> guard["ingest.url_guard.validate_url()"]
     resolver[Operating system DNS] --> guard
     guard --> target["ValidatedTarget: scheme, host, ip, port"]
-    target -. F1b .-> transport[Guarded HTTP transport]
+    target --> transport["ingest.safe_http.fetch_url(): pinned HTTP transport"]
     raw[Raw posting text] --> norm["ingest.normalize()"]
     norm --> posting[Posting]
-    posting -. later cards .-> reqs[Requirements]
+    posting --> extract["pipeline.extract_requirements()"]
+    extract --> reqs[Requirements]
     migs[(storage/migrations/*.sql)] --> migrate["storage.migrate()"]
     migrate --> db[(data/cypress_creek.sqlite3)]
     bank[(facts.private/bank.yaml)] --> load["facts.load_bank()"]
@@ -104,9 +108,9 @@ flowchart LR
     score --> result["score, supported of total, inputs"]
     reqs -. model output .-> val["validators (V1 to V14)"]
 ```
-Dotted means not built yet. Drafting, more provider adapters, the command line and the app arrive in later cards (see the issue board and the spec). The pieces that exist are libraries with no app around them yet.
+The diagram shows library components, not a running app workflow. Extraction, entailment, gap reporting, the Ollama adapter and validators exist; a user-facing fetch workflow and drafting remain later cards (see the issue board and the spec).
 
-URL validation is a separate library entry point. It rejects unsafe syntax, resolves a hostname once, checks every address, and returns connection coordinates without fetching anything. The future transport must connect to the returned IP while using the hostname for Host and TLS verification; validation alone does not enforce this. See [the SSRF rules and limits](threat-model.md) and [ADR 0009](adr/0009-url-target-validation.md). The transport architecture and its import restriction are part of F1b.
+URL validation is a separate library entry point. It rejects unsafe syntax, resolves a hostname once, checks every address, and returns connection coordinates without fetching anything. `fetch_url` uses that selected IP for the connection while retaining the hostname for Host and TLS verification. It revalidates every redirect, bounds the final response and gives DNS resolution a whole-fetch deadline in a child process. The test audit restricts HTTP client imports to this transport and the separate Ollama provider adapter. See [the fetching architecture](architecture.md), [the SSRF rules and limits](threat-model.md), [ADR 0009](adr/0009-url-target-validation.md) and [ADR 0013](adr/0013-pinned-http-transport.md).
 
 ## Ideas to know
 - **One source of truth.** The bank file is the only record of facts. Verification is derived from `verified_on` and is never stored as a separate flag. The pipeline only ever sees `Bank.verified_facts()`.
@@ -114,6 +118,7 @@ URL validation is a separate library entry point. It rejects unsafe syntax, reso
 - **Data, not code.** Things a person should tune (the alias table, the score weights) or bundled third party data (the Unicode confusables) are YAML in `config/`, loaded and validated, never hard coded.
 - **Typed errors.** Failures are specific exception classes (`PostingTooLong`, `FactValidationError`), so callers and tests can tell them apart. Text is rejected, never silently cut or repaired.
 - **Public URL targets.** `validate_url` raises `UrlGuardError` with a stable `reason_code` and a generic message. It never echoes the URL or resolver error. Every DNS answer must pass the address checks before any one is selected; one private answer rejects the entire result.
+- **Pinned HTTP connections.** `fetch_url` connects only to the validated numeric IP, disables environment proxies and redirects, then handles redirects itself. It returns bytes only after content-type and size checks. `SafeHttpError` has stable reason codes and generic messages.
 - **Safe by default config.** Backends default to loopback only, going remote needs `allow_remote`, and keys come from the environment alone. Config errors never echo a submitted value.
 - **Truncation is refused, not tolerated.** The Ollama adapter estimates before the call and checks the reported count after it, so a prompt the server would silently cut never produces an answer.
 - **Spend is capped before it happens.** `BudgetedProvider` checks the worst case (estimate plus output cap) against the run limits before a call and records the server's real usage after it. Real usage above an estimate blocks the next call, so the guard fails closed.
@@ -164,6 +169,7 @@ Conventions you will trip over if you do not know them:
 - **A new fact field:** change `facts/models.py`, add a failing test in `tests/unit/test_fact_models.py` first, write an ADR if it is a design decision, and update `docs/data-model.md`.
 - **A new pipeline stage:** a new module under the right package, typed errors beside it, tests in all relevant tiers, and a section in `docs/pipeline.md`.
 - **A change to URL policy:** start with a hostile or accepted input in `tests/unit/test_url_guard.py`, then change `ingest/url_guard.py`. Keep the real-resolver, public-DNS and process tests passing and update [threat-model.md](threat-model.md). Never add an environment or config switch that permits private URLs.
+- **A new posting fetch caller:** use `ingest.safe_http.fetch_url` and handle `UrlGuardError` and `SafeHttpError`. Do not import an HTTP client in another module. Keep the transport's unit, component, public-network and process tests passing, and update [architecture.md](architecture.md) if the boundary changes.
 
 ## Where to look when something is unclear
 Picking up a card from the board? [handoff.md](handoff.md) is the step by step routine.
