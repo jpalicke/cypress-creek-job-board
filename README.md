@@ -4,7 +4,7 @@ Tailors a job application to a posting without ever stating a claim the author h
 
 It reads a posting, extracts requirements, maps each requirement to facts in a curated bank, reports gaps honestly, and only then helps draft. Every claim cites verified fact IDs, enforced by deterministic validators rather than prompting. There is no auto apply, and a human reviews every draft.
 
-Status: early implementation. The fact bank, the posting normalizer, the tag alias table, the deterministic support gate, the score formula, the company name normalizer, the SQLite migration runner, the grounding validators, the provider interface, the provider config, the Ollama adapter, the budget guard, the prompt builder (extraction and entailment prompts), the extraction stage, candidate retrieval, the entailment stage, the gap report, the pipeline run, URL target validation, guarded HTTP transport, the link fetcher and the fictional sample fact bank for evals exist as libraries. The link fetcher returns bounded raw bytes with provenance and typed errors; HTML and PDF text extraction and an app workflow are still to come. There is no app to start yet. Work is tracked as a kanban in this repo's issues (one issue per card, labeled by lane). Cards marked `core` are the smallest set that makes the repo credible and demoable on its own.
+Status: early implementation. The fact bank, the posting normalizer, the tag alias table, the deterministic support gate, the score formula, the company name normalizer, the SQLite migration runner, the grounding validators, the provider interface, the provider config, the Ollama adapter, the budget guard, the prompt builder (extraction and entailment prompts), the extraction stage, candidate retrieval, the entailment stage, the gap report, the pipeline run, URL target validation, guarded HTTP transport, the link fetcher, the fictional sample fact bank for evals and the discovery tables with the watchlist exist as libraries. The link fetcher returns bounded raw bytes with provenance and typed errors; HTML and PDF text extraction and an app workflow are still to come. There is no app to start yet. Work is tracked as a kanban in this repo's issues (one issue per card, labeled by lane). Cards marked `core` are the smallest set that makes the repo credible and demoable on its own.
 
 License: MIT.
 
@@ -42,6 +42,7 @@ Each command is copy and paste, and lives with its documentation:
 | Run the support gate on a requirement | [docs/pipeline.md](docs/pipeline.md#try-it-locally) |
 | Compute a score from requirement supports | [docs/pipeline.md](docs/pipeline.md#score) |
 | Normalize a company name to its comparison key | [docs/data-model.md](docs/data-model.md#try-company_key) |
+| Add a company to the watchlist and see a denied one refused | [docs/data-model.md](docs/data-model.md#try-the-discovery-tables) |
 | Create the local database and apply migrations | [docs/data-model.md](docs/data-model.md#try-the-database) |
 | Run a grounding validator on model output | [docs/validators.md](docs/validators.md#try-it-locally) |
 | See the provider errors and retry policy, load backend config, run the Ollama adapter, print a projected cost | [docs/providers.md](docs/providers.md#try-it-locally) |
