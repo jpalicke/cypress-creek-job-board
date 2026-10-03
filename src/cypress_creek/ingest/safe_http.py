@@ -146,6 +146,8 @@ def _fetch(
                     except ValueError:
                         raise SafeHttpError("invalid_redirect") from None
                     continue
+                if response.status_code == 401:
+                    raise SafeHttpError("authentication_required")
                 if not 200 <= response.status_code < 300:
                     raise SafeHttpError("http_status")
                 content_type = (
@@ -209,6 +211,7 @@ def _parse_worker_result(output: bytes, limits: FetchLimits) -> FetchResponse:
                 "too_many_redirects",
                 "invalid_redirect",
                 "http_status",
+                "authentication_required",
             }:
                 raise ValueError("Unknown transport reason")
             raise SafeHttpError(result["reason"])

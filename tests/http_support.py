@@ -51,6 +51,10 @@ def http_server() -> Iterator[tuple[int, Requests]]:
                 elif route == "/private":
                     status = "302 Found"
                     fields.append(("Location", "http://169.254.169.254/secret"))
+                elif route == "/cross-host":
+                    status = "302 Found"
+                    port = cast(tuple[str, int], self.server.server_address)[1]
+                    fields.append(("Location", f"http://other-fixture.test:{port}/ok"))
                 elif route == "/bad-location":
                     status = "302 Found"
                     fields.append(("Location", "http://fixture.test/a b"))
@@ -58,6 +62,22 @@ def http_server() -> Iterator[tuple[int, Requests]]:
                     status = "302 Found"
                 elif route == "/wrong-type":
                     fields = [("Content-Type", "image/png")]
+                elif route == "/json":
+                    fields = [("Content-Type", "application/json")]
+                elif route == "/html":
+                    fields = [("Content-Type", "text/html; charset=utf-8")]
+                    body = b"<main>Public posting</main>"
+                elif route == "/pdf":
+                    fields = [("Content-Type", "application/pdf")]
+                    body = b"%PDF-1.4\npublic posting\n"
+                elif route == "/empty":
+                    body = b""
+                elif route == "/login":
+                    status = "401 Unauthorized"
+                    body = b"private account details"
+                elif route == "/forbidden":
+                    status = "403 Forbidden"
+                    body = b"private access details"
                 elif route == "/missing-type":
                     fields = []
                 elif route == "/error":
@@ -123,8 +143,12 @@ def http_server() -> Iterator[tuple[int, Requests]]:
 def local_target(url: str) -> ValidatedTarget:
     """Permit only the named local fixture; every other URL gets production validation."""
     parsed = urlsplit(url)
-    if parsed.hostname == "fixture.test" and parsed.scheme == "http" and parsed.port:
-        return ValidatedTarget("http", "fixture.test", "127.0.0.1", parsed.port)
+    if (
+        parsed.hostname in {"fixture.test", "other-fixture.test"}
+        and parsed.scheme == "http"
+        and parsed.port
+    ):
+        return ValidatedTarget("http", parsed.hostname, "127.0.0.1", parsed.port)
     return validate_url(url)
 
 

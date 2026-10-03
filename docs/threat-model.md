@@ -1,10 +1,10 @@
 # Threat model
 
-The full design threat model is in [spec.md, section 9](spec.md#9-threat-model). This page records the URL and HTTP transport boundary and the prompt structure. User-facing fetch orchestration remains a later card.
+The full design threat model is in [spec.md, section 9](spec.md#9-threat-model). This page records the URL, HTTP transport and one-off posting fetch boundaries and the prompt structure. A user-facing app workflow remains a later card.
 
 ## SSRF boundary
 
-A posting link or discovery URL is hostile input. It must not cause a connection to a local service, private network or cloud metadata endpoint. F1a implements `validate_url` in `src/cypress_creek/ingest/url_guard.py`; F1b's `fetch_url` in `src/cypress_creek/ingest/safe_http.py` uses its selected IP for the actual connection. See [the fetching architecture](architecture.md).
+A posting link or discovery URL is hostile input. It must not cause a connection to a local service, private network or cloud metadata endpoint. F1a implements `validate_url` in `src/cypress_creek/ingest/url_guard.py`; F1b's `fetch_url` in `src/cypress_creek/ingest/safe_http.py` uses its selected IP for the actual connection. F2b's `fetch_posting` calls only that guarded transport, with no alternate resolver or HTTP client. See [the fetching architecture](architecture.md) and [setup guide](setup.md).
 
 | Rule | Enforcement |
 | --- | --- |
@@ -19,6 +19,7 @@ A posting link or discovery URL is hostile input. It must not cause a connection
 | Stream with byte and decompression-ratio caps, a content-type allow list, connect and total timeouts | Implemented in F1b |
 | Fetch without cookies, credentials or JavaScript execution | Implemented in F1b |
 | Restrict HTTP client imports to reviewed modules; prove IP pinning with real DNS/server tests | Implemented in F1b |
+| Map a one-off posting link to bounded bytes or a typed, redacted failure | Implemented in F2b |
 
 `validate_url(url)` returns a frozen `ValidatedTarget` containing `scheme`, `host`, `ip` and `port`. The hostname is lowercased and one trailing dot is removed; IP literals are canonicalized. The transport connects to this IP, keeps the hostname for Host and TLS verification, omits fragments and revalidates every redirect. Merely constructing a `ValidatedTarget` yourself is not validation.
 
@@ -26,7 +27,7 @@ No flag, config field or environment variable can permit a private destination. 
 
 ## Rejection reasons
 
-Every rejection raises `UrlGuardError`. Branch on `reason_code`, not the message. The message is always `URL rejected by the network safety policy`, with no URL, credentials or underlying resolver message.
+At the URL guard boundary, a rejection raises `UrlGuardError`. Branch on `reason_code`, not the message. The message is always `URL rejected by the network safety policy`, with no URL, credentials or underlying resolver message. `fetch_posting` maps this to `BlockedByPolicy` and preserves the stable reason code.
 
 | Code | Meaning |
 | --- | --- |
@@ -47,9 +48,9 @@ Every rejection raises `UrlGuardError`. Branch on `reason_code`, not the message
 - Paths and queries are not decoded by the guard. The literal-character check covers ASCII controls and Unicode whitespace, not every Unicode control category. The transport preserves encoded data in the HTTP request target; HTTPX handles request framing.
 - The guard's operating-system DNS call has no independent timeout. The transport runs it in a child process under the whole-fetch deadline. OS process creation and cleanup can add latency beyond the configured deadline.
 - The final body defaults to 10 MiB wire, 10 MiB decoded and a 100:1 decompression ratio. Redirect bodies are not read. Only identity or one complete gzip stream is allowed. Only HTML, XHTML, plain text and PDF content types are accepted by default, and a missing content type is rejected.
-- The public entry does not execute JavaScript or forward cookies or URL credentials. Sites requiring login or client-side rendering need later user-facing guidance in F2.
+- The public entry does not execute JavaScript or forward cookies or URL credentials. `fetch_posting` maps HTTP 401 to `NeedsBrowser` and a zero-byte body to `Empty`, both with manual-paste guidance. Other statuses, including HTTP 403, are `FetchFailed`. Successful HTML is returned as bytes; F3 will assess pages whose posting needs client-side rendering.
 
-The choices are recorded in [ADR 0009](adr/0009-url-target-validation.md) and [ADR 0013](adr/0013-pinned-http-transport.md). Python's [URL parser documentation](https://docs.python.org/3.13/library/urllib.parse.html#url-parsing-security) explains why parsing needs additional validation. The all-address check follows [OWASP's SSRF guidance](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html). HTTPX documents [IP connection with separate Host and TLS hostname](https://www.python-httpx.org/advanced/extensions/#sni_hostname).
+The choices are recorded in [ADR 0009](adr/0009-url-target-validation.md), [ADR 0013](adr/0013-pinned-http-transport.md) and [ADR 0015](adr/0015-link-fetch-browser-signals.md). Python's [URL parser documentation](https://docs.python.org/3.13/library/urllib.parse.html#url-parsing-security) explains why parsing needs additional validation. The all-address check follows [OWASP's SSRF guidance](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html). HTTPX documents [IP connection with separate Host and TLS hostname](https://www.python-httpx.org/advanced/extensions/#sni_hostname).
 
 ## Try it locally
 
@@ -88,20 +89,20 @@ Expected: a `200` status, `text/html`, and a positive byte count. This is a libr
 | Tier | Evidence |
 | --- | --- |
 | Unit | Hostile URL/reason table, IP properties, malformed input and address sets; transport coordinates, bounded decoding, limits, redacted worker protocol and HTTP-import audit |
-| Component | Real local HTTP servers exercise redirects, Host and request path, cookies, type, size, gzip ratio and deadlines; production entry refuses a local target |
-| Integration (`needs_network`) | Real public DNS and HTTPS fetch with certificate verification, plus typed failure for a rejected local URL |
-| End to end | Separate process consumes the public guard; a real UDP DNS responder alternates loopback answers while the test-only worker connects to the first resolved IP |
+| Component | Real local HTTP servers exercise redirects, Host and request path, cookies, type, size, gzip ratio and deadlines; posting fetch tests cover typed errors, provenance and production loopback refusal |
+| Integration (`needs_network`) | Real public DNS and HTTPS fetch with certificate verification, plus public posting HTML and PDF through `fetch_posting` |
+| End to end | Separate processes consume the public guard and posting fetcher; a real UDP DNS responder alternates loopback answers while the test-only worker connects to the first resolved IP |
 
 Run local guard and transport tests (the URL component tier requires the machine's hostname to resolve to at least one nonpublic address):
 
 ```bash
-uv run pytest tests/unit/test_url_guard.py tests/unit/test_safe_http.py tests/component/test_url_guard_resolver.py tests/component/test_safe_http_transport.py tests/e2e/test_url_guard_process.py tests/e2e/test_safe_http_rebinding.py -q
+uv run pytest tests/unit/test_url_guard.py tests/unit/test_safe_http.py tests/component/test_url_guard_resolver.py tests/component/test_safe_http_transport.py tests/component/test_fetch.py tests/e2e/test_url_guard_process.py tests/e2e/test_safe_http_rebinding.py tests/e2e/test_fetch_process.py -q
 ```
 
 Run the public-DNS tests with working network access. An unavailable resolver fails loudly:
 
 ```bash
-uv run pytest tests/integration/test_url_guard_dns.py tests/integration/test_safe_http_network.py -q
+uv run pytest tests/integration/test_url_guard_dns.py tests/integration/test_safe_http_network.py tests/integration/test_fetch_network.py -q
 ```
 
 Run all tiers with the project coverage gate:

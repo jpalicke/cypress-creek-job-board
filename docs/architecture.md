@@ -1,10 +1,12 @@
 # Ingestion network architecture
 
-Untrusted posting and discovery URLs enter `ingest.safe_http.fetch_url`. This library returns bounded response bytes and metadata. It does not extract HTML or PDF text, store a posting, call a model, or apply to a job. Those steps belong to separate components.
+Untrusted posting URLs enter `ingest.fetch.fetch_posting`, which calls `ingest.safe_http.fetch_url` for bounded response bytes. Discovery callers may use `fetch_url` directly. The posting fetcher does not extract HTML or PDF text, store a posting, call a model, or apply to a job. Those steps belong to separate components.
 
 ```mermaid
 flowchart LR
-    caller[Posting or discovery caller] --> parent["safe_http.fetch_url: deadline and worker"]
+    posting[Posting caller] --> fetcher["fetch_posting: raw bytes and typed failures"]
+    fetcher --> parent["safe_http.fetch_url: deadline and worker"]
+    discovery[Discovery caller] --> parent
     parent --> worker["_fetch_worker: one fetch"]
     worker --> guard["url_guard.validate_url: parse and resolve"]
     guard --> target["ValidatedTarget: host and public IP"]
@@ -13,13 +15,16 @@ flowchart LR
     request --> stream["Raw stream: wire, decoded byte and gzip ratio caps"]
     request -->|redirect, at most three| guard
     stream --> response["FetchResponse: final URL, status, content type, bytes"]
+    response --> result["FetchResult: bytes, type, provenance"]
 ```
 
 The worker calls the F1a guard at the first URL and at every redirect. The guard validates all DNS answers and returns the chosen IP. HTTPX connects to a numeric-IP URL, with the validated hostname in `Host` and its documented `sni_hostname` extension for certificate verification. Each hop uses a fresh client with redirects disabled and `trust_env=False`, so environment proxies and credentials cannot change where it connects. No cookies are replayed. The fragment is omitted from the request, while encoded path and query bytes are preserved. Redirect `Location` text is checked for literal controls, whitespace and backslashes before joining and validation.
 
 Every request, including redirects, sends `User-Agent: cypress-creek/<installed version> (personal job search tool; +https://github.com/jpalicke/cypress-creek-job-board)` and `Accept-Encoding: gzip`. The version comes from package metadata. This identifies the tool honestly at the network boundary; it does not add browser execution, authentication or a user-facing posting workflow.
 
-Only HTTP and HTTPS on ports 80 and 443 can pass the production URL guard. The independent provider adapter talks to its operator-configured model API, normally loopback, under the provider configuration rule. Its `httpx` use is explicitly allowed by the HTTP-import audit; it does not accept posting or discovery URLs. A provider's `allow_remote` setting cannot change the posting URL policy. Future posting and discovery fetchers must call `fetch_url`, never an HTTP client directly.
+Only HTTP and HTTPS on ports 80 and 443 can pass the production URL guard. The independent provider adapter talks to its operator-configured model API, normally loopback, under the provider configuration rule. Its `httpx` use is explicitly allowed by the HTTP-import audit; it does not accept posting or discovery URLs. A provider's `allow_remote` setting cannot change the posting URL policy. `fetch_posting` and future discovery fetchers call `fetch_url`, never an HTTP client directly.
+
+`fetch_posting(url)` uses fixed transport limits and returns raw `body` bytes, normalized `content_type`, and provenance containing the requested and final URLs, byte count, UTC retrieval time, `raw-fetch` extractor name, installed package version, and a warning when a redirect changes host. It raises `BlockedByPolicy` with the URL guard's stable reason code for a rejected URL or redirect, `TooLarge` for byte or decompression-ratio caps, `UnsupportedContent` for a missing or disallowed content type, `Empty` with guidance to paste the posting text manually for a zero-byte body, and `FetchFailed` for other transport failures. A server response of HTTP 401 is the narrow `NeedsBrowser` signal with the same manual-paste guidance. Other non-success statuses, including HTTP 403, remain `FetchFailed`; arbitrary HTML is returned as bytes for the later extractor to assess. These exceptions use generic messages and do not include hostile URLs or response text.
 
 The public call starts a disposable Python child and grants one deadline for worker startup, operating-system DNS, all redirects, headers and body reading. A missed deadline kills and reaps the child, including a blocked resolver. The operating system can delay process creation and cleanup, so the configured timeout bounds worker activity rather than promising an exact return time. HTTPX also applies a connect timeout. Errors crossing the worker boundary are typed reason codes with generic messages, never a response body, URL, credential or socket error.
 
