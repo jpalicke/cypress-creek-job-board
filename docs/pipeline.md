@@ -19,10 +19,10 @@ Expected: `Requirements` and `Write Python.` on separate lines, followed by a `h
 ## Stage 0: normalize the posting
 `normalize(raw_text)` in `src/cypress_creek/ingest/normalize.py` cleans untrusted posting text before anything else sees it. It returns `(text, warnings)` or raises a typed error.
 
-1. Reject raw input over 300,000 characters.
+1. Reject raw input over 500,000 characters.
 2. Unify line endings, strip control, zero-width and bidi characters (counted in a `control_chars_stripped` warning).
 3. Unicode NFKC, collapse runs of spaces and tabs, keep single newlines, collapse runs of blank lines, trim.
-4. Reject over 30,000 characters (`PostingTooLong`) or nothing left (`EmptyPosting`). Text is never silently cut.
+4. Reject over 50,000 characters (`PostingTooLong`) or nothing left (`EmptyPosting`). Text is never silently cut. The provider separately checks the prompt, schema and output allowance against its configured token context.
 
 `text_hash(text)` is the sha256 of the normalized text. See [ADR 0002](adr/0002-posting-whitespace-and-normalization-order.md) for the reasoning.
 

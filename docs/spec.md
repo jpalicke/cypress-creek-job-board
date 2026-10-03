@@ -633,7 +633,7 @@ The fetcher treats the URL as hostile. Every hop is validated, not just the firs
 ### 11.3 Normalization
 
 - Unicode NFKC, strip control and zero width characters, collapse whitespace.
-- Cap total length (default 30,000 characters). Over the cap is rejected with a clear message.
+- Cap total length (default 50,000 characters). Over the cap is rejected with a clear message. The selected provider also rejects requests that exceed its configured token context.
 - Spans in requirements (V1) refer to the normalized text, and the normalized text is what is stored and shown, so there is one source of truth for what the model saw.
 - A cue sentence coverage scan (V13) runs here so the extraction stage can be checked against it.
 
@@ -911,7 +911,7 @@ Every card follows TDD: the first failing test is named, it is shown failing, th
 | --- | --- | --- | --- | --- |
 | B1 ★ | Fact bank schema and loader (YAML) | A fact missing `verified_on` is rejected with a typed error | Valid bank loads, invalid ones fail with the field named, `share` and tags validated, duplicate IDs rejected | A2 |
 | B2 ★ | Tag alias table and tag gate | A requirement term with an alias maps to the right tag and level | Support ceiling computed deterministically, aliases are data not code | B1 |
-| B3 ★ | Posting and Requirement models, normalizer | Zero width and control characters are stripped, over-cap text rejected | NFKC, whitespace collapse, 30,000 character cap, hypothesis test passes | A2 |
+| B3 ★ | Posting and Requirement models, normalizer | Zero width and control characters are stripped, over-cap text rejected | NFKC, whitespace collapse, 50,000 character cap, hypothesis test passes | A2 |
 | B4 ★ | Validators V1 to V14 as pure functions | One hostile output per validator is rejected | Every validator has accept and reject cases, a hostile output corpus exists, 95% coverage on the package | B1, B3 |
 | B5 ★ | Scoring (weights, support values, no score case) | Zero requirements gives "no score" | Formula matches section 7 on hand computed examples, entailment can only downgrade | B2, B4 |
 | B6 | SQLite storage and `company_key` normalizer | Homoglyph and suffix variants of one company produce one key | One normalizer, migrations run, key tested with a confusable corpus | A2 |
