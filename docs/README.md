@@ -6,12 +6,12 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | --- | --- |
 | [codebase.md](codebase.md) | Start here if you are new: layout, how the pieces fit, ideas to know, how a card goes |
 | [data-model.md](data-model.md) | The fact bank, Posting and Requirement, and the tag alias table (`config/aliases.yaml`) the company name key (`company_key`) and the SQLite storage and migrations |
-| [pipeline.md](pipeline.md) | Each pipeline stage and its rules: posting normalization, the prompt builder (extraction and entailment prompts), accepting extraction output, stage 1 extraction, stage 2 retrieval, stage 3 entailment, stages 4 and 5 score and report, running the pipeline and the derived run id, the support gate, the score |
+| [pipeline.md](pipeline.md) | HTML posting text extraction, posting normalization, the prompt builder (extraction and entailment prompts), accepting extraction output, stage 1 extraction, stage 2 retrieval, stage 3 entailment, stages 4 and 5 score and report, running the pipeline and the derived run id, the support gate, the score |
 | [validators.md](validators.md) | The grounding validators V1 to V14: what each rejects and its known limits |
 | [providers.md](providers.md) | The provider interface, typed errors, retry policy, backend config, the loopback rule, the Ollama adapter and the budget guard |
 | [setup.md](setup.md) | Fetch one public posting link, inspect raw bytes and provenance, and understand network behavior and typed failures |
 | [architecture.md](architecture.md) | How guarded public HTTP fetching pins the connection, bounds the response and isolates DNS behind a deadline |
-| [threat-model.md](threat-model.md) | The prompt structure (T1 to T4), URL target validation and guarded HTTP transport, SSRF rules, compatibility limits and test coverage |
+| [threat-model.md](threat-model.md) | The hostile HTML and hidden-content boundary, prompt structure (T1 to T4), URL target validation and guarded HTTP transport, SSRF rules, compatibility limits and test coverage |
 | [spec.md](spec.md) | The full design spec: goals, architecture, data model, pipeline, providers, validators, evals, threat model, discovery, ingestion, UI, testing and the card plan |
 | [lanes.md](lanes.md) | How the lanes depend on each other and which can be worked in parallel |
 | [handoff.md](handoff.md) | The card routine step by step, for a new contributor or assistant picking up a card |
@@ -35,6 +35,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [0013](adr/0013-pinned-http-transport.md) | Pinned HTTP connections, deadline isolation and bounded response decoding |
 | [0014](adr/0014-run-id-is-derived-from-the-inputs.md) | The run id is a hash of the posting, the fact bank, the backend and the model |
 | [0015](adr/0015-link-fetch-browser-signals.md) | Only clear HTTP authentication signals need browser guidance during raw link fetching |
+| [0016](adr/0016-html-text-parsing.md) | Bounded standard-library HTML parsing and best-effort visible text rules |
 
 ## Configuration
 - `config/aliases.yaml`: tag alias table, described in [data-model.md](data-model.md#tag-alias-table).

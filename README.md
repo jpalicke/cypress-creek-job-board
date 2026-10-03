@@ -4,7 +4,7 @@ Tailors a job application to a posting without ever stating a claim the author h
 
 It reads a posting, extracts requirements, maps each requirement to facts in a curated bank, reports gaps honestly, and only then helps draft. Every claim cites verified fact IDs, enforced by deterministic validators rather than prompting. There is no auto apply, and a human reviews every draft.
 
-Status: early implementation. The fact bank, the posting normalizer, the tag alias table, the deterministic support gate, the score formula, the company name normalizer, the SQLite migration runner, the grounding validators, the provider interface, the provider config, the Ollama adapter, the budget guard, the prompt builder (extraction and entailment prompts), the extraction stage, candidate retrieval, the entailment stage, the gap report, the pipeline run, URL target validation, guarded HTTP transport and link fetcher exist as libraries. The link fetcher returns bounded raw bytes with provenance and typed errors; HTML and PDF text extraction and an app workflow are still to come. There is no app to start yet. Work is tracked as a kanban in this repo's issues (one issue per card, labeled by lane). Cards marked `core` are the smallest set that makes the repo credible and demoable on its own.
+Status: early implementation. The fact bank, the posting normalizer, the tag alias table, the deterministic support gate, the score formula, the company name normalizer, the SQLite migration runner, the grounding validators, the provider interface, the provider config, the Ollama adapter, the budget guard, the prompt builder (extraction and entailment prompts), the extraction stage, candidate retrieval, the entailment stage, the gap report, the pipeline run, URL target validation, guarded HTTP transport, link fetcher and HTML text extractor exist as libraries. The link fetcher returns bounded raw bytes with provenance and typed errors. HTML text extraction is a separate library step that drops hidden content and reports warnings; PDF text extraction and an app workflow are still to come. There is no app to start yet. Work is tracked as a kanban in this repo's issues (one issue per card, labeled by lane). Cards marked `core` are the smallest set that makes the repo credible and demoable on its own.
 
 License: MIT.
 
@@ -46,6 +46,7 @@ Each command is copy and paste, and lives with its documentation:
 | See the provider errors and retry policy, load backend config, run the Ollama adapter, print a projected cost | [docs/providers.md](docs/providers.md#try-it-locally) |
 | Validate a URL or fetch a bounded public page | [docs/threat-model.md](docs/threat-model.md#try-it-locally) |
 | Fetch one public posting link as bounded raw bytes | [docs/setup.md](docs/setup.md#fetch-a-posting-link) |
+| Extract readable text from HTML bytes | [docs/pipeline.md](docs/pipeline.md#html-posting-text) |
 
 ## What a report looks like
 This is a real run of the "whole run against a local model" command in [docs/pipeline.md](docs/pipeline.md#try-a-whole-run-against-a-local-model): the sample posting, a two fact bank and the `qwen3.5:0.8b` model. The model is small, so its answers vary from run to run, and the report shows exactly what it could and could not back up.

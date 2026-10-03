@@ -6,7 +6,7 @@ Status: proposed (F2b, pending PR review)
 
 `fetch_posting(url)` uses the guarded `fetch_url` transport with fixed limits. It returns bounded raw bytes and provenance or a typed, redacted failure. HTTP 401 is a clear authentication signal and becomes `NeedsBrowser` with guidance to paste the posting text manually. A zero-byte successful response becomes `Empty` with the same guidance. HTTP 403 and other unsuccessful statuses remain `FetchFailed`.
 
-A successful HTML response is returned as bytes even when the page may require JavaScript to display a posting. F2 does not parse HTML or execute scripts. F3 will inspect the content when it implements HTML-to-text extraction and can provide more specific guidance then.
+A successful HTML response is returned as bytes even when the page may require JavaScript to display a posting. F2 does not parse HTML or execute scripts. The separate F3 HTML-to-text extractor parses those bytes without running scripts; if no posting text appears, the caller offers manual paste.
 
 ## Why
 
