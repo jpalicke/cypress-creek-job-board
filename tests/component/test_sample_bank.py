@@ -3,10 +3,15 @@
 import itertools
 from pathlib import Path
 
+import pytest
+
 from cypress_creek.facts import load_bank
+from cypress_creek.facts.errors import FactValidationError
 from cypress_creek.facts.models import Bank, EvidenceType, Kind, Level, Share
 
-SAMPLE_BANK = Path(__file__).parent.parent.parent / "evals" / "bank" / "sample_bank.yaml"
+SAMPLE_BANK_DIR = Path(__file__).parent.parent.parent / "evals" / "bank"
+SAMPLE_BANK = SAMPLE_BANK_DIR / "sample_bank.yaml"
+UNVERIFIED_BANK = SAMPLE_BANK_DIR / "sample_bank_unverified.yaml"
 
 
 def test_the_sample_bank_loads_in_strict_mode() -> None:
@@ -53,3 +58,23 @@ def test_employers_have_overlapping_and_separate_periods() -> None:
     separate = [pair for pair in pairs if pair not in overlapping]
     assert overlapping
     assert separate
+
+
+def test_the_sample_bank_has_at_least_twenty_five_facts() -> None:
+    assert len(_bank().facts) >= 25
+
+
+def test_the_verified_sample_bank_has_no_unverified_fact() -> None:
+    assert _bank().unverified_ids() == []
+
+
+def test_the_unverified_bank_loads_with_one_unverified_fact_and_fails_strict_mode() -> None:
+    bank = load_bank(UNVERIFIED_BANK)
+    assert bank.unverified_ids() == ["F-0026"]
+    with pytest.raises(FactValidationError, match="verified_on"):
+        load_bank(UNVERIFIED_BANK, strict=True)
+
+
+def test_fact_ids_are_unique_across_both_sample_banks() -> None:
+    ids = [fact.id for fact in _bank().facts + load_bank(UNVERIFIED_BANK).facts]
+    assert len(ids) == len(set(ids))

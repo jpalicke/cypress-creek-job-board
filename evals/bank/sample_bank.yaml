@@ -162,3 +162,69 @@ facts:
     verified_on: 2024-03-01
     evidence: {type: repo, pointer: "https://example.invalid/sample/pipeline-rewrite"}
     share: shareable
+
+  - id: F-0018
+    claim: Wrote Bash and Python tooling that automated database backups and restores.
+    kind: project
+    tags: [{name: bash, level: working}, {name: python, level: expert}]
+    verified_on: 2024-03-01
+    evidence: {type: repo, pointer: "https://example.invalid/sample/backup-tools"}
+    share: shareable
+
+  - id: F-0019
+    claim: Edited a teammate's Terraform once to add a database.
+    kind: project
+    tags: [{name: terraform, level: familiar}]
+    verified_on: 2024-03-01
+    evidence: {type: self_attested, pointer: "Fictional personal notes"}
+    share: shareable
+
+  - id: F-0020
+    claim: Added data quality checks that failed a load when row counts drifted.
+    kind: project
+    tags: [{name: testing, level: working}, {name: sql, level: expert}]
+    verified_on: 2024-03-01
+    evidence: {type: repo, pointer: "https://example.invalid/sample/quality-checks"}
+    share: shareable
+
+  - id: F-0021
+    claim: Gave a local meetup talk on PostgreSQL indexing.
+    kind: achievement
+    tags: [{name: postgresql, level: expert}]
+    verified_on: 2024-03-01
+    evidence: {type: public_url, pointer: "https://example.invalid/sample/indexing-talk"}
+    share: shareable
+
+  - id: F-0022
+    claim: Finished the Bogus Open Courseware statistics course.
+    kind: certification
+    issuer: Bogus Open Courseware
+    tags: [{name: statistics, level: familiar}]
+    verified_on: 2024-03-01
+    evidence: {type: certificate, pointer: "https://example.invalid/sample/statistics-certificate"}
+    share: shareable
+
+  - id: F-0023
+    claim: Built a type checked Python command line tool for loading CSV files.
+    kind: project
+    tags: [{name: python, level: expert}, {name: mypy, level: working}]
+    verified_on: 2024-03-01
+    evidence: {type: repo, pointer: "https://example.invalid/sample/csv-loader"}
+    share: shareable
+
+  - id: F-0024
+    claim: Wrote the data warehouse onboarding guide for new engineers.
+    kind: project
+    tags: [{name: documentation, level: working}]
+    verified_on: 2024-03-01
+    evidence: {type: repo, pointer: "https://example.invalid/sample/onboarding-guide"}
+    share: shareable
+
+  - id: F-0025
+    claim: Cut the warehouse storage bill by about a third by dropping unused tables.
+    kind: achievement
+    employer: Turbo Tortoise Systems
+    tags: [{name: sql, level: working}]
+    verified_on: 2024-03-01
+    evidence: {type: employer_doc, pointer: "Fictional cost review, Turbo Tortoise Systems"}
+    share: shareable
