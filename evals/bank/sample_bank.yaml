@@ -1,0 +1,78 @@
+# Fictional sample fact bank. Every person, employer, product and credential here is invented.
+# Planted gaps and thin support cases are listed in PLANTED_GAPS.md.
+facts:
+  - id: F-0001
+    claim: Backend Developer at Gravy Boat Labs, where I built and ran Python services.
+    kind: employment
+    employer: Gravy Boat Labs
+    role: Backend Developer
+    start: 2015-03-01
+    end: 2019-12-31
+    tags: [{name: python, level: expert}]
+    verified_on: 2024-03-01
+    evidence: {type: employer_doc, pointer: "Fictional reference letter, Gravy Boat Labs"}
+    share: shareable
+
+  - id: F-0002
+    claim: Senior Data Engineer at Turbo Tortoise Systems, where I ran the PostgreSQL reporting warehouse.
+    kind: employment
+    employer: Turbo Tortoise Systems
+    role: Senior Data Engineer
+    start: 2019-06-01
+    end: 2024-02-29
+    tags: [{name: postgresql, level: expert}, {name: sql, level: expert}]
+    verified_on: 2024-03-01
+    evidence: {type: employer_doc, pointer: "Fictional reference letter, Turbo Tortoise Systems"}
+    share: shareable
+
+  - id: F-0003
+    claim: Migrated a reporting database to PostgreSQL and cut the nightly batch from 6 hours to 90 minutes.
+    kind: project
+    start: 2021-01-01
+    end: 2021-09-30
+    tags: [{name: postgresql, level: expert}, {name: etl, level: working}]
+    verified_on: 2024-03-01
+    evidence: {type: repo, pointer: "https://example.invalid/sample/reporting-migration"}
+    share: shareable
+
+  - id: F-0004
+    claim: Packaged services in Docker and deployed them to a Kubernetes cluster run by another team.
+    kind: project
+    tags: [{name: docker, level: working}, {name: kubernetes, level: familiar}]
+    verified_on: 2024-03-01
+    evidence: {type: self_attested, pointer: "Fictional personal notes"}
+    share: shareable
+
+  - id: F-0005
+    claim: BS in Computer Science from Lake Bogus State University.
+    kind: education
+    issuer: Lake Bogus State University
+    start: 2011-09-01
+    end: 2015-05-31
+    verified_on: 2024-03-01
+    evidence: {type: certificate, pointer: "Fictional transcript, Lake Bogus State University"}
+    share: shareable
+
+  - id: F-0006
+    claim: Holds the Cloud Pelican Associate certification.
+    kind: certification
+    issuer: Cloud Pelican Institute
+    verified_on: 2024-03-01
+    evidence: {type: certificate, pointer: "https://example.invalid/sample/cloud-pelican-certificate"}
+    share: shareable
+
+  - id: F-0007
+    claim: Won the incident response award at Turbo Tortoise Systems.
+    kind: achievement
+    employer: Turbo Tortoise Systems
+    verified_on: 2024-03-01
+    evidence: {type: self_attested, pointer: "Fictional personal notes"}
+    share: local_only
+
+  - id: F-0008
+    claim: Maintains a small public Python library that validates CSV files, with a pytest test suite.
+    kind: project
+    tags: [{name: python, level: expert}, {name: pytest, level: working}]
+    verified_on: 2024-03-01
+    evidence: {type: public_url, pointer: "https://example.invalid/sample/csv-checker"}
+    share: shareable
