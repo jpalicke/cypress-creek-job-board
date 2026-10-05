@@ -7,6 +7,7 @@ import pytest
 
 from cypress_creek import __version__
 from cypress_creek.ingest.fetch import fetch_posting
+from cypress_creek.ingest.html_text import html_to_text
 
 HTML_URL = "https://www.usajobs.gov/job/883691200"
 PDF_URL = "https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf"
@@ -30,3 +31,15 @@ def test_public_posting_has_raw_bytes_and_provenance(
     assert result.provenance.retrieved_at.tzinfo is UTC
     assert result.provenance.extractor_name == "raw-fetch"
     assert result.provenance.extractor_version == __version__
+
+
+@pytest.mark.needs_network
+def test_public_posting_html_retains_requirements_without_scripts() -> None:
+    fetched = fetch_posting(HTML_URL)
+
+    extracted = html_to_text(fetched.body)
+
+    assert "Requirements" in extracted.text.splitlines()
+    assert "<script" not in extracted.text.lower()
+    assert extracted.warnings[0].kind == "hidden_elements_removed"
+    assert extracted.warnings[0].count > 0

@@ -11,8 +11,20 @@ The file is included unmodified.
 
 Third-party fixtures
 --------------------
-None yet. Any recorded real posting or other third-party material added under
-tests/ or evals/ must be listed here with its source and license.
+tests/fixtures/html/postings.json contains project-authored, anonymized excerpts
+based on the HTML structure of public ATS postings observed on 2026-10-03.
+All posting prose in the fixture was written for this project. The excerpts are
+licensed under this project's MIT License. No original posting prose is included.
+The structural references were:
+- Greenhouse public posting page:
+  https://job-boards.greenhouse.io/greenhouse/jobs/8204473
+- Lever public training posting page:
+  https://jobs.lever.co/leverdemo-8/28b44fc8-5436-4110-aafa-cf83b6bff9c5
+- Ashby public job-board description HTML:
+  https://api.ashbyhq.com/posting-api/job-board/ashby
+The original pages and API output did not state a reuse license. They are not
+redistributed here. Any recorded third-party posting added later needs its
+source and license listed here.
 
 Takedown
 --------
