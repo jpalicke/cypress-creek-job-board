@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from cypress_creek.discovery.tombstones import Tombstones
+from cypress_creek.discovery.tombstones import InvalidBoard, Tombstones
 from cypress_creek.discovery.watchlist import (
     AlreadyWatched,
     IdentityEvidence,
@@ -173,3 +173,100 @@ def test_denying_the_same_company_twice_keeps_one_tombstone(conn: sqlite3.Connec
     _deny(conn)
     _deny(conn, name="ACME Corporation")
     assert Tombstones(conn).remove(name="Acme") == 1
+
+
+def test_a_second_denial_of_a_company_keeps_its_other_board_blocked(
+    conn: sqlite3.Connection,
+) -> None:
+    _deny(conn)
+    _deny(conn, name="ACME Corporation", ats="lever", slug="acme-jobs")
+    with pytest.raises(Tombstoned, match="board"):
+        Watchlist(conn).add(_entry("Renamed Holdings", ats="lever", slug="acme-jobs"))
+
+
+def test_removing_a_tombstone_lifts_every_board_of_that_company(conn: sqlite3.Connection) -> None:
+    _deny(conn)
+    _deny(conn, ats="lever", slug="acme-jobs")
+    assert Tombstones(conn).remove(name="Acme Corp") == 2
+    Watchlist(conn).add(_entry("Renamed Holdings", ats="lever", slug="acme-jobs"))
+
+
+@pytest.mark.parametrize(
+    ("ats", "slug"),
+    [
+        ("greenhouse", "Acme"),
+        ("Greenhouse", "acme"),
+        (" greenhouse ", "acme "),
+        ("GREENHOUSE", "ACME"),
+    ],
+)
+def test_a_denied_board_is_matched_without_regard_to_case_or_padding(
+    conn: sqlite3.Connection, ats: str, slug: str
+) -> None:
+    _deny(conn)
+    with pytest.raises(Tombstoned, match="board"):
+        Watchlist(conn).add(_entry("Renamed Holdings", ats=ats, slug=slug))
+
+
+def test_a_board_cannot_be_watched_twice_under_a_case_variant(conn: sqlite3.Connection) -> None:
+    Watchlist(conn).add(_entry("Acme Corp"))
+    with pytest.raises(AlreadyWatched, match="board"):
+        Watchlist(conn).add(_entry("Different Name", ats="Greenhouse", slug="ACME "))
+
+
+def test_a_watchlist_entry_stores_the_normalized_board() -> None:
+    entry = _entry(ats=" Greenhouse ", slug="Acme ")
+    assert (entry.ats, entry.slug) == ("greenhouse", "acme")
+
+
+@pytest.mark.parametrize(("ats", "slug"), [("", "acme"), ("greenhouse", ""), (" ", "  ")])
+def test_a_watchlist_entry_with_an_empty_board_part_is_refused(ats: str, slug: str) -> None:
+    with pytest.raises(InvalidBoard):
+        _entry(ats=ats, slug=slug)
+
+
+@pytest.mark.parametrize(
+    ("ats", "slug"), [("", ""), ("greenhouse", ""), ("", "acme"), ("greenhouse", None)]
+)
+def test_a_denial_with_a_half_or_empty_board_is_refused(
+    conn: sqlite3.Connection, ats: str, slug: str | None
+) -> None:
+    with pytest.raises(InvalidBoard):
+        Tombstones(conn).deny(
+            name="Acme Corp", ats=ats, slug=slug, proposed_by="ollama:test", decided_at=NOW
+        )
+
+
+def test_a_denial_with_no_board_blocks_only_by_company(conn: sqlite3.Connection) -> None:
+    Tombstones(conn).deny(
+        name="Acme Corp", ats=None, slug=None, proposed_by="ollama:test", decided_at=NOW
+    )
+    with pytest.raises(Tombstoned, match="company"):
+        Watchlist(conn).add(_entry("ACME Corporation", slug="other"))
+    Watchlist(conn).add(_entry("Other Co", slug="acme"))
+
+
+@pytest.mark.parametrize(
+    "statement",
+    [
+        "INSERT INTO watchlist_entry (company_key, display_name, ats, slug, identity_evidence,"
+        " approved_at) VALUES ('k', 'K', '', 'b', 'strong', 'now')",
+        "INSERT INTO watchlist_entry (company_key, display_name, ats, slug, identity_evidence,"
+        " approved_at) VALUES ('k', 'K', 'a', '', 'strong', 'now')",
+        "INSERT INTO suggestion (name, company_key, proposed_by, ats, slug, resolver_result, state,"
+        " decided_at) VALUES ('K', 'k', 'm', '', '', '{}', 'denied', 'now')",
+        "INSERT INTO suggestion (name, company_key, proposed_by, ats, slug, resolver_result, state,"
+        " decided_at) VALUES ('K', 'k', 'm', 'a', NULL, '{}', 'denied', 'now')",
+    ],
+)
+def test_an_empty_or_half_board_is_refused_by_the_database(
+    conn: sqlite3.Connection, statement: str
+) -> None:
+    with pytest.raises(sqlite3.IntegrityError):
+        conn.execute(statement)
+
+
+def test_the_refusal_names_the_company_that_was_denied(conn: sqlite3.Connection) -> None:
+    _deny(conn)
+    with pytest.raises(Tombstoned, match="Acme Corp"):
+        Watchlist(conn).add(_entry("Renamed Holdings", slug="acme"))

@@ -70,7 +70,7 @@ src/cypress_creek/       The library
     migrations/          Numbered .sql files, one per schema change (0001_schema_version.sql, 0002_discovery.sql)
   discovery/             Discovery state in SQLite, no network
     watchlist.py         WatchlistEntry, Watchlist, Tombstoned, AlreadyWatched, IdentityEvidence
-    tombstones.py        Tombstones, DenialReason: denied companies kept as denied suggestion rows
+    tombstones.py        Tombstones, Denial, DenialReason, normalize_board: denied companies kept as denied suggestion rows
   scoring/               Deterministic scoring, no model calls
     aliases.py           AliasTable, load_aliases
     support.py           candidate_facts, merged_years, support_ceiling
@@ -143,7 +143,7 @@ URL validation is a separate library entry point. It rejects unsafe syntax, reso
 - **A report cites or is refused.** `build_report` ends with `verify_report` (V4, V5, V9), so a fabricated or unverified fact id never reaches a report. Failed stages make the report incomplete rather than quietly partial. See `pipeline.md`.
 - **Retrieval is not a model.** `retrieve` matches tags and aliases, ranks and caps the candidates, and sets the support ceiling. A requirement with no candidate is a gap and costs no model call. See `pipeline.md`.
 - **The sample bank and its gap table cannot drift.** `PLANTED_GAPS.md` is parsed by a test that runs each row through `retrieve`, so a bank edit that changes a gap fails the build. See `evals.md`.
-- **A denial is permanent until a human removes it.** A denied company is a tombstone matched by `company_key` and by board, and `Watchlist.add` refuses it. Only `Tombstones.remove` lifts one. See [ADR 0016](adr/0016-tombstones-are-removed-only-by-a-human-call.md).
+- **A denial is permanent until a human removes it.** A denied company is a tombstone matched by `company_key` and by normalized board, and `Watchlist.add` refuses it. Only `Tombstones.remove` lifts one. See [ADR 0016](adr/0016-tombstones-are-removed-only-by-a-human-call.md).
 - **One retry place.** Providers raise typed errors and `providers.call_with_retry` is the only code that retries them. Adapters never loop on their own.
 - **Frozen models.** Pydantic models are frozen and reject unknown fields, so a typo or smuggled field is an error.
 - **Two stores, on purpose.** The fact bank and config are hand edited YAML (reviewable, diffable, versioned). Mutable app state, which later cards add (postings, drafts, watchlists), is SQLite behind numbered migrations.

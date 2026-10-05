@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 
-from cypress_creek.discovery.tombstones import Tombstones
+from cypress_creek.discovery.tombstones import Tombstones, normalize_board
 from cypress_creek.storage.company_key import company_key
 
 
@@ -25,7 +25,7 @@ class AlreadyWatched(Exception):
 
 @dataclass(frozen=True)
 class WatchlistEntry:
-    """An approved company. Its key is derived from the display name, never supplied."""
+    """An approved company. Its key comes from the display name and its board is normalized."""
 
     display_name: str
     ats: str
@@ -35,6 +35,9 @@ class WatchlistEntry:
     company_key: str = field(init=False)
 
     def __post_init__(self) -> None:
+        ats, slug = normalize_board(self.ats, self.slug)
+        object.__setattr__(self, "ats", ats)
+        object.__setattr__(self, "slug", slug)
         object.__setattr__(self, "company_key", company_key(self.display_name))
 
 
@@ -66,11 +69,13 @@ class Watchlist:
         self._conn.execute("COMMIT")
 
     def _refuse_if_blocked(self, entry: WatchlistEntry) -> None:
-        reason = Tombstones(self._conn).denial_reason(
+        denial = Tombstones(self._conn).denial(
             name=entry.display_name, ats=entry.ats, slug=entry.slug
         )
-        if reason is not None:
-            raise Tombstoned(f"the {reason.value} was denied by a human: {entry.display_name}")
+        if denial is not None:
+            raise Tombstoned(
+                f"{entry.display_name} matches a denied {denial.reason.value}: {denial.name}"
+            )
         if self._conn.execute(
             "SELECT 1 FROM watchlist_entry WHERE company_key = ?", (entry.company_key,)
         ).fetchone():
