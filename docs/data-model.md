@@ -131,7 +131,7 @@ Code is in `src/cypress_creek/discovery/`. Tables come from `0002_discovery.sql`
 - `suggestion`: a proposed company. `state` is pending, approved or denied. A denied row is the permanent tombstone, one per company and board. `ats` and `slug` are both set or both empty. Nothing writes pending or approved rows until the suggestion card.
 
 Rules, in `watchlist.py` and `tombstones.py`:
-- `Watchlist.add` refuses with `Tombstoned` when a denied row matches the company key or the board, and with `AlreadyWatched` when the company or the board is already listed. A refusal writes nothing. See [ADR 0016](adr/0016-tombstones-are-removed-only-by-a-human-call.md).
+- `Watchlist.add` refuses with `Tombstoned` when a denied row matches the company key or the board, and with `AlreadyWatched` when the company or the board is already listed. A refusal writes nothing. See [ADR 0017](adr/0017-tombstones-are-removed-only-by-a-human-call.md).
 - A board is compared trimmed and lower case, through `normalize_board`, so `Greenhouse/Acme ` and `greenhouse/acme` are one board. An empty ATS or slug raises `InvalidBoard`.
 - A tombstone is lifted only by `Tombstones.remove(name=...)`, which lifts every board of that company. Adding to the watchlist never lifts one. The `Tombstoned` message names the denied company to pass to `remove`.
 - Names are stored and returned as plain text. A name with no letters or digits is refused with `CompanyNameError`.

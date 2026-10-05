@@ -1,6 +1,12 @@
 # Threat model
 
-The full design threat model is in [spec.md, section 9](spec.md#9-threat-model). This page records the URL, HTTP transport and one-off posting fetch boundaries and the prompt structure. A user-facing app workflow remains a later card.
+The full design threat model is in [spec.md, section 9](spec.md#9-threat-model). This page records the URL, HTTP transport, posting fetch and HTML content boundaries, and the prompt structure. A user-facing app workflow remains a later card.
+
+## HTML content boundary
+
+Fetched HTML is hostile input. `html_to_text` parses only the supplied bytes, never executes JavaScript and never loads linked resources. It drops script, style, noscript, template, head, meta and comment content, plus elements hidden with supported attributes or inline CSS. A warning counts the hidden elements removed. A 10 MiB input cap and 128-element depth cap reject oversized or deeply nested pages with typed errors. Headings and list items remain separate lines for later requirement extraction. See [ADR 0016](adr/0016-html-text-parsing.md) and [pipeline usage](pipeline.md#html-posting-text).
+
+This is a best-effort visibility filter, not a browser layout engine. It cannot evaluate external stylesheets, CSS selectors, inherited style, media queries or script-rendered content. A page whose posting appears only after JavaScript may yield no posting text; callers must offer manual paste rather than treat an empty extraction as a valid posting. The extracted text remains untrusted and goes through normalization and the downstream validators.
 
 ## SSRF boundary
 
@@ -48,7 +54,7 @@ At the URL guard boundary, a rejection raises `UrlGuardError`. Branch on `reason
 - Paths and queries are not decoded by the guard. The literal-character check covers ASCII controls and Unicode whitespace, not every Unicode control category. The transport preserves encoded data in the HTTP request target; HTTPX handles request framing.
 - The guard's operating-system DNS call has no independent timeout. The transport runs it in a child process under the whole-fetch deadline. OS process creation and cleanup can add latency beyond the configured deadline.
 - The final body defaults to 10 MiB wire, 10 MiB decoded and a 100:1 decompression ratio. Redirect bodies are not read. Only identity or one complete gzip stream is allowed. Only HTML, XHTML, plain text and PDF content types are accepted by default, and a missing content type is rejected.
-- The public entry does not execute JavaScript or forward cookies or URL credentials. `fetch_posting` maps HTTP 401 to `NeedsBrowser` and a zero-byte body to `Empty`, both with manual-paste guidance. Other statuses, including HTTP 403, are `FetchFailed`. Successful HTML is returned as bytes; F3 will assess pages whose posting needs client-side rendering.
+- The public entry does not execute JavaScript or forward cookies or URL credentials. `fetch_posting` maps HTTP 401 to `NeedsBrowser` and a zero-byte body to `Empty`, both with manual-paste guidance. Other statuses, including HTTP 403, are `FetchFailed`. Successful HTML is returned as bytes. The separate HTML extractor cannot recover posting text that only client-side scripts render; offer manual paste when extraction is empty.
 
 The choices are recorded in [ADR 0009](adr/0009-url-target-validation.md), [ADR 0013](adr/0013-pinned-http-transport.md) and [ADR 0015](adr/0015-link-fetch-browser-signals.md). Python's [URL parser documentation](https://docs.python.org/3.13/library/urllib.parse.html#url-parsing-security) explains why parsing needs additional validation. The all-address check follows [OWASP's SSRF guidance](https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html). HTTPX documents [IP connection with separate Host and TLS hostname](https://www.python-httpx.org/advanced/extensions/#sni_hostname).
 

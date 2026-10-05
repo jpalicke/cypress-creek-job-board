@@ -1,4 +1,4 @@
-# ADR 0016: Denied companies are tombstoned and only an explicit call lifts one
+# ADR 0017: Denied companies are tombstoned and only an explicit call lifts one
 
 Status: accepted (Joe P, card H1a)
 
