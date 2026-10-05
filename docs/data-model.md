@@ -120,12 +120,49 @@ Migration rules:
 - Each file runs in one transaction together with its row in `schema_version`. If it fails, nothing from that file is kept and `MigrationError` names the file. Do not put `BEGIN` or `COMMIT` in a migration.
 - A whole folder is checked before anything runs, so a bad name, a gap or a file that is not utf-8 changes nothing.
 - A database newer than the code, or one whose applied name differs from the file of that number, is refused. Never edit or rename a migration that has been applied; add a new one.
-- `0001_schema_version.sql` creates the version table and holds no domain data. Each card that needs tables adds its own file.
+- `0001_schema_version.sql` creates the version table and holds no domain data. Each card that needs tables adds its own file. `0002_discovery.sql` creates the discovery tables described below.
 
 Known limits: there are no checksums, so an edited applied migration is not detected (only a renamed one is). There is no downgrade path. The database file is not encrypted.
+
+## Discovery: watchlist and tombstones
+Code is in `src/cypress_creek/discovery/`. Tables come from `0002_discovery.sql`:
+- `listing`: a posting found on a company board. `id` is `ats:slug:job_id`, `state` is new, seen or closed. Nothing writes listings yet.
+- `watchlist_entry`: an approved company. `company_key` is the key, derived from `display_name` by `company_key()` and never supplied. `(ats, slug)` is unique, stored trimmed and lower case, and neither part may be empty. `identity_evidence` is strong, weak or none. It is written only by a human approval, so `Watchlist.add` takes the approval time from the caller and never reads a clock.
+- `suggestion`: a proposed company. `state` is pending, approved or denied. A denied row is the permanent tombstone, one per company and board. `ats` and `slug` are both set or both empty. Nothing writes pending or approved rows until the suggestion card.
+
+Rules, in `watchlist.py` and `tombstones.py`:
+- `Watchlist.add` refuses with `Tombstoned` when a denied row matches the company key or the board, and with `AlreadyWatched` when the company or the board is already listed. A refusal writes nothing. See [ADR 0017](adr/0017-tombstones-are-removed-only-by-a-human-call.md).
+- A board is compared trimmed and lower case, through `normalize_board`, so `Greenhouse/Acme ` and `greenhouse/acme` are one board. An empty ATS or slug raises `InvalidBoard`.
+- A tombstone is lifted only by `Tombstones.remove(name=...)`, which lifts every board of that company. Adding to the watchlist never lifts one. The `Tombstoned` message names the denied company to pass to `remove`.
+- Names are stored and returned as plain text. A name with no letters or digits is refused with `CompanyNameError`.
+
+Known limits: removing a tombstone keeps no history of the denial, and the blacklist table and routes come in later cards.
+
+## Try the discovery tables
+```bash
+uv run python - <<'PY'
+import tempfile
+from datetime import UTC, datetime
+from pathlib import Path
+
+from cypress_creek.discovery.tombstones import Tombstones
+from cypress_creek.discovery.watchlist import IdentityEvidence, Tombstoned, Watchlist, WatchlistEntry
+from cypress_creek.storage.db import connect, migrate
+
+conn = connect(Path(tempfile.mkdtemp()) / "try.sqlite3")
+migrate(conn)
+now = datetime.now(UTC)
+Tombstones(conn).deny(name="Acme Corp", ats="greenhouse", slug="acme", proposed_by="me", decided_at=now)
+try:
+    Watchlist(conn).add(WatchlistEntry("ACME Corporation", "lever", "other", IdentityEvidence.WEAK, now))
+except Tombstoned as error:
+    print(error)
+PY
+```
+It prints `ACME Corporation matches a denied company: Acme Corp`. The variant name is refused because it has the same company key as the denied one.
 
 ## Try the database
 ```bash
 uv run python -c "from cypress_creek.storage.db import connect, database_path, migrate, schema_version; c = connect(database_path()); print('applied', migrate(c), 'now at version', schema_version(c)); print('again', migrate(c))"
 ```
-The first run prints `applied [1]` and creates `data/cypress_creek.sqlite3`. Running it again prints `applied []`. Delete the `data/` folder to start over.
+The first run prints `applied [1, 2]` and creates `data/cypress_creek.sqlite3`. Running it again prints `applied []`. Delete the `data/` folder to start over.
