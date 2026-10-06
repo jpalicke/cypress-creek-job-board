@@ -29,3 +29,5 @@ Why: Joe P asked for it on B6a.
 ## Treat truncated token counts as truncated counts
 Never infer the full input token count from Ollama's `prompt_eval_count` when it matches a truncation signature. Keep a posting character cap separate from the configured model context and verify actual fit with the provider guard.
 Why: a 50,000-character posting returned 16,386 prompt tokens at `num_ctx` 32,768 because Ollama had already cut it to about half the window; that number did not measure the full posting.
+
+- After resolving a merge, grep every touched file for conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`) before `git add`. A resolver script that asserts and fails must stop the commit, never be chained to it.

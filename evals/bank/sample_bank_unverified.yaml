@@ -1,0 +1,9 @@
+# One deliberately unverified fact, kept apart so sample_bank.yaml still loads in strict mode.
+# It claims Go at expert level. The verified bank has no Go, so the tool must still report a gap.
+facts:
+  - id: F-0026
+    claim: Led a rewrite of the ingestion service in Go.
+    kind: project
+    tags: [{name: go, level: expert}]
+    evidence: {type: self_attested, pointer: "Fictional personal notes"}
+    share: shareable
