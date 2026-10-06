@@ -25,3 +25,7 @@ Why: on B6a the implementation was rewritten for the full Unicode confusables da
 ## Post the merge summary on the issue too
 When asking Joe P to merge, post the same summary as a comment on the card's issue so the ticket records the completed work.
 Why: Joe P asked for it on B6a.
+
+## Treat truncated token counts as truncated counts
+Never infer the full input token count from Ollama's `prompt_eval_count` when it matches a truncation signature. Keep a posting character cap separate from the configured model context and verify actual fit with the provider guard.
+Why: a 50,000-character posting returned 16,386 prompt tokens at `num_ctx` 32,768 because Ollama had already cut it to about half the window; that number did not measure the full posting.

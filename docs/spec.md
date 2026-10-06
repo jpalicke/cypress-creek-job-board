@@ -260,7 +260,7 @@ Why three and not two: Ollama's OpenAI compatible endpoint cannot set `num_ctx` 
 
 1. Pre-flight: estimate tokens. If estimate exceeds the configured `num_ctx` minus the output budget, refuse before calling.
 2. Set `num_ctx` explicitly on every request. Never rely on the server default.
-3. Post-flight: compare `prompt_eval_count` to the estimate and to `num_ctx`. A count suspiciously close to `num_ctx`, or far below the estimate, raises `ContextTruncated`.
+3. Post-flight: compare `prompt_eval_count` to the estimate and to `num_ctx`. A count in the measured half-window truncation band raises `ContextTruncated` regardless of the estimate. A count near `num_ctx` also raises it when the estimate was lower.
 4. The same post-flight check runs for `openai_compatible` against the declared `context_tokens`.
 
 The post-flight rule is an inference from reported behavior (the docs do not describe truncation, a GitHub issue does), so the integration test must deliberately overflow a small `num_ctx` against a real Ollama and assert the typed error.
@@ -633,7 +633,7 @@ The fetcher treats the URL as hostile. Every hop is validated, not just the firs
 ### 11.3 Normalization
 
 - Unicode NFKC, strip control and zero width characters, collapse whitespace.
-- Cap total length (default 50,000 characters). Over the cap is rejected with a clear message. The selected provider also rejects requests that exceed its configured token context.
+- Cap total length (default 50,000 characters). Over the cap is rejected with a clear message. This is an input-size cap, not a guarantee of model fit; the selected provider separately rejects requests that exceed its configured token context.
 - Spans in requirements (V1) refer to the normalized text, and the normalized text is what is stored and shown, so there is one source of truth for what the model saw.
 - A cue sentence coverage scan (V13) runs here so the extraction stage can be checked against it.
 

@@ -40,8 +40,15 @@ def test_every_error_is_a_provider_error_and_a_distinct_class() -> None:
 def test_context_truncated_carries_the_token_counts() -> None:
     error = ContextTruncated(input_tokens=9000, context_tokens=8192)
     assert (error.input_tokens, error.context_tokens) == (9000, 8192)
-    assert "9000" in str(error)
-    assert "8192" in str(error)
+    assert str(error) == "input of 9000 tokens exceeds context of 8192"
+
+
+def test_reported_truncation_does_not_claim_the_reported_count_exceeds_context() -> None:
+    error = ContextTruncated(input_tokens=16386, context_tokens=32768, detected_after_call=True)
+    assert (error.input_tokens, error.context_tokens) == (16386, 32768)
+    assert str(error) == (
+        "server reported 16386 prompt tokens matching a truncation signature for context of 32768"
+    )
 
 
 def test_schema_violation_carries_the_schema_error() -> None:

@@ -18,10 +18,19 @@ class ProviderError(Exception):
 
 
 class ContextTruncated(ProviderError):
-    """The input did not fit the model context. Never retried."""
+    """The input exceeded context or matched a reported truncation signature. Never retried."""
 
-    def __init__(self, input_tokens: int, context_tokens: int) -> None:
-        super().__init__(f"input of {input_tokens} tokens exceeds context of {context_tokens}")
+    def __init__(
+        self, input_tokens: int, context_tokens: int, *, detected_after_call: bool = False
+    ) -> None:
+        if detected_after_call:
+            message = (
+                f"server reported {input_tokens} prompt tokens matching a truncation signature "
+                f"for context of {context_tokens}"
+            )
+        else:
+            message = f"input of {input_tokens} tokens exceeds context of {context_tokens}"
+        super().__init__(message)
         self.input_tokens = input_tokens
         self.context_tokens = context_tokens
 
