@@ -97,7 +97,7 @@ Steps, in order:
 
 `Acme, Inc.`, `ACME Incorporated`, `Ac me`, `A.C.M.E.`, `Acrne`, a full-width spelling and a Cyrillic lookalike spelling all give the same key. `IBM`, `lBM` and `1BM` match, and so do `Oracle` and `0racle`. Keys are for comparison only and are not readable (`Acme` becomes `acrne`), so never show one to a person. The result is idempotent, which a Hypothesis test checks, and a component test checks every character in the shipped data.
 
-Known limits: the table is the Unicode data, so a lookalike it does not list is not folded, and `w` versus `vv` is one such pair. Folding also applies inside genuinely non Latin names, which is fine because keys are only compared. Different companies that differ only by lookalike letters or spacing collide, which for a blacklist fails safe. Slug and domain matching is a later card (H1).
+Known limits: the table is the Unicode data, so a lookalike it does not list is not folded, and `w` versus `vv` is one such pair. Folding also applies inside genuinely non Latin names, which is fine because keys are only compared. Different companies that differ only by lookalike letters or spacing collide, which for a blacklist fails safe. Slug and domain matching is in the blacklist filter, see [Discovery: the blacklist](#discovery-the-blacklist).
 
 To update the data, download the latest `confusables.txt` from the URL in `NOTICE`, replace the file, update the version line in `NOTICE`, and run the tests. See [ADR 0004](adr/0004-company-key-rules.md).
 
@@ -120,7 +120,7 @@ Migration rules:
 - Each file runs in one transaction together with its row in `schema_version`. If it fails, nothing from that file is kept and `MigrationError` names the file. Do not put `BEGIN` or `COMMIT` in a migration.
 - A whole folder is checked before anything runs, so a bad name, a gap or a file that is not utf-8 changes nothing.
 - A database newer than the code, or one whose applied name differs from the file of that number, is refused. Never edit or rename a migration that has been applied; add a new one.
-- `0001_schema_version.sql` creates the version table and holds no domain data. Each card that needs tables adds its own file. `0002_discovery.sql` creates the discovery tables described below.
+- `0001_schema_version.sql` creates the version table and holds no domain data. Each card that needs tables adds its own file. `0002_discovery.sql` creates the watchlist, listing and suggestion tables and `0003_blacklist.sql` creates the blacklist table, both described below.
 
 Known limits: there are no checksums, so an edited applied migration is not detected (only a renamed one is). There is no downgrade path. The database file is not encrypted.
 
@@ -136,7 +136,7 @@ Rules, in `watchlist.py` and `tombstones.py`:
 - A tombstone is lifted only by `Tombstones.remove(name=...)`, which lifts every board of that company. Adding to the watchlist never lifts one. The `Tombstoned` message names the denied company to pass to `remove`.
 - Names are stored and returned as plain text. A name with no letters or digits is refused with `CompanyNameError`.
 
-Known limits: removing a tombstone keeps no history of the denial, and the blacklist table and routes come in later cards.
+Known limits: removing a tombstone keeps no history of the denial, and the watchlist routes come in a later card.
 
 ## Try the discovery tables
 ```bash
@@ -161,8 +161,59 @@ PY
 ```
 It prints `ACME Corporation matches a denied company: Acme Corp`. The variant name is refused because it has the same company key as the denied one.
 
+## Discovery: the blacklist
+A blacklist is a list of companies, board slugs and domains the tool must never consider. The code is `src/cypress_creek/discovery/blacklist.py` (the pure filter) and `blacklist_repository.py` (storage). The table comes from `0003_blacklist.sql`:
+- `blacklist_entry`: `match_kind` is `company_key`, `slug` or `domain`. `value` is stored already normalized and may not be empty. `reason` is free text for the human. `added_at` is supplied by the caller, never read from a clock. `(match_kind, value)` is unique, so one blocked thing has one row.
+
+Match kinds and how each value is normalized (the entry and the candidate go through the same function, so they compare equal):
+- `company_key`: `company_key(name)`, the one company name normalizer described above. `Аcme Corp` with a Cyrillic A, `ACME, Inc.` and `Ac me` are one entry. A name with no letters or digits is refused as an entry (`InvalidBlacklistValue`).
+- `slug`: `normalize_slug`, trimmed and lower case. An empty slug is refused.
+- `domain`: `normalize_domain`. Accepts a bare host or a full URL and keeps only the host: lower case, no scheme, userinfo, port, path or query, no leading `www.`, no trailing dot, and an internationalized name is stored as punycode, so `https://WWW.Acme.com:8443/jobs` and `acme.com` are one entry. A value with no host is refused.
+
+The filter, `is_blacklisted(candidate, entries)`:
+- A `Candidate` is a name plus an optional slug and domain. The result is the `BlockReason` of the first match, or `None`.
+- Check order is company key, then slug, then domain, and the first match wins, so a candidate that matches on two kinds is reported as the first.
+- It is pure: no database, no network, no clock. It runs on a discovered company before any fetch of that company, so a blocked company costs no request.
+- A candidate with a missing or blank slug or domain, or a name with no company key, cannot match on that check and the others still run. A hostile value never raises out of the filter.
+
+The repository, `Blacklist(conn)`:
+- `add(entry)` returns the new id. It dedupes on the normalized value: adding `Acme Corp` and then `ACME Incorporated` raises `AlreadyBlacklisted` and writes nothing. The check and the insert run in one write transaction.
+- `remove(entry_id)` deletes by id and returns whether a row was there. `rows()` returns `(id, entry)` pairs, oldest first. `entries()` returns just the entries, ready to pass to `is_blacklisted`.
+- The repository stores and loads. It never matches.
+
+Known limits: the `/api/watchlist` and `/api/blacklist` routes are not built yet. They come in H1c, after G1, and card issue #40 stays open until then. Domains are compared as exact hosts, so blocking `acme.com` does not block `jobs.acme.com`. Slugs are compared as plain text and are not scoped to an ATS. Company keys inherit the limits listed under `company_key`. Nothing calls the filter from a fetch path yet.
+
+## Try the blacklist
+```bash
+uv run python - <<'PY'
+import tempfile
+from datetime import UTC, datetime
+from pathlib import Path
+
+from cypress_creek.discovery.blacklist import BlacklistEntry, BlockReason, Candidate, is_blacklisted
+from cypress_creek.discovery.blacklist_repository import AlreadyBlacklisted, Blacklist
+from cypress_creek.storage.db import connect, migrate
+
+conn = connect(Path(tempfile.mkdtemp()) / "try.sqlite3")
+migrate(conn)
+now = datetime.now(UTC)
+blacklist = Blacklist(conn)
+blacklist.add(BlacklistEntry(BlockReason.COMPANY_KEY, "Acme Corp", "not a fit", now))
+blacklist.add(BlacklistEntry(BlockReason.DOMAIN, "https://WWW.Example.com:8443/jobs", "spam", now))
+try:
+    blacklist.add(BlacklistEntry(BlockReason.COMPANY_KEY, "ACME Incorporated", "again", now))
+except AlreadyBlacklisted as error:
+    print(error)
+entries = blacklist.entries()
+print(is_blacklisted(Candidate("\u0410cme, Inc.", None, None), entries))
+print(is_blacklisted(Candidate("Other Co", "other", "example.com"), entries))
+print(is_blacklisted(Candidate("Other Co", "other", "other.com"), entries))
+PY
+```
+It prints `already blacklisted as a company_key: acrne` (the stored key, which is not readable), then `company_key` for the Cyrillic lookalike, then `domain` for the domain match, then `None`. The reason values are the strings `company_key`, `slug` and `domain`.
+
 ## Try the database
 ```bash
 uv run python -c "from cypress_creek.storage.db import connect, database_path, migrate, schema_version; c = connect(database_path()); print('applied', migrate(c), 'now at version', schema_version(c)); print('again', migrate(c))"
 ```
-The first run prints `applied [1, 2]` and creates `data/cypress_creek.sqlite3`. Running it again prints `applied []`. Delete the `data/` folder to start over.
+The first run prints `applied [1, 2, 3]` and creates `data/cypress_creek.sqlite3`. Running it again prints `applied []`. Delete the `data/` folder to start over.
