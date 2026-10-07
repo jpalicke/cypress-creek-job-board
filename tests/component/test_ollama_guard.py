@@ -5,12 +5,15 @@ import pytest
 from pydantic import BaseModel
 
 from cypress_creek.config import ConfigError, parse_settings
+from cypress_creek.pipeline.prompt import Stage, build_prompt
+from cypress_creek.pipeline.schemas import ExtractionOutput
 from cypress_creek.providers import (
     ContextTruncated,
     ProviderUnavailable,
     RateLimited,
     get_provider,
 )
+from cypress_creek.providers.base import estimate_input_tokens
 from cypress_creek.providers.ollama import (
     CHARS_PER_TOKEN,
     MIN_NUM_CTX,
@@ -62,11 +65,23 @@ def test_pre_flight_refuses_one_token_over() -> None:
     assert caught.value.context_tokens == 1000
 
 
+def test_posting_cap_does_not_guarantee_the_default_model_context_fits() -> None:
+    provider = OllamaProvider(parse_settings({"provider": "ollama", "model": "qwen3.5:0.8b"}))
+    prompt = build_prompt(Stage.EXTRACT, "a" * 50_000, [], provider.capabilities, ExtractionOutput)
+    estimate = estimate_input_tokens(provider, prompt.system, prompt.data_block, ExtractionOutput)
+
+    with pytest.raises(ContextTruncated):
+        check_pre_flight(
+            estimate, max_output_tokens=4000, num_ctx=provider.capabilities.context_tokens
+        )
+
+
 def test_post_flight_flags_a_count_at_the_window_when_the_estimate_was_lower() -> None:
     with pytest.raises(ContextTruncated) as caught:
         check_post_flight(reported_tokens=1000, estimated_tokens=300, num_ctx=1000)
     assert caught.value.input_tokens == 1000
     assert caught.value.context_tokens == 1000
+    assert "server reported 1000 prompt tokens" in str(caught.value)
 
 
 def test_post_flight_flags_a_count_near_the_window() -> None:
@@ -95,8 +110,16 @@ def test_post_flight_accepts_counts_just_outside_the_half_window_band(reported: 
     check_post_flight(reported_tokens=reported, estimated_tokens=30, num_ctx=2048)
 
 
-def test_post_flight_accepts_a_half_window_count_the_estimate_bounded() -> None:
-    check_post_flight(reported_tokens=1026, estimated_tokens=1100, num_ctx=2048)
+@pytest.mark.parametrize(
+    ("num_ctx", "reported", "estimated"),
+    [(2048, 1026, 1100), (32768, 16386, 16715), (32768, 16386, 32000)],
+)
+def test_post_flight_rejects_a_half_window_count_even_when_the_estimate_is_higher(
+    num_ctx: int, reported: int, estimated: int
+) -> None:
+    with pytest.raises(ContextTruncated) as caught:
+        check_post_flight(reported_tokens=reported, estimated_tokens=estimated, num_ctx=num_ctx)
+    assert "server reported" in str(caught.value)
 
 
 def test_an_oversized_prompt_is_refused_before_any_connection() -> None:
