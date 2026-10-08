@@ -19,6 +19,7 @@ docs/                    Documentation, indexed in docs/README.md
 scripts/                 Repo tooling run by hooks and CI (ABOUTME check, license check)
 src/cypress_creek/       The library
   terms.py               normalize_term: the one term normalizer
+  eval_records.py         Typed JSONL eval records, identity and resume checks
   facts/                 The fact bank
     models.py            Fact, Tag, Evidence, Bank and their enums
     loader.py            Safe YAML loading, parse_bank, load_bank
@@ -78,6 +79,8 @@ src/cypress_creek/       The library
     score.py             Weights, load_weights, Match, downgrade, score, ScoreResult
 evals/
   bank/                  The fictional sample fact bank, its unverified lure file and PLANTED_GAPS.md (see evals.md)
+  scratch/               Gitignored local run output when the runner arrives
+  results/               Published labeled runs when the runner arrives
 tests/
   unit/                  Pure functions and models, no I/O beyond tmp files
   component/             Real files and real environment, several modules together
@@ -145,6 +148,7 @@ URL validation is a separate library entry point. It rejects unsafe syntax, reso
 - **Entailment can only lower support.** The model's verdict is clamped to the rule ceiling by code, and `Match` refuses support above its ceiling. A drop of any size is allowed. See [ADR 0011](adr/0011-entailment-can-only-lower-support.md).
 - **A positive verdict must cite.** `judge` counts a `supports` or `partial` verdict with no valid citation (candidate, verified, shareable) as `does_not_support`, and withholds any rationale that fails V7 to V10. See `pipeline.md`.
 - **A run id is derived, not random.** `run_id` hashes the posting, the fact bank, the backend and the model, so the same inputs give the same id and a changed input gives a new one. See `pipeline.md`.
+- **Eval resume identity is stricter than report identity.** `RunHeader.run_id` hashes the complete eval header, including commit, prompts, schemas, fixture set, bank, case plan and repeats. `load_run` refuses mismatched headers and duplicate case pairs, and only a terminal record marks a file complete. This is separate from the pipeline report's `run_id`, which intentionally excludes prompt versions. See [evals.md](evals.md#run-record-format) and [ADR 0018](adr/0018-eval-run-identity.md).
 - **A report cites or is refused.** `build_report` ends with `verify_report` (V4, V5, V9), so a fabricated or unverified fact id never reaches a report. Failed stages make the report incomplete rather than quietly partial. See `pipeline.md`.
 - **Retrieval is not a model.** `retrieve` matches tags and aliases, ranks and caps the candidates, and sets the support ceiling. A requirement with no candidate is a gap and costs no model call. See `pipeline.md`.
 - **The sample bank and its gap table cannot drift.** `PLANTED_GAPS.md` is parsed by a test that runs each row through `retrieve`, so a bank edit that changes a gap fails the build. See `evals.md`.
