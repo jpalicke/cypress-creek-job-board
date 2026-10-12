@@ -22,6 +22,8 @@ New here or handing a card to someone else? [handoff.md](handoff.md) is the comp
 ## Tests
 Four tiers exist: unit, component, integration and e2e. Markers `live` (needs a real model backend) and `needs_network` (needs the internet) select tests. The `live` tests need a running Ollama with `qwen3.5:0.8b` (see [providers.md](providers.md#try-it-locally)) and are not in the gated unit and component run. Property tests use Hypothesis, and they run with the rest of the suite.
 
+The integration and e2e tiers are not in the gated run, so run them by hand when you touch what they cover. For the blacklist: `uv run pytest tests/e2e/test_blacklist_process.py tests/integration/test_blacklist_dns.py -q`. The e2e file starts real child Python processes against a real temp SQLite file. The integration file is marked `needs_network` and resolves a real host, so an unreachable network makes it fail, never skip.
+
 ## Documentation checklist
 Before a PR is ready, in the same PR:
 - The doc the card owns is updated, and any copy and paste command in it was run.
