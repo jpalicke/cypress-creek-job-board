@@ -9,7 +9,7 @@ from cypress_creek.ingest.models import PostingWarning, WarningKind
 
 __all__ = ["MAX_CHARS", "normalize", "text_hash"]
 
-MAX_CHARS = 30_000
+MAX_CHARS = 50_000
 # Raw input far beyond the cap is refused before any per-character work happens.
 MAX_RAW_CHARS = MAX_CHARS * 10
 

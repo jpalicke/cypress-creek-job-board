@@ -14,5 +14,6 @@ data/
 *.sqlite3
 # The private fact bank never lands in the repo
 facts.private/
+evals/scratch/
 requirements-audit.txt
 licenses.json

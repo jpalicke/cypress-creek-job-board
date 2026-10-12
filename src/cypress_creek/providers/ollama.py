@@ -24,13 +24,12 @@ from cypress_creek.providers.factory import REGISTRY
 
 DEFAULT_BASE_URL = "http://localhost:11434"
 
-# Conservative: real tokenizers average nearer four characters per token, so the estimate runs
-# high and the guard errs toward refusing.
+# The estimate runs high for typical prose but can undercount dense tokenization such as CJK.
+# The post-flight guard checks the server's reported count for truncation signatures.
 CHARS_PER_TOKEN = 3
 
-# Ollama drops the start of an over-long prompt, which is where the trusted instructions live,
-# and reports a prompt count at the window. A count this close to num_ctx that the estimate did
-# not predict is treated as truncation.
+# Ollama drops the start of an over-long prompt, which is where the trusted instructions live.
+# A reported count near the window that the estimate did not predict is treated as truncation.
 NEAR_FULL_FRACTION = 0.95
 
 # Measured against Ollama 0.34: a prompt that overflows the window is cut to its first few
@@ -55,16 +54,16 @@ def check_pre_flight(input_tokens: int, max_output_tokens: int, num_ctx: int) ->
 
 
 def check_post_flight(reported_tokens: int, estimated_tokens: int, num_ctx: int) -> None:
-    """Treat a reported prompt count at or near the window as truncation the estimate missed."""
+    """Refuse prompt counts matching a truncation signature, even if the estimate was higher."""
+    half = num_ctx / 2
+    if half <= reported_tokens <= half + HALF_WINDOW_SLACK:
+        raise ContextTruncated(reported_tokens, num_ctx, detected_after_call=True)
+
     near_full = num_ctx * NEAR_FULL_FRACTION
     if estimated_tokens >= near_full:
         return
-    half = num_ctx / 2
-    near_half = (
-        reported_tokens > estimated_tokens and half <= reported_tokens <= half + HALF_WINDOW_SLACK
-    )
-    if reported_tokens >= near_full or near_half:
-        raise ContextTruncated(reported_tokens, num_ctx)
+    if reported_tokens >= near_full:
+        raise ContextTruncated(reported_tokens, num_ctx, detected_after_call=True)
 
 
 class OllamaProvider:

@@ -55,6 +55,14 @@ def test_a_prompt_longer_than_num_ctx_raises_context_truncated() -> None:
     assert caught.value.context_tokens == 2048
 
 
+def test_cjk_prompt_undercount_is_caught_after_the_real_server_call() -> None:
+    provider = OllamaProvider(_settings(num_ctx=4096))
+    with pytest.raises(ContextTruncated) as caught:
+        provider.complete_structured("Extract requirements.", "漢" * 7000, Greeting, 100)
+    assert caught.value.context_tokens == 4096
+    assert 2048 <= caught.value.input_tokens <= 2064
+
+
 def test_the_conservative_estimate_refuses_the_same_prompt_before_calling() -> None:
     provider = OllamaProvider(_settings(num_ctx=2048))
     with pytest.raises(ContextTruncated):

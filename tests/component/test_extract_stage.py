@@ -57,7 +57,17 @@ def test_an_unreachable_backend_gives_an_incomplete_result_with_no_requirements(
 
 
 def test_a_posting_that_cannot_fit_the_context_gives_an_incomplete_result() -> None:
-    result = extract_requirements("Needs Python. " * 3000, _provider(), sleep=_no_sleep)
+    settings = parse_settings(
+        {
+            "provider": "ollama",
+            "model": "qwen3.5:0.8b",
+            "base_url": NOTHING_LISTENING,
+            "context_tokens": 8192,
+        }
+    )
+    result = extract_requirements(
+        "Needs Python. " * 3000, OllamaProvider(settings), sleep=_no_sleep
+    )
     assert result.status is ExtractionStatus.INCOMPLETE
     assert result.failure == "context_truncated"
 
