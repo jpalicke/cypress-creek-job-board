@@ -18,12 +18,13 @@ class Blacklist:
         """Add an entry and return its id. Raises AlreadyBlacklisted without writing."""
         self._conn.execute("BEGIN IMMEDIATE")
         try:
-            if self._conn.execute(
-                "SELECT 1 FROM blacklist_entry WHERE match_kind = ? AND value = ?",
+            existing = self._conn.execute(
+                "SELECT reason FROM blacklist_entry WHERE match_kind = ? AND value = ?",
                 (entry.match_kind.value, entry.value),
-            ).fetchone():
+            ).fetchone()
+            if existing:
                 raise AlreadyBlacklisted(
-                    f"already blacklisted as a {entry.match_kind.value}: {entry.value}"
+                    f"already blacklisted as a {entry.match_kind.value}, reason: {existing[0]}"
                 )
             cursor = self._conn.execute(
                 "INSERT INTO blacklist_entry (match_kind, value, reason, added_at)"

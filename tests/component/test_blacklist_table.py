@@ -115,6 +115,27 @@ def test_variant_duplicates_raise_already_blacklisted_and_write_nothing(
     assert not conn.in_transaction
 
 
+def test_already_blacklisted_names_the_kind_and_stored_reason_not_the_key(
+    conn: sqlite3.Connection,
+) -> None:
+    blacklist = Blacklist(conn)
+    blacklist.add(
+        BlacklistEntry(
+            match_kind=BlockReason.COMPANY_KEY,
+            value="Acme Corp",
+            reason="laid off the whole team",
+            added_at=ADDED_AT,
+        )
+    )
+    with pytest.raises(AlreadyBlacklisted) as caught:
+        blacklist.add(_entry(value="ACME Corporation"))
+    message = str(caught.value)
+    assert "company_key" in message
+    assert "laid off the whole team" in message
+    assert "acrne" not in message
+    assert not conn.in_transaction
+
+
 def test_the_same_value_under_another_kind_is_not_a_duplicate(conn: sqlite3.Connection) -> None:
     blacklist = Blacklist(conn)
     blacklist.add(_entry(BlockReason.SLUG, "acme"))

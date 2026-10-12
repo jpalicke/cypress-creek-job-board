@@ -177,7 +177,7 @@ The filter, `is_blacklisted(candidate, entries)`:
 - A candidate with a missing or blank slug or domain, or a name with no company key, cannot match on that check and the others still run. A hostile value never raises out of the filter.
 
 The repository, `Blacklist(conn)`:
-- `add(entry)` returns the new id. It dedupes on the normalized value: adding `Acme Corp` and then `ACME Incorporated` raises `AlreadyBlacklisted` and writes nothing. The check and the insert run in one write transaction.
+- `add(entry)` returns the new id. It dedupes on the normalized value: adding `Acme Corp` and then `ACME Incorporated` raises `AlreadyBlacklisted` and writes nothing. The message names the match kind and the reason saved on the existing row, so a person can read it, and it never includes the normalized value. The check and the insert run in one write transaction.
 - `remove(entry_id)` deletes by id and returns whether a row was there. `rows()` returns `(id, entry)` pairs, oldest first. `entries()` returns just the entries, ready to pass to `is_blacklisted`.
 - The repository stores and loads. It never matches.
 
@@ -210,7 +210,7 @@ print(is_blacklisted(Candidate("Other Co", "other", "example.com"), entries))
 print(is_blacklisted(Candidate("Other Co", "other", "other.com"), entries))
 PY
 ```
-It prints `already blacklisted as a company_key: acrne` (the stored key, which is not readable), then `company_key` for the Cyrillic lookalike, then `domain` for the domain match, then `None`. The reason values are the strings `company_key`, `slug` and `domain`.
+It prints `already blacklisted as a company_key, reason: not a fit` (the match kind and the reason stored on the existing row, never the normalized key), then `company_key` for the Cyrillic lookalike, then `domain` for the domain match, then `None`. The reason values are the strings `company_key`, `slug` and `domain`.
 
 ## Try the database
 ```bash

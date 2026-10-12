@@ -83,8 +83,8 @@ evals/
 tests/
   unit/                  Pure functions and models, no I/O beyond tmp files
   component/             Real files and real environment, several modules together
-  integration/           Real public DNS (needs_network) and real Ollama requests (live)
-  e2e/                   URL guard, posting fetch and HTML text extraction from separate processes
+  integration/           Real public DNS (needs_network), including the blacklist making no lookup, and real Ollama requests (live)
+  e2e/                   URL guard, posting fetch, HTML text extraction and the blacklist filter from separate processes
   http_support.py        Test-only real HTTP and UDP DNS servers, with a loopback resolver
   fixtures/              Recorded or hand written inputs
     extraction/          A posting and a recorded real model output for the accept step
