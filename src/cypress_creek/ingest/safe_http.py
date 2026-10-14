@@ -58,6 +58,8 @@ class FetchResponse:
     status: int
     content_type: str
     body: bytes
+    etag: str | None = None
+    retry_after: str | None = None
 
 
 class SafeHttpError(Exception):
@@ -66,6 +68,43 @@ class SafeHttpError(Exception):
     def __init__(self, reason_code: str) -> None:
         super().__init__("Resource could not be fetched safely")
         self.reason_code = reason_code
+
+
+_MAX_HEADER_VALUE = 512
+
+
+def _is_plain_header_text(value: str) -> bool:
+    """Printable ASCII only, so a value can be echoed back in a header safely."""
+    return all(32 <= ord(char) < 127 for char in value)
+
+
+def _check_validator(value: object) -> str | None:
+    """Accept a conditional-request validator only if it is safe to send as a header."""
+    if value is None:
+        return None
+    if (
+        not isinstance(value, str)
+        or not value
+        or len(value) > _MAX_HEADER_VALUE
+        or value != value.strip(" ")
+        or not _is_plain_header_text(value)
+    ):
+        raise SafeHttpError("invalid_validator")
+    return value
+
+
+def _clean_header(raw: str | None) -> str | None:
+    """Return a response header value, or None if it is missing, oversized or hostile."""
+    if raw is None:
+        return None
+    value = raw.strip(" ")
+    if not value or len(value) > _MAX_HEADER_VALUE or not _is_plain_header_text(value):
+        return None
+    return value
+
+
+def _is_pass_through_status(status: int) -> bool:
+    return status in {304, 429} or 500 <= status < 600
 
 
 def _request_coordinates(url: str, target: ValidatedTarget) -> tuple[str, str]:
@@ -109,8 +148,17 @@ def _decode(chunks: Iterable[bytes], encoding: str, limits: FetchLimits) -> byte
 
 
 def _fetch(
-    url: str, limits: FetchLimits, *, resolve: Callable[[str], ValidatedTarget]
+    url: str,
+    limits: FetchLimits,
+    *,
+    resolve: Callable[[str], ValidatedTarget],
+    if_none_match: str | None = None,
+    pass_through_statuses: bool = False,
 ) -> FetchResponse:
+    _check_validator(if_none_match)
+    request_headers = {"Accept-Encoding": "gzip", "User-Agent": _USER_AGENT}
+    if if_none_match is not None:
+        request_headers["If-None-Match"] = if_none_match
     for redirects in range(4):
         target = resolve(url)
         wire_url, host = _request_coordinates(url, target)
@@ -124,11 +172,7 @@ def _fetch(
                 client.stream(
                     "GET",
                     wire_url,
-                    headers={
-                        "Host": host,
-                        "Accept-Encoding": "gzip",
-                        "User-Agent": _USER_AGENT,
-                    },
+                    headers={"Host": host, **request_headers},
                     extensions={"sni_hostname": target.host},
                 ) as response,
             ):
@@ -148,6 +192,15 @@ def _fetch(
                     continue
                 if response.status_code == 401:
                     raise SafeHttpError("authentication_required")
+                if pass_through_statuses and _is_pass_through_status(response.status_code):
+                    return FetchResponse(
+                        url,
+                        response.status_code,
+                        "",
+                        b"",
+                        _clean_header(response.headers.get("etag")),
+                        _clean_header(response.headers.get("retry-after")),
+                    )
                 if not 200 <= response.status_code < 300:
                     raise SafeHttpError("http_status")
                 content_type = (
@@ -160,7 +213,13 @@ def _fetch(
                     response.headers.get("content-encoding", "").lower(),
                     limits,
                 )
-                return FetchResponse(url, response.status_code, content_type, body)
+                return FetchResponse(
+                    url,
+                    response.status_code,
+                    content_type,
+                    body,
+                    _clean_header(response.headers.get("etag")),
+                )
         except httpx.TimeoutException:
             raise SafeHttpError("timeout") from None
         except (httpx.HTTPError, httpx.InvalidURL, UnicodeError):
@@ -168,10 +227,25 @@ def _fetch(
     raise SafeHttpError("too_many_redirects")
 
 
-def _run_worker(url: str, limits: FetchLimits, command: list[str]) -> FetchResponse:
+def _run_worker(
+    url: str,
+    limits: FetchLimits,
+    command: list[str],
+    *,
+    if_none_match: str | None = None,
+    pass_through_statuses: bool = False,
+) -> FetchResponse:
+    _check_validator(if_none_match)
     configuration = asdict(limits)
     configuration["content_types"] = sorted(limits.content_types)
-    payload = json.dumps({"url": url, "limits": configuration}).encode()
+    payload = json.dumps(
+        {
+            "url": url,
+            "limits": configuration,
+            "if_none_match": if_none_match,
+            "pass_through_statuses": pass_through_statuses,
+        }
+    ).encode()
     started = time.monotonic()
     try:
         with subprocess.Popen(
@@ -190,6 +264,14 @@ def _run_worker(url: str, limits: FetchLimits, command: list[str]) -> FetchRespo
     except OSError:
         raise SafeHttpError("network_error") from None
     return _parse_worker_result(output, limits)
+
+
+def _checked_header(value: object) -> str | None:
+    if value is None:
+        return None
+    if not isinstance(value, str) or _clean_header(value) != value:
+        raise ValueError("Invalid header value")
+    return value
 
 
 def _parse_worker_result(output: bytes, limits: FetchLimits) -> FetchResponse:
@@ -212,6 +294,7 @@ def _parse_worker_result(output: bytes, limits: FetchLimits) -> FetchResponse:
                 "invalid_redirect",
                 "http_status",
                 "authentication_required",
+                "invalid_validator",
             }:
                 raise ValueError("Unknown transport reason")
             raise SafeHttpError(result["reason"])
@@ -219,15 +302,23 @@ def _parse_worker_result(output: bytes, limits: FetchLimits) -> FetchResponse:
             "error" in result
             or not isinstance(result["url"], str)
             or type(result["status"]) is not int
-            or not 200 <= result["status"] < 300
-            or result["content_type"] not in limits.content_types
             or not isinstance(result["body"], str)
         ):
             raise ValueError("Invalid response record")
+        status = result["status"]
+        if 200 <= status < 300:
+            if result["content_type"] not in limits.content_types:
+                raise ValueError("Unexpected content type")
+        elif not (
+            _is_pass_through_status(status) and result["content_type"] == "" and not result["body"]
+        ):
+            raise ValueError("Unexpected status")
+        etag = _checked_header(result.get("etag"))
+        retry_after = _checked_header(result.get("retry_after"))
         body = base64.b64decode(result["body"], validate=True)
         if len(body) > limits.max_decoded_bytes:
             raise SafeHttpError("too_large")
-        return FetchResponse(result["url"], result["status"], result["content_type"], body)
+        return FetchResponse(result["url"], status, result["content_type"], body, etag, retry_after)
     except (ValueError, KeyError, TypeError, AttributeError):
         raise SafeHttpError("network_error") from None
 
@@ -235,6 +326,22 @@ def _parse_worker_result(output: bytes, limits: FetchLimits) -> FetchResponse:
 _DEFAULT_LIMITS = FetchLimits()
 
 
-def fetch_url(url: str, *, limits: FetchLimits = _DEFAULT_LIMITS) -> FetchResponse:
-    """Fetch with public-address policy, pinned TLS and an overall worker deadline."""
-    return _run_worker(url, limits, [sys.executable, "-m", "cypress_creek.ingest._fetch_worker"])
+def fetch_url(
+    url: str,
+    *,
+    limits: FetchLimits = _DEFAULT_LIMITS,
+    if_none_match: str | None = None,
+    pass_through_statuses: bool = False,
+) -> FetchResponse:
+    """Fetch with public-address policy, pinned TLS and an overall worker deadline.
+
+    With pass_through_statuses, 304, 429 and 5xx return an empty-body response carrying the
+    status and any ETag or Retry-After value instead of raising.
+    """
+    return _run_worker(
+        url,
+        limits,
+        [sys.executable, "-m", "cypress_creek.ingest._fetch_worker"],
+        if_none_match=if_none_match,
+        pass_through_statuses=pass_through_statuses,
+    )
