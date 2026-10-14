@@ -35,3 +35,7 @@ Why: a 50,000-character posting returned 16,386 prompt tokens at `num_ctx` 32,76
 ## Keep live eval state in SQLite
 Store resumable eval runs in SQLite transactions. Preserve each record's JSON payload there, and write JSONL only as an audit export. Never make an exported file the live state store.
 Why: direct JSONL append could leave a torn final row, and rewriting the whole file to avoid that defect adds file-level recovery work already handled by SQLite transactions.
+
+## Tests written after the code need a mutation check
+When a test is written after the code it covers, a red run proves nothing. Break the behavior one piece at a time (remove the unescape, unmap the 404, drop the budget check), confirm a test fails for each, restore, and record the result in the PR. State plainly which tiers can and cannot catch each break, since a healthy live feed will not exercise hostile input handling.
+Why: on H3 the live tests were red only through deliberate wrong assertions because the adapter already existed, so the red evidence was weak. Joe P flagged it.

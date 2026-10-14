@@ -42,6 +42,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [0018](adr/0018-eval-run-identity.md) | Eval resume identity includes every audited input, stays distinct from the pipeline run id, and uses SQLite for live runs with JSONL exports |
 | [0019](adr/0019-polite-fetch-timing-and-clocks.md) | Polite fetch delay counts from the end of the previous request, wall time stamps the cache and monotonic time drives the limiter, and the transport passes 304, 429 and 5xx through only on request |
 | [0020](adr/0020-adapter-failure-modes.md) | Adapter failure modes: a feed shape violation skips the whole board by name, only a 404 means a missing board, other refusals propagate, and description HTML is unescaped exactly once |
+| [0021](adr/0021-per-job-skipping.md) | Per job skipping: a malformed job is skipped and reported in `BoardFetch.skipped`, and a board that skips more than 10 percent of its jobs still fails whole |
 
 ## Configuration
 - `config/aliases.yaml`: tag alias table, described in [data-model.md](data-model.md#tag-alias-table).
