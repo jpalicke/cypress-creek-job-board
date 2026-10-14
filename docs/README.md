@@ -11,7 +11,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [validators.md](validators.md) | The grounding validators V1 to V14: what each rejects and its known limits |
 | [providers.md](providers.md) | The provider interface, typed errors, retry policy, backend config, the loopback rule, the Ollama adapter and the budget guard |
 | [setup.md](setup.md) | Fetch one public posting link, inspect raw bytes and provenance, and understand network behavior and typed failures. Also fetch a job board politely, the fetch cache location, the three fetch environment variables and how to clear the cache |
-| [architecture.md](architecture.md) | How guarded public HTTP fetching pins the connection, bounds the response and isolates DNS behind a deadline, and how the polite fetch layer (rate limiter, refresh window, ETag cache, backoff) sits on top of it |
+| [architecture.md](architecture.md) | How guarded public HTTP fetching pins the connection, bounds the response and isolates DNS behind a deadline, and how the polite fetch layer (rate limiter, refresh window, ETag cache, backoff) sits on top of it, and the board adapter interface (listings, probe, typed errors, the Greenhouse mapping and its failure modes) |
 | [threat-model.md](threat-model.md) | The hostile HTML and hidden-content boundary, prompt structure (T1 to T4), URL target validation and guarded HTTP transport, SSRF rules, compatibility limits and test coverage |
 | [README, discovery findings](../README.md#discovery-findings-and-sources) | The ATS findings table with links to each provider's docs, the politeness policy, and the not legal advice statement |
 | [spec.md](spec.md) | The full design spec: goals, architecture, data model, pipeline, providers, validators, evals, threat model, discovery, ingestion, UI, testing and the card plan |
@@ -41,6 +41,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [0017](adr/0017-tombstones-are-removed-only-by-a-human-call.md) | Denied companies are tombstoned by key and board, and only an explicit call lifts one |
 | [0018](adr/0018-eval-run-identity.md) | Eval resume identity includes every audited input, stays distinct from the pipeline run id, and uses SQLite for live runs with JSONL exports |
 | [0019](adr/0019-polite-fetch-timing-and-clocks.md) | Polite fetch delay counts from the end of the previous request, wall time stamps the cache and monotonic time drives the limiter, and the transport passes 304, 429 and 5xx through only on request |
+| [0020](adr/0020-adapter-failure-modes.md) | Adapter failure modes: a feed shape violation skips the whole board by name, only a 404 means a missing board, other refusals propagate, and description HTML is unescaped exactly once |
 
 ## Configuration
 - `config/aliases.yaml`: tag alias table, described in [data-model.md](data-model.md#tag-alias-table).

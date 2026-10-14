@@ -104,7 +104,7 @@ def _clean_header(raw: str | None) -> str | None:
 
 
 def _is_pass_through_status(status: int) -> bool:
-    return status in {304, 429} or 500 <= status < 600
+    return status in {304, 404, 429} or 500 <= status < 600
 
 
 def _request_coordinates(url: str, target: ValidatedTarget) -> tuple[str, str]:
@@ -335,7 +335,7 @@ def fetch_url(
 ) -> FetchResponse:
     """Fetch with public-address policy, pinned TLS and an overall worker deadline.
 
-    With pass_through_statuses, 304, 429 and 5xx return an empty-body response carrying the
+    With pass_through_statuses, 304, 404, 429 and 5xx return an empty-body response carrying the
     status and any ETag or Retry-After value instead of raising.
     """
     return _run_worker(

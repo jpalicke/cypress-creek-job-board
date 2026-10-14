@@ -10,7 +10,9 @@ from cypress_creek import __version__
 from cypress_creek.discovery.cache import ResponseCache
 from cypress_creek.discovery.fetch_policy import FetchPolicy
 from cypress_creek.discovery.polite_client import (
+    NotFound,
     PoliteClient,
+    PoliteFetchError,
     RetriesExhausted,
     UnexpectedNotModified,
 )
@@ -307,11 +309,73 @@ def test_a_retry_that_succeeds_returns_the_body(tmp_path: Path) -> None:
 def test_a_transport_error_propagates_unchanged(tmp_path: Path) -> None:
     client, cache = _client(tmp_path, ManualClock())
     with http_server() as (port, _):
-        url = f"http://fixture.test:{port}/missing"
+        url = f"http://fixture.test:{port}/forbidden"
         with pytest.raises(SafeHttpError) as caught:
             client.get(url)
     assert caught.value.reason_code == "http_status"
     assert cache.get(url) is None
+
+
+def test_a_404_is_a_typed_not_found_that_is_not_cached_or_retried(tmp_path: Path) -> None:
+    clock = ManualClock()
+    client, cache = _client(tmp_path, clock)
+    with http_server() as (port, requests):
+        url = f"http://fixture.test:{port}/missing"
+        with pytest.raises(NotFound) as caught:
+            client.get(url)
+        assert len(requests.received) == 1
+    assert isinstance(caught.value, PoliteFetchError)
+    assert caught.value.reason_code == "not_found"
+    assert vars(caught.value) == {"reason_code": "not_found"}
+    assert cache.get(url) is None
+    assert clock.sleeps == []
+
+
+def test_a_404_leaves_an_existing_cache_entry_alone(tmp_path: Path) -> None:
+    clock = ManualClock(wall_start=5000.0)
+    client, cache = _client(tmp_path, clock, policy=FetchPolicy(refresh_interval_seconds=900))
+    with http_server() as (port, requests):
+        url = f"http://fixture.test:{port}/missing"
+        cache.put(url, b"older body", '"v0"', 5000.0)
+        clock.advance(901.0)
+        with pytest.raises(NotFound):
+            client.get(url)
+        assert [headers.get("if-none-match") for _, headers in requests.received] == ['"v0"']
+    stored = cache.get(url)
+    assert stored is not None
+    assert (stored.body, stored.etag, stored.fetched_at) == (b"older body", '"v0"', 5000.0)
+
+
+def test_a_404_still_counts_toward_the_per_host_spacing(tmp_path: Path) -> None:
+    clock = ManualClock()
+    attempts: list[float] = []
+
+    def recording_fetch(
+        url: str, *, limits: FetchLimits, if_none_match: str | None, pass_through_statuses: bool
+    ) -> FetchResponse:
+        attempts.append(clock.monotonic())
+        return _live_fetch(
+            url,
+            limits=limits,
+            if_none_match=if_none_match,
+            pass_through_statuses=pass_through_statuses,
+        )
+
+    client = PoliteClient(
+        FetchPolicy(),
+        ResponseCache(tmp_path / "cache"),
+        HostRateLimiter(clock, delay_seconds=1.0),
+        clock,
+        limits=LIMITS,
+        fetch=recording_fetch,
+        random_source=lambda: 0.0,
+    )
+    with http_server() as (port, _):
+        for _attempt in range(2):
+            with pytest.raises(NotFound):
+                client.get(f"http://fixture.test:{port}/missing")
+    assert len(attempts) == 2
+    assert attempts[1] - attempts[0] >= 1.0
 
 
 def test_the_ssrf_guard_stays_in_charge(tmp_path: Path) -> None:

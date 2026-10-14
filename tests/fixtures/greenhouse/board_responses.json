@@ -1,0 +1,62 @@
+{
+  "jobs_response": {
+    "jobs": [
+      {
+        "id": 4100001,
+        "internal_job_id": 9100001,
+        "title": "Kite Platform Engineer",
+        "updated_at": "2026-09-20T11:15:00-04:00",
+        "requisition_id": "REQ-1",
+        "location": {"name": "Austin, TX"},
+        "absolute_url": "https://boards.example.test/examplecoboard/jobs/4100001",
+        "language": "en",
+        "company_name": "Example Co",
+        "first_published": "2026-09-01T09:30:00-04:00",
+        "metadata": null,
+        "data_compliance": [{"type": "gdpr", "requires_consent": false}],
+        "departments": [{"id": 1, "name": "Engineering", "child_ids": [], "parent_id": null}],
+        "offices": [{"id": 2, "name": "Austin", "location": "Austin, TX", "child_ids": []}],
+        "content": "&lt;h2&gt;Who we are&lt;/h2&gt;&lt;p&gt;Example Co builds paper airplanes &amp;amp; kites.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Design flight software&lt;/li&gt;&lt;li&gt;Review each other&amp;#39;s work&lt;/li&gt;&lt;/ul&gt;"
+      },
+      {
+        "id": 4100002,
+        "internal_job_id": 9100002,
+        "title": "Glider Operations Lead",
+        "updated_at": "2026-09-21T08:00:00-04:00",
+        "requisition_id": "REQ-2",
+        "location": {"name": "Remote, US"},
+        "absolute_url": "https://boards.example.test/examplecoboard/jobs/4100002",
+        "language": "en",
+        "company_name": "Example Co",
+        "first_published": "2026-09-05T14:00:00+00:00",
+        "metadata": [{"id": 7, "name": "Level", "value": "Senior", "value_type": "single_select"}],
+        "data_compliance": [],
+        "departments": [],
+        "offices": [],
+        "content": "&lt;p&gt;Visible duties for the glider team.&lt;/p&gt;&lt;div style=\"display:none\"&gt;hidden note for crawlers only&lt;/div&gt;&lt;script&gt;window.pwned = true&lt;/script&gt;&lt;p&gt;Literal markup in prose: &amp;amp;lt;b&amp;amp;gt; stays text.&lt;/p&gt;"
+      },
+      {
+        "id": 4100003,
+        "internal_job_id": 9100003,
+        "title": "Balloon Pilot",
+        "updated_at": "2026-09-22T10:00:00-04:00",
+        "requisition_id": null,
+        "location": {},
+        "absolute_url": "https://boards.example.test/examplecoboard/jobs/4100003",
+        "language": "en",
+        "company_name": "Example Co",
+        "first_published": null,
+        "metadata": null,
+        "data_compliance": [],
+        "departments": [],
+        "offices": [],
+        "content": "&lt;p&gt;Fly the balloon and keep the logbook tidy.&lt;/p&gt;"
+      }
+    ],
+    "meta": {"total": 3}
+  },
+  "board_response": {
+    "name": "Example Co",
+    "content": ""
+  }
+}

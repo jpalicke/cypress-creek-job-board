@@ -236,6 +236,7 @@ def test_not_modified_passes_through_with_empty_body() -> None:
         ("/rate-limited", 429, "120"),
         ("/unavailable", 503, "Wed, 21 Oct 2026 07:28:00 GMT"),
         ("/error", 500, None),
+        ("/missing", 404, None),
     ],
 )
 def test_throttle_and_server_errors_pass_through_without_reading_the_body(
@@ -254,14 +255,14 @@ def test_throttle_and_server_errors_pass_through_without_reading_the_body(
     assert response.content_type == ""
 
 
-@pytest.mark.parametrize("path", ["/rate-limited", "/unavailable", "/error"])
+@pytest.mark.parametrize("path", ["/rate-limited", "/unavailable", "/error", "/missing"])
 def test_throttle_and_server_errors_are_http_status_unless_passed_through(path: str) -> None:
     with http_server() as (port, _), pytest.raises(SafeHttpError) as caught:
         _fetch(f"http://fixture.test:{port}{path}", FetchLimits(), resolve=local_target)
     assert caught.value.reason_code == "http_status"
 
 
-@pytest.mark.parametrize("path", ["/missing", "/teapot", "/forbidden"])
+@pytest.mark.parametrize("path", ["/teapot", "/forbidden", "/gone"])
 def test_other_statuses_stay_http_status_even_when_passing_through(path: str) -> None:
     with http_server() as (port, _), pytest.raises(SafeHttpError) as caught:
         _fetch(
@@ -363,6 +364,25 @@ def test_worker_carries_validator_and_passes_statuses_back() -> None:
     assert (throttled.status, throttled.retry_after, throttled.body) == (429, "120", b"")
 
 
+def test_worker_passes_a_404_back_and_keeps_a_403_an_error() -> None:
+    with http_server() as (port, _):
+        missing = _run_worker(
+            f"http://fixture.test:{port}/missing",
+            FetchLimits(),
+            WORKER,
+            pass_through_statuses=True,
+        )
+        with pytest.raises(SafeHttpError) as caught:
+            _run_worker(
+                f"http://fixture.test:{port}/forbidden",
+                FetchLimits(),
+                WORKER,
+                pass_through_statuses=True,
+            )
+    assert (missing.status, missing.body, missing.content_type) == (404, b"", "")
+    assert caught.value.reason_code == "http_status"
+
+
 def test_worker_revalidates_the_validator() -> None:
     request = {
         "url": "http://fixture.test:1/etag",
@@ -400,7 +420,8 @@ def test_default_limits_still_refuse_json() -> None:
     [
         {"url": "u", "status": 304, "content_type": "", "body": "Zm9v"},
         {"url": "u", "status": 429, "content_type": "text/plain", "body": ""},
-        {"url": "u", "status": 404, "content_type": "", "body": ""},
+        {"url": "u", "status": 404, "content_type": "", "body": "Zm9v"},
+        {"url": "u", "status": 403, "content_type": "", "body": ""},
         {"url": "u", "status": 200, "content_type": "image/png", "body": ""},
         {"url": "u", "status": 600, "content_type": "", "body": ""},
         {"url": "u", "status": 429, "content_type": "", "body": "", "retry_after": "a\nb"},
@@ -412,6 +433,12 @@ def test_worker_result_rejects_malformed_pass_through_records(payload: object) -
     with pytest.raises(SafeHttpError) as caught:
         _parse_worker_result(json.dumps(payload).encode(), FetchLimits())
     assert caught.value.reason_code == "network_error"
+
+
+def test_worker_result_accepts_a_pass_through_404_record() -> None:
+    payload = {"url": "u", "status": 404, "content_type": "", "body": "", "etag": None}
+    response = _parse_worker_result(json.dumps(payload).encode(), FetchLimits())
+    assert response == FetchResponse("u", 404, "", b"", None, None)
 
 
 def test_worker_result_accepts_pass_through_records() -> None:

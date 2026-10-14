@@ -24,7 +24,10 @@ class Requests:
 
 
 @contextmanager
-def http_server() -> Iterator[tuple[int, Requests]]:
+def http_server(
+    json_routes: dict[str, bytes] | None = None,
+    status_routes: dict[str, str] | None = None,
+) -> Iterator[tuple[int, Requests]]:
     requests = Requests()
 
     class Handler(socketserver.StreamRequestHandler):
@@ -43,7 +46,15 @@ def http_server() -> Iterator[tuple[int, Requests]]:
                 body = b"public posting"
                 fields = [("Content-Type", "text/plain")]
                 status = "200 OK"
-                if route.startswith("/redirect/"):
+                if json_routes is not None:
+                    if status_routes is not None and route in status_routes:
+                        status = status_routes[route]
+                    elif route in json_routes:
+                        fields = [("Content-Type", "application/json")]
+                        body = json_routes[route]
+                    else:
+                        status = "404 Not Found"
+                elif route.startswith("/redirect/"):
                     hops = int(route.rsplit("/", 1)[1])
                     location = f"/redirect/{hops - 1}" if hops > 1 else "/ok"
                     status = "302 Found"
@@ -100,6 +111,9 @@ def http_server() -> Iterator[tuple[int, Requests]]:
                 elif route == "/forbidden":
                     status = "403 Forbidden"
                     body = b"private access details"
+                elif route == "/gone":
+                    status = "410 Gone"
+                    body = b"private removal details"
                 elif route == "/missing-type":
                     fields = []
                 elif route == "/error":

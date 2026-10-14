@@ -28,7 +28,7 @@ Only HTTP and HTTPS on ports 80 and 443 can pass the production URL guard. The i
 
 `fetch_posting(url)` uses fixed transport limits and returns raw `body` bytes, normalized `content_type`, and provenance containing the requested and final URLs, byte count, UTC retrieval time, `raw-fetch` extractor name, installed package version, and a warning when a redirect changes host. It raises `BlockedByPolicy` with the URL guard's stable reason code for a rejected URL or redirect, `TooLarge` for byte or decompression-ratio caps, `UnsupportedContent` for a missing or disallowed content type, `Empty` with guidance to paste the posting text manually for a zero-byte body, and `FetchFailed` for other transport failures. A server response of HTTP 401 is the narrow `NeedsBrowser` signal with the same manual-paste guidance. Other non-success statuses, including HTTP 403, remain `FetchFailed`; arbitrary HTML is returned as bytes for the later extractor to assess. These exceptions use generic messages and do not include hostile URLs or response text.
 
-The transport also supports polite repeat fetching. `fetch_url(url, if_none_match=..., pass_through_statuses=True)` sends a validated `If-None-Match` value on every hop and, instead of raising, returns an empty-body `FetchResponse` for HTTP 304, 429 and 5xx with the status and any `etag` and `retry_after` header values (printable ASCII, 512 characters at most, otherwise `None`). A bad `if_none_match` raises `SafeHttpError` with reason `invalid_validator`. Callers needing JSON pass `FetchLimits(content_types=frozenset({"application/json"}))`. `fetch_posting` uses neither option, so its behavior is unchanged.
+The transport also supports polite repeat fetching. `fetch_url(url, if_none_match=..., pass_through_statuses=True)` sends a validated `If-None-Match` value on every hop and, instead of raising, returns an empty-body `FetchResponse` for HTTP 304, 404, 429 and 5xx with the status and any `etag` and `retry_after` header values (printable ASCII, 512 characters at most, otherwise `None`). A bad `if_none_match` raises `SafeHttpError` with reason `invalid_validator`. Callers needing JSON pass `FetchLimits(content_types=frozenset({"application/json"}))`. `fetch_posting` uses neither option, so its behavior is unchanged.
 
 For an HTML response, a caller passes the body to `html_to_text`, then normalizes the extracted text. The parser does not fetch resources or execute scripts. It excludes supported hidden content and conservative navigation, footer and cookie boilerplate, reports hidden elements, and rejects inputs above 10 MiB or 128 nested elements. Empty extracted text needs manual paste. See [the pipeline guide](pipeline.md#html-posting-text) for usage.
 
@@ -63,14 +63,56 @@ flowchart TD
 
 **Typed errors.** Every failure is a stable reason code with a generic message. None carries the remote body or the URL.
 - `RetriesExhausted` (`retries_exhausted`) when the last allowed attempt still got a 429 or 5xx. It exposes `last_status`.
+- `NotFound` (`not_found`) when the server answers 404. Nothing is written to the cache.
 - `UnexpectedNotModified` (`unexpected_not_modified`) when the server answers 304 and there is no cached entry to serve. The client only sends `If-None-Match` when it has an entry, so this means the cache changed or the server misbehaved.
 - `SafeHttpError` and `UrlGuardError` from the transport propagate unchanged, for example a blocked address, a wrong content type, a timeout or an oversize body. They are not retried.
 - `FetchConfigError` comes from `FetchPolicy.from_environment` and names the setting, never its value.
 
-**Retries and backoff.** The number of attempts is `max_retries + 1`, so `max_retries=0` means one attempt and no retry. `max_retries` is at most 8. Between attempts the client sleeps for an exponential delay from a 1 second base, capped at 60 seconds, with caller supplied jitter that spreads the delay over the upper half of the window (never below half). A usable `Retry-After` header (delta-seconds or an HTTP-date, a past date meaning zero) can only lengthen the wait, and is itself capped at 60 seconds, so a hostile header cannot stall the client for hours. An unparseable header is ignored. Only 429 and 5xx are retried. Other non-success statuses, including 404, raise `SafeHttpError` with reason `http_status` from the transport and are not retried.
+**Retries and backoff.** The number of attempts is `max_retries + 1`, so `max_retries=0` means one attempt and no retry. `max_retries` is at most 8. Between attempts the client sleeps for an exponential delay from a 1 second base, capped at 60 seconds, with caller supplied jitter that spreads the delay over the upper half of the window (never below half). A usable `Retry-After` header (delta-seconds or an HTTP-date, a past date meaning zero) can only lengthen the wait, and is itself capped at 60 seconds, so a hostile header cannot stall the client for hours. An unparseable header is ignored. Only 429 and 5xx are retried. A 404 is not retried and is never cached: the client raises `NotFound` (`not_found`). Other non-success statuses, such as 403 and 410, raise `SafeHttpError` with reason `http_status` from the transport and are not retried.
 
 **Timing.** The limiter measures the delay from the end of the previous request, not its start, and the client uses wall time only to stamp and age cache entries. [ADR 0019](adr/0019-polite-fetch-timing-and-clocks.md) records why. All timing goes through an injected `Clock` (`SystemClock` in production, `ManualClock` in tests), so the delay, window and backoff logic is tested without sleeping.
 
 **The test-only fetch seam.** `PoliteClient` takes `fetch` (default `fetch_url`) and `random_source` (default `random.random`) as constructor arguments. Production code uses the defaults. Tests use `fetch` to point the transport at a real local server by name, and to record the time of each attempt, and `random_source` to make jitter deterministic. The seam substitutes the address lookup, never the HTTP exchange, so a test still talks to a real server. It adds no mock mode.
 
 See [the threat model](threat-model.md) for rules, error reasons and executable test commands, and [ADR 0013](adr/0013-pinned-http-transport.md) for the HTTP client and deadline choices.
+
+## Board adapters
+
+An adapter reads one ATS board and returns listings in the common shape. Adapters only issue GET requests, only through `PoliteClient`, and never touch an apply endpoint. Code that needs a board depends on the `BoardAdapter` protocol in `discovery/adapters/base.py`, not on a vendor.
+
+```mermaid
+flowchart TD
+    caller[Discovery caller] --> adapter["BoardAdapter: fetch_board(slug), probe(slug)"]
+    adapter --> client["PoliteClient.get"]
+    client --> feed["Public board feed: bytes, hostile input"]
+    feed --> schema["pydantic feed models: strict, extra fields ignored"]
+    schema --> unescape["html.unescape, exactly once"]
+    unescape --> text["html_to_text"]
+    text --> norm["normalize"]
+    norm --> hash["text_hash: sha256 hex"]
+    hash --> listing["Listing"]
+```
+
+**The interface.**
+- `fetch_board(slug) -> list[Listing]` returns every job on the board.
+- `probe(slug) -> ExistenceResult` says whether the board exists. `ExistenceResult(found, organization_name)` carries the organization name the ATS reports, which is the strong identity evidence for a suggestion. A result with `found=False` cannot carry a name.
+- `Listing` is a frozen dataclass shaped like a row of the listing table: `id`, `ats`, `slug`, `title`, `location`, `url`, `posted_at` (timezone aware, or `None`), `fetched_at` (UTC), `content_text`, `content_hash` and `state` (`ListingState`: `new`, `seen`, `closed`; an adapter always emits `new`). `listing_id(ats, slug, job_id)` is the one id format, `ats:slug:job_id`, for example `greenhouse:acme:12345`.
+
+**Typed errors.** All derive from `AdapterError` and carry a stable `reason_code`. None echoes a value taken from a feed.
+- `FeedSchemaError` (`feed_schema`) names the field path of the first problem, such as `jobs[3].title`, and never the value or the validator message.
+- `BoardNotFound` (`board_not_found`) names the ATS and the slug the caller supplied.
+
+**The Greenhouse mapping.** `GreenhouseAdapter` reads `/v1/boards/{slug}/jobs?content=true` for a board and `/v1/boards/{slug}` for the probe. For each job it validates the shape, then turns the description into text in a fixed order: unescape the HTML entities exactly once (the feed escapes the description HTML inside JSON), `html_to_text`, `normalize`, then `text_hash` of the normalized text. Titles and locations are normalized to one plain line with control characters stripped. [ADR 0020](adr/0020-adapter-failure-modes.md) records the choices below.
+
+**Failure modes.**
+| Cause | What the adapter does |
+| --- | --- |
+| The feed has the wrong shape (a missing or mistyped field, an over long value, a non http(s) job URL, an empty title or description) | Raises `FeedSchemaError` naming the field. The whole board is skipped, visibly. Other boards are unaffected because the error is per call. |
+| HTTP 404 for the slug | `fetch_board` raises `BoardNotFound` so the caller can mark the watchlist entry broken. `probe` returns `found=False` without raising. |
+| HTTP 403, 410 or any other refused status | Propagates as `SafeHttpError` (`http_status`). It is never reported as a missing board. |
+| 429 or 5xx after the allowed retries | Propagates as `RetriesExhausted`. |
+| A blocked address, wrong content type, timeout or oversize body | Propagates from the transport unchanged. |
+
+**Limits.** `GREENHOUSE_FETCH_LIMITS` allows 64 MiB on the wire and decoded, a 60 second total timeout and `application/json` only, because a large board with full descriptions is many megabytes. Titles, locations and board names are at most 1000 characters and a job URL at most 2048. There is no pagination: one response holds the whole board.
+
+The adapter does not decide what to do with an error. The caller (the scan, later cards) turns `BoardNotFound` into a broken watchlist entry and any other error into a visible failure for that board only.

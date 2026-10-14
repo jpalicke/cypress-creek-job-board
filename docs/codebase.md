@@ -71,7 +71,7 @@ src/cypress_creek/       The library
     company_key.py       company_key, load_confusables: the one company name normalizer
     db.py                data_dir, connect, migrate, schema_version, MigrationError
     migrations/          Numbered .sql files, including 0003_blacklist.sql and 0004_eval_runs.sql
-  discovery/             Discovery state in SQLite, plus the polite fetch layer over the guarded transport
+  discovery/             Discovery state in SQLite, the polite fetch layer over the guarded transport, and the ATS board adapters
     watchlist.py         WatchlistEntry, Watchlist, Tombstoned, AlreadyWatched, IdentityEvidence
     tombstones.py        Tombstones, Denial, DenialReason, normalize_board: denied companies kept as denied suggestion rows
     blacklist.py         The pure filter: is_blacklisted, Candidate, BlacklistEntry, BlockReason, normalize_slug, normalize_domain, InvalidBlacklistValue
@@ -79,7 +79,10 @@ src/cypress_creek/       The library
     fetch_policy.py      FetchPolicy, FetchConfigError, parse_retry_after: refresh window, host delay, retries and backoff, read from env
     rate_limiter.py      Clock, SystemClock, ManualClock, HostRateLimiter: per host spacing over an injectable clock
     cache.py             ResponseCache, CacheEntry, default_cache_dir: disk cache keyed by a hash of the URL
-    polite_client.py     PoliteClient, CachedResponse, PoliteFetchError, RetriesExhausted, UnexpectedNotModified: the one discovery fetch entry
+    polite_client.py     PoliteClient, CachedResponse, PoliteFetchError, RetriesExhausted, UnexpectedNotModified, NotFound: the one discovery fetch entry
+    adapters/            One module per ATS: public board feed in, normalized listings out
+      base.py            Listing, ListingState, listing_id, ExistenceResult, BoardAdapter, AdapterError, FeedSchemaError, BoardNotFound
+      greenhouse.py      GreenhouseAdapter, GREENHOUSE_FETCH_LIMITS, parse_jobs_response, parse_board_name
   scoring/               Deterministic scoring, no model calls
     aliases.py           AliasTable, load_aliases
     support.py           candidate_facts, merged_years, support_ceiling
@@ -89,14 +92,15 @@ evals/
   scratch/               Gitignored local JSONL exports
   results/               Published labeled JSONL exports when the runner arrives
 tests/
-  unit/                  Pure functions and models, no I/O beyond tmp files (test_fetch_policy.py also covers ManualClock and HostRateLimiter)
-  component/             Real files and real environment, several modules together (test_response_cache.py on a real temp directory, test_polite_client.py against real local servers)
-  integration/           Real public DNS (needs_network), including the blacklist making no lookup, real Ollama requests (live), and test_polite_client_network.py (a real public feed, needs_network)
+  unit/                  Pure functions and models, no I/O beyond tmp files (test_fetch_policy.py also covers ManualClock and HostRateLimiter; test_adapter_base.py covers the adapter contract; test_greenhouse_mapping.py covers the feed mapping)
+  component/             Real files and real environment, several modules together (test_response_cache.py on a real temp directory, test_polite_client.py against real local servers, test_greenhouse_adapter.py driving the adapter against a real local server)
+  integration/           Real public DNS (needs_network), including the blacklist making no lookup, real Ollama requests (live), test_polite_client_network.py (a real public feed, needs_network) and test_greenhouse_network.py (a real large public board through the adapter, needs_network)
   e2e/                   URL guard, posting fetch, HTML text extraction and the blacklist filter from separate processes
   http_support.py        Test-only real HTTP and UDP DNS servers, with a loopback resolver
   fixtures/              Recorded or hand written inputs
     extraction/          A posting and a recorded real model output for the accept step
     html/postings.json   Anonymized excerpts of three public ATS posting layouts
+    greenhouse/board_responses.json  Hand written board and jobs responses, including hostile ones, for the adapter tests
     hostile_outputs/     One bad model output per validator, plus a small bank (see validators.md)
   conftest.py            Fails the run if any test is skipped
 ```
@@ -137,10 +141,15 @@ flowchart LR
     polite --> cachefile[(fetch_cache/ by URL hash)]
     polite --> limiter["HostRateLimiter and FetchPolicy"]
     polite --> transport
+    discovery --> adapter["discovery.adapters.GreenhouseAdapter: fetch_board, probe"]
+    adapter --> polite
+    adapter --> listings["Listing rows: id, title, location, content_text, content_hash"]
 ```
 The diagram shows library components, not a running app workflow. The link fetcher returns raw bytes, and a caller can pass HTML bytes separately to the HTML text extractor before normalization. PDF text extraction, a user-facing app workflow and drafting remain later cards (see the issue board and the spec).
 
 URL validation is a separate library entry point. It rejects unsafe syntax, resolves a hostname once, checks every address, and returns connection coordinates without fetching anything. `fetch_url` uses that selected IP for the connection while retaining the hostname for Host and TLS verification. It revalidates every redirect, bounds the final response and gives DNS resolution a whole-fetch deadline in a child process. The test audit restricts HTTP client imports to this transport and the separate Ollama provider adapter. `PoliteClient.get(url)` is the one entry point for repeat discovery fetches. It sits over the same `fetch_url` transport and adds a per host delay, a refresh window, an ETag disk cache and backoff on 429 and 5xx, then returns a `CachedResponse`. No discovery code calls `fetch_url` directly. See [Polite fetching](architecture.md#polite-fetching), [the setup guide](setup.md#fetch-a-job-board-politely) and [ADR 0019](adr/0019-polite-fetch-timing-and-clocks.md).
+
+A board adapter sits on top of `PoliteClient`. It turns one public ATS board feed into `Listing` rows, and it only ever issues a GET through the polite client. See [Board adapters](architecture.md#board-adapters), [the setup guide](setup.md#fetch-a-greenhouse-board) and [ADR 0020](adr/0020-adapter-failure-modes.md).
 
 See [the fetching architecture](architecture.md), [the SSRF rules and limits](threat-model.md), [ADR 0009](adr/0009-url-target-validation.md) and [ADR 0013](adr/0013-pinned-http-transport.md).
 
@@ -177,6 +186,12 @@ See [the fetching architecture](architecture.md), [the SSRF rules and limits](th
 - **Fetch errors never carry remote bodies.** `PoliteFetchError` subclasses hold a stable `reason_code` (and `RetriesExhausted` the last status number) behind a generic message. They never include the response body or the URL. `FetchConfigError` names a setting, never its value.
 - **ManualClock is time, not a mock.** `ManualClock` is a controllable clock: sleeping advances it and records the request. Everything else in the polite tests is real (files, HTTP servers, the transport). Do not add a fake HTTP layer or a fake provider.
 - **One retry place.** Providers raise typed errors and `providers.call_with_retry` is the only code that retries them. Adapters never loop on their own.
+- **An adapter is a contract, not a vendor.** Code that needs a board depends on the `BoardAdapter` protocol (`fetch_board(slug)` and `probe(slug)`) and the `Listing` dataclass in `discovery/adapters/base.py`. A vendor module only maps its own feed onto that shape.
+- **Only a 404 means a missing board.** The transport passes 404 through, `PoliteClient` raises `NotFound`, and the adapter turns that into `BoardNotFound` (and `found=False` from `probe`). A 403, a 410 or any other refused status propagates as a transport error and is never reported as missing.
+- **Adapter errors never echo feed values.** `FeedSchemaError` names the field path (for example `jobs[3].title`) and never the value or the validator message. `BoardNotFound` names only the ATS and the slug the caller supplied.
+- **Unescape once.** The Greenhouse feed carries the description as escaped HTML inside JSON, so the adapter runs `html.unescape` exactly once, then `html_to_text`, then `normalize`, then `text_hash`. Unescaping twice would turn text that merely looks like markup into real markup.
+- **The client must be built with the adapter's limits.** The default fetch limits allow neither JSON nor a multi megabyte body. Pass `GREENHOUSE_FETCH_LIMITS` to `PoliteClient`, or the first real fetch fails with a transport error.
+- **One bad job fails the board.** A single job with a missing field, an over long value or a non http(s) URL raises `FeedSchemaError` for the whole call, so a half read board is never presented as a complete one. The error is per call, so other boards are unaffected.
 - **Frozen models.** Pydantic models are frozen and reject unknown fields, so a typo or smuggled field is an error.
 - **Two stores, on purpose.** The fact bank and config are hand edited YAML (reviewable, diffable, versioned). Mutable app state, including eval runs, is SQLite behind numbered migrations. JSONL eval files are audit exports.
 - **Shared normalization.** `terms.normalize_term` is used for bank tags, requirement terms and the alias table, so they always compare under the same rules. Company names have their own single normalizer, `company_key`, which every blacklist, denied list and watchlist comparison must use. Blacklist slugs and domains likewise have one normalizer each, `normalize_slug` and `normalize_domain` in `discovery/blacklist.py`.
@@ -219,6 +234,14 @@ Conventions you will trip over if you do not know them:
 - **A change to URL policy:** start with a hostile or accepted input in `tests/unit/test_url_guard.py`, then change `ingest/url_guard.py`. Keep the real-resolver, public-DNS and process tests passing and update [threat-model.md](threat-model.md). Never add an environment or config switch that permits private URLs.
 - **A new posting fetch caller:** use `ingest.fetch.fetch_posting` and handle its typed `FetchError` subclasses. Discovery transport work may call `ingest.safe_http.fetch_url` directly. Do not import an HTTP client in another module. Keep the transport's unit, component, public-network and process tests passing, and update [architecture.md](architecture.md) if the boundary changes.
 - **An ATS adapter (cards H3 to H5) fetching a board feed:** take a `PoliteClient` as a constructor argument and call `client.get(feed_url)`. Never call `fetch_url` or import an HTTP client. Build the client once per run and share it, so the cache and the per host spacing are shared. Pass `FetchLimits(content_types=frozenset({"application/json"}))` for a JSON feed, since the default limits allow only HTML, plain text and PDF. Give `HostRateLimiter` the same delay as the policy, as in `HostRateLimiter(clock, policy.per_host_delay_seconds)`, so the two never disagree. Parse `response.body` as hostile input, and handle `RetriesExhausted`, `UnexpectedNotModified`, `SafeHttpError` and `UrlGuardError` as stable reason codes. Test it against a real local server with a `ManualClock`, as `tests/component/test_polite_client.py` does, and run the `needs_network` test for a real feed. The worked call is in [setup.md](setup.md#fetch-a-job-board-politely).
+- **A new ATS adapter (cards H4 and H5 follow this, Greenhouse is the worked example):**
+  1. Write the failing tests first. Add hand written feed responses, including hostile ones (a missing field, a wrong type, an over long value, a non http(s) URL, markup in the description), to `tests/fixtures/<ats>/board_responses.json`, and write `tests/unit/test_<ats>_mapping.py` against them. `tests/unit/test_greenhouse_mapping.py` is the model.
+  2. Add `src/cypress_creek/discovery/adapters/<ats>.py` with the two `ABOUTME: ` lines. Validate the feed with strict pydantic models that ignore extra fields and cap every string, and raise `FeedSchemaError` with a field path, never a value. Build ids with `listing_id`, hash the normalized text with `text_hash`, and emit `ListingState.NEW`.
+  3. Take a `PoliteClient` in the constructor and call only `client.get(url)`. Define the vendor's `<ATS>_FETCH_LIMITS` beside the adapter, sized from a real board, and document that the client must be built with it. Catch `NotFound` and raise `BoardNotFound`, and let every other transport error propagate.
+  4. Satisfy `BoardAdapter`: `fetch_board(slug)` and `probe(slug)`. `probe` returns `ExistenceResult(found=False, organization_name=None)` for a missing board and never raises for that case.
+  5. Add `tests/component/test_<ats>_adapter.py`, which runs the adapter against a real local HTTP server (use `base_url` to point at it) and asserts the 404, 403, 5xx and wrong shape behavior. `tests/component/test_greenhouse_adapter.py` is the model. No stubbed HTTP.
+  6. Add `tests/integration/test_<ats>_network.py`, marked `needs_network`, against a large real public board, and a made-up slug for both operations. Run it by hand: `uv run pytest tests/integration/test_<ats>_network.py -q`.
+  7. In the same PR, add a section to [setup.md](setup.md) with a runnable snippet and real output, a row in the README "Try what exists" table, a row for the adapter in the failure modes table in [architecture.md](architecture.md#board-adapters), the files in the layout above, and an ADR if you made a design decision. Search for the new module name in every doc listed in [handoff.md](handoff.md).
 - **A change to HTML extraction:** start with hostile markup in `tests/unit/test_html_text.py`, then update `ingest/html_text.py`. Keep the ATS layout component cases in `tests/component/test_html_fixtures.py` and the public-network and process tests passing. Update [pipeline.md](pipeline.md#html-posting-text) and [threat-model.md](threat-model.md#html-content-boundary) when visibility or limits change.
 
 ## Where to look when something is unclear
