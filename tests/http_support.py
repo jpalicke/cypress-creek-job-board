@@ -26,6 +26,7 @@ class Requests:
 @contextmanager
 def http_server(
     json_routes: dict[str, bytes] | None = None,
+    status_routes: dict[str, str] | None = None,
 ) -> Iterator[tuple[int, Requests]]:
     requests = Requests()
 
@@ -46,7 +47,9 @@ def http_server(
                 fields = [("Content-Type", "text/plain")]
                 status = "200 OK"
                 if json_routes is not None:
-                    if route in json_routes:
+                    if status_routes is not None and route in status_routes:
+                        status = status_routes[route]
+                    elif route in json_routes:
                         fields = [("Content-Type", "application/json")]
                         body = json_routes[route]
                     else:
@@ -108,6 +111,9 @@ def http_server(
                 elif route == "/forbidden":
                     status = "403 Forbidden"
                     body = b"private access details"
+                elif route == "/gone":
+                    status = "410 Gone"
+                    body = b"private removal details"
                 elif route == "/missing-type":
                     fields = []
                 elif route == "/error":

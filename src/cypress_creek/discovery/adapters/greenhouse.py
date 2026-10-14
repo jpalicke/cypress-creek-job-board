@@ -21,12 +21,12 @@ from cypress_creek.discovery.adapters.base import (
     ListingState,
     listing_id,
 )
-from cypress_creek.discovery.polite_client import CachedResponse, PoliteClient
+from cypress_creek.discovery.polite_client import CachedResponse, NotFound, PoliteClient
 from cypress_creek.discovery.tombstones import normalize_board
 from cypress_creek.ingest.errors import EmptyPosting, PostingTooLong
 from cypress_creek.ingest.html_text import HtmlTextError, html_to_text
 from cypress_creek.ingest.normalize import normalize, text_hash
-from cypress_creek.ingest.safe_http import FetchLimits, SafeHttpError
+from cypress_creek.ingest.safe_http import FetchLimits
 
 ATS = "greenhouse"
 DEFAULT_BASE_URL = "https://boards-api.greenhouse.io"
@@ -170,9 +170,7 @@ class GreenhouseAdapter:
     def _get(self, url: str, slug: str) -> CachedResponse:
         try:
             return self._client.get(url)
-        except SafeHttpError as error:
-            # The transport reports every non-success status as http_status. A board that
-            # does not exist is answered with a 404, which is the case this adapter handles.
-            if error.reason_code == "http_status":
-                raise BoardNotFound(ATS, slug) from None
-            raise
+        except NotFound:
+            # Only a 404 means the board does not exist. Any other refused status, such as a
+            # 403 or a 410, propagates as a transport error and is never reported as missing.
+            raise BoardNotFound(ATS, slug) from None

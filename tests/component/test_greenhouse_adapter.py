@@ -88,6 +88,30 @@ def test_probe_of_a_missing_board_is_not_an_error(tmp_path: Path) -> None:
     assert result == ExistenceResult(found=False, organization_name=None)
 
 
+FORBIDDEN = {
+    "/v1/boards/lockedboard": "403 Forbidden",
+    "/v1/boards/lockedboard/jobs": "403 Forbidden",
+    "/v1/boards/goneboard": "410 Gone",
+    "/v1/boards/goneboard/jobs": "410 Gone",
+}
+
+
+@pytest.mark.parametrize("slug", ["lockedboard", "goneboard"])
+def test_a_refused_board_is_a_transport_error_not_a_missing_board(
+    tmp_path: Path, slug: str
+) -> None:
+    with http_server(ROUTES, FORBIDDEN) as (port, _), pytest.raises(SafeHttpError) as caught:
+        _adapter(tmp_path, port).fetch_board(slug)
+    assert caught.value.reason_code == "http_status"
+
+
+@pytest.mark.parametrize("slug", ["lockedboard", "goneboard"])
+def test_probe_of_a_refused_board_is_not_reported_as_missing(tmp_path: Path, slug: str) -> None:
+    with http_server(ROUTES, FORBIDDEN) as (port, _), pytest.raises(SafeHttpError) as caught:
+        _adapter(tmp_path, port).probe(slug)
+    assert caught.value.reason_code == "http_status"
+
+
 def test_a_hostile_slug_cannot_change_the_path_or_query(tmp_path: Path) -> None:
     with http_server(ROUTES) as (port, requests), pytest.raises(BoardNotFound):
         _adapter(tmp_path, port).fetch_board("examplecoboard/../x?content=false#frag")

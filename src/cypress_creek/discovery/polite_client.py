@@ -38,6 +38,11 @@ class RetriesExhausted(PoliteFetchError):
         self.last_status = last_status
 
 
+class NotFound(PoliteFetchError):
+    def __init__(self) -> None:
+        super().__init__("not_found")
+
+
 class UnexpectedNotModified(PoliteFetchError):
     def __init__(self) -> None:
         super().__init__("unexpected_not_modified")
@@ -79,6 +84,8 @@ class PoliteClient:
         if cached is not None and self._is_fresh(cached):
             return _from_entry(url, cached, status=200)
         response = self._fetch_with_retries(url, cached.etag if cached else None)
+        if response.status == 404:
+            raise NotFound()
         now = self._clock.time()
         if response.status == 304:
             if cached is None:
