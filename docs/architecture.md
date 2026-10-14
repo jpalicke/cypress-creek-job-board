@@ -38,4 +38,39 @@ The final response body is read from raw network chunks. The defaults allow at m
 
 The small loopback test entry lives only in `tests/http_support.py`. It substitutes a resolver for a named fixture inside the private transport function and worker; production `fetch_url` always invokes the worker with `validate_url`. Real local HTTP servers test redirects, limits, timeouts and cookie isolation. A real UDP DNS responder changes its answer between queries to test that the transport connects to the first validated IP. That rebinding test is compositional: the F1a public-address policy has independent tests, and the local fixture alone does not claim a production OS-DNS end-to-end rebinding proof.
 
+## Polite fetching
+
+Discovery code never calls `fetch_url` directly. It calls `PoliteClient.get(url)`, which adds the politeness rules described in [the README](../README.md#discovery-findings-and-sources) on top of the guarded transport. The layering, outermost first:
+
+```mermaid
+flowchart TD
+    caller[Discovery caller] --> client["PoliteClient.get: one URL, one CachedResponse"]
+    client --> cache["ResponseCache: disk, keyed by SHA-256 of the URL"]
+    client --> policy["FetchPolicy: refresh window, retries, backoff, Retry-After"]
+    client --> limiter["HostRateLimiter: one request at a time, delay per host"]
+    client --> fetch["safe_http.fetch_url with if_none_match and pass_through_statuses"]
+    fetch --> worker["_fetch_worker: one fetch in a disposable child"]
+    worker --> guard["url_guard.validate_url: public addresses only"]
+```
+
+`get` works in this order. It reads the cache. An entry younger than the refresh window (900 seconds by default) is returned with no request. Otherwise it sends a request, waiting first for the limiter, with the stored ETag as `If-None-Match`. A 429 or 5xx is retried after a backoff delay. A 304 returns the cached body. A 2xx replaces the cache entry. Every request, including each retry, passes through the limiter and through the URL guard.
+
+**Result semantics.** `get` returns a frozen `CachedResponse`:
+- `status` is 200 when the body came from a download or from a hit inside the refresh window, and 304 after a revalidation that the server confirmed. Callers can tell a window hit from a download with `from_cache`: it is `True` for a window hit and for a 304, `False` for a download.
+- `fetched_at` is wall clock seconds since the epoch, taken when the body was last downloaded or revalidated. A 304 restamps the cache entry, so the refresh window restarts from the revalidation. A window hit reports the stored time and does not touch the entry.
+- `url` is the requested URL, kept so every posting can link back to its source for attribution.
+- `body` is the raw bytes and `etag` the stored validator, or `None`.
+
+**Typed errors.** Every failure is a stable reason code with a generic message. None carries the remote body or the URL.
+- `RetriesExhausted` (`retries_exhausted`) when the last allowed attempt still got a 429 or 5xx. It exposes `last_status`.
+- `UnexpectedNotModified` (`unexpected_not_modified`) when the server answers 304 and there is no cached entry to serve. The client only sends `If-None-Match` when it has an entry, so this means the cache changed or the server misbehaved.
+- `SafeHttpError` and `UrlGuardError` from the transport propagate unchanged, for example a blocked address, a wrong content type, a timeout or an oversize body. They are not retried.
+- `FetchConfigError` comes from `FetchPolicy.from_environment` and names the setting, never its value.
+
+**Retries and backoff.** The number of attempts is `max_retries + 1`, so `max_retries=0` means one attempt and no retry. `max_retries` is at most 8. Between attempts the client sleeps for an exponential delay from a 1 second base, capped at 60 seconds, with caller supplied jitter that spreads the delay over the upper half of the window (never below half). A usable `Retry-After` header (delta-seconds or an HTTP-date, a past date meaning zero) can only lengthen the wait, and is itself capped at 60 seconds, so a hostile header cannot stall the client for hours. An unparseable header is ignored. Only 429 and 5xx are retried. Other non-success statuses, including 404, raise `SafeHttpError` with reason `http_status` from the transport and are not retried.
+
+**Timing.** The limiter measures the delay from the end of the previous request, not its start, and the client uses wall time only to stamp and age cache entries. [ADR 0019](adr/0019-polite-fetch-timing-and-clocks.md) records why. All timing goes through an injected `Clock` (`SystemClock` in production, `ManualClock` in tests), so the delay, window and backoff logic is tested without sleeping.
+
+**The test-only fetch seam.** `PoliteClient` takes `fetch` (default `fetch_url`) and `random_source` (default `random.random`) as constructor arguments. Production code uses the defaults. Tests use `fetch` to point the transport at a real local server by name, and to record the time of each attempt, and `random_source` to make jitter deterministic. The seam substitutes the address lookup, never the HTTP exchange, so a test still talks to a real server. It adds no mock mode.
+
 See [the threat model](threat-model.md) for rules, error reasons and executable test commands, and [ADR 0013](adr/0013-pinned-http-transport.md) for the HTTP client and deadline choices.

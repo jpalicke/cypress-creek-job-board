@@ -10,9 +10,10 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [evals.md](evals.md) | The typed JSONL run record and resume contract, fictional sample fact bank and planted gaps |
 | [validators.md](validators.md) | The grounding validators V1 to V14: what each rejects and its known limits |
 | [providers.md](providers.md) | The provider interface, typed errors, retry policy, backend config, the loopback rule, the Ollama adapter and the budget guard |
-| [setup.md](setup.md) | Fetch one public posting link, inspect raw bytes and provenance, and understand network behavior and typed failures |
-| [architecture.md](architecture.md) | How guarded public HTTP fetching pins the connection, bounds the response and isolates DNS behind a deadline |
+| [setup.md](setup.md) | Fetch one public posting link, inspect raw bytes and provenance, and understand network behavior and typed failures. Also fetch a job board politely, the fetch cache location, the three fetch environment variables and how to clear the cache |
+| [architecture.md](architecture.md) | How guarded public HTTP fetching pins the connection, bounds the response and isolates DNS behind a deadline, and how the polite fetch layer (rate limiter, refresh window, ETag cache, backoff) sits on top of it |
 | [threat-model.md](threat-model.md) | The hostile HTML and hidden-content boundary, prompt structure (T1 to T4), URL target validation and guarded HTTP transport, SSRF rules, compatibility limits and test coverage |
+| [README, discovery findings](../README.md#discovery-findings-and-sources) | The ATS findings table with links to each provider's docs, the politeness policy, and the not legal advice statement |
 | [spec.md](spec.md) | The full design spec: goals, architecture, data model, pipeline, providers, validators, evals, threat model, discovery, ingestion, UI, testing and the card plan |
 | [lanes.md](lanes.md) | How the lanes depend on each other and which can be worked in parallel |
 | [handoff.md](handoff.md) | The card routine step by step, for a new contributor or assistant picking up a card |
@@ -39,6 +40,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [0016](adr/0016-html-text-parsing.md) | Bounded standard-library HTML parsing and best-effort visible text rules |
 | [0017](adr/0017-tombstones-are-removed-only-by-a-human-call.md) | Denied companies are tombstoned by key and board, and only an explicit call lifts one |
 | [0018](adr/0018-eval-run-identity.md) | Eval resume identity includes every audited input and remains distinct from the pipeline run id |
+| [0019](adr/0019-polite-fetch-timing-and-clocks.md) | Polite fetch delay counts from the end of the previous request, wall time stamps the cache and monotonic time drives the limiter, and the transport passes 304, 429 and 5xx through only on request |
 
 ## Configuration
 - `config/aliases.yaml`: tag alias table, described in [data-model.md](data-model.md#tag-alias-table).
@@ -46,6 +48,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 - `config/confusables.txt`: Unicode confusables data (do not hand edit), used for company names and described in [data-model.md](data-model.md#company-names-company_key).
 - `CYPRESS_CREEK_DATA_DIR` (default `data/`, gitignored): where the SQLite database lives, described in [data-model.md](data-model.md#storage-sqlite-and-migrations).
 - `config/provider.toml` (or the file named by `CYPRESS_CREEK_CONFIG`) and `CYPRESS_CREEK_<FIELD>` variables: which model backend to use and the run budget limits, described in [providers.md](providers.md#configuration). API keys are read only from the environment variable the file names.
+- `CYPRESS_CREEK_FETCH_REFRESH_SECONDS` (default `900`), `CYPRESS_CREEK_FETCH_HOST_DELAY_SECONDS` (default `1.0`) and `CYPRESS_CREEK_FETCH_MAX_RETRIES` (default `4`, at most `8`): the polite fetch policy, described in [setup.md](setup.md#polite-fetch-settings-and-cache). The fetch cache lives in `fetch_cache` under `CYPRESS_CREEK_DATA_DIR`.
 - `facts.private/bank.yaml` (gitignored) or the path in `CYPRESS_CREEK_BANK`: your fact bank.
 
 URL target validation and guarded HTTP fetching have no configuration or environment override for private destinations. In particular, the provider's `allow_remote` setting does not relax the URL guard's public-address rule.
