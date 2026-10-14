@@ -32,6 +32,6 @@ Why: a 50,000-character posting returned 16,386 prompt tokens at `num_ctx` 32,76
 
 - After resolving a merge, grep every touched file for conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`) before `git add`. A resolver script that asserts and fails must stop the commit, never be chained to it.
 
-## Preserve completed eval rows across interrupted writes
-Append eval JSONL rows with atomic replacement. Keep normal reads strict, and require explicit recovery of an unterminated tail with the discarded bytes saved for audit. Never skip a malformed complete line.
-Why: direct append could leave a torn final row after interruption, preventing resume despite earlier completed case pairs.
+## Keep live eval state in SQLite
+Store resumable eval runs in SQLite transactions. Preserve each record's JSON payload there, and write JSONL only as an audit export. Never make an exported file the live state store.
+Why: direct JSONL append could leave a torn final row, and rewriting the whole file to avoid that defect adds file-level recovery work already handled by SQLite transactions.

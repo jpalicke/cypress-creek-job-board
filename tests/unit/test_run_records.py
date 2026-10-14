@@ -1,12 +1,11 @@
-# ABOUTME: Tests strict eval run metadata, case records and JSONL round trips.
+# ABOUTME: Tests strict eval run metadata and typed record parsing.
 # ABOUTME: Resume identity must change whenever audited inputs or prompt versions change.
 import json
-from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
 
-from cypress_creek.eval_records import RunHeader, load_run, write_header
+from cypress_creek.eval_records import RunHeader, parse_run_rows
 
 
 def _header(**changes: object) -> RunHeader:
@@ -25,13 +24,10 @@ def _header(**changes: object) -> RunHeader:
     return RunHeader.model_validate(fields)
 
 
-def test_header_round_trips_commit_model_and_prompt_hash(tmp_path: Path) -> None:
-    path = tmp_path / "run.jsonl"
+def test_header_round_trips_commit_model_and_prompt_hash() -> None:
     header = _header()
 
-    write_header(path, header)
-
-    state = load_run(path)
+    state = parse_run_rows([header.model_dump_json()])
     assert state.header == header
     assert state.header.git_commit == "a" * 40
     assert state.header.model == "qwen3.5:0.8b"
@@ -66,14 +62,9 @@ def test_header_rejects_prompt_without_matching_schema_version() -> None:
 
 
 @pytest.mark.parametrize("missing", ["record_type", "format_version"])
-def test_run_file_rejects_header_without_explicit_format_field(
-    tmp_path: Path, missing: str
-) -> None:
-    path = tmp_path / "run.jsonl"
-    write_header(path, _header())
-    row = json.loads(path.read_text(encoding="utf-8"))
+def test_run_rows_reject_header_without_explicit_format_field(missing: str) -> None:
+    row = json.loads(_header().model_dump_json())
     del row[missing]
-    path.write_text(json.dumps(row) + "\n", encoding="utf-8")
 
     with pytest.raises(ValueError, match="header format"):
-        load_run(path)
+        parse_run_rows([json.dumps(row)])
