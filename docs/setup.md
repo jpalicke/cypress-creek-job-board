@@ -89,3 +89,62 @@ The retry cap of 8 is fixed in code, so a typo cannot turn into a long retry loo
 The policy does not build the limiter for you. Give `HostRateLimiter` the same delay as the policy (`HostRateLimiter(clock, policy.per_host_delay_seconds)`, as in the example above). If the two differ, the limiter's value is the one that spaces requests, and the policy's value is then only a number nothing enforces.
 
 To clear the cache, delete the `fetch_cache` directory under your data directory (`data/fetch_cache` by default). The next `get` downloads again. A corrupt, truncated or foreign file in the cache counts as a miss and is overwritten, so clearing is never required to recover from a bad file.
+
+## Fetch a Greenhouse board
+
+`GreenhouseAdapter` reads one public Greenhouse board through `PoliteClient` and returns normalized `Listing` rows. There is no app to start yet, so this is a library call. It makes real requests to a large public board (a board info request for the probe, then the full jobs feed with descriptions, a few megabytes), and the cache goes in a throwaway directory. The client must be built with `GREENHOUSE_FETCH_LIMITS`, because the default limits allow neither JSON nor a body this large. From the repository root, in a bash shell:
+
+```bash
+export CYPRESS_CREEK_DATA_DIR="$(mktemp -d)"
+uv run python - <<'PY'
+from cypress_creek.discovery.adapters.greenhouse import GREENHOUSE_FETCH_LIMITS, GreenhouseAdapter
+from cypress_creek.discovery.cache import ResponseCache, default_cache_dir
+from cypress_creek.discovery.fetch_policy import FetchPolicy
+from cypress_creek.discovery.polite_client import PoliteClient
+from cypress_creek.discovery.rate_limiter import HostRateLimiter, SystemClock
+
+policy = FetchPolicy()
+clock = SystemClock()
+client = PoliteClient(
+    policy,
+    ResponseCache(default_cache_dir()),
+    HostRateLimiter(clock, policy.per_host_delay_seconds),
+    clock,
+    limits=GREENHOUSE_FETCH_LIMITS,
+)
+adapter = GreenhouseAdapter(client)
+
+probe = adapter.probe("stripe")
+print(f"probe: found={probe.found} has_name={probe.organization_name is not None}")
+
+listings = adapter.fetch_board("stripe")
+first = listings[0]
+print(f"listings: {len(listings)}")
+print(f"id:       {first.id}")
+print(f"title:    {first.title}")
+print(f"location: {first.location}")
+print(f"excerpt:  {first.content_text[:10]!r}")
+PY
+unset CYPRESS_CREEK_DATA_DIR
+```
+
+Real output from a run on 2026-10-14 (the count and the first listing change as the board changes). The snippet prints only whether the board reported a name and a ten character excerpt, so the output stays generic:
+
+```text
+probe: found=True has_name=True
+listings: 723
+id:       greenhouse:stripe:8172508
+title:    Abuse Investigator
+location: Dublin
+excerpt:  'Who we are'
+```
+
+What it shows: `probe` asks whether the board exists and reports its organization name, and `fetch_board` returns one `Listing` per job, with an id of the form `greenhouse:slug:job_id`, the description as plain text and a SHA-256 `content_hash` of that text. A slug that does not exist makes `probe` return `found=False` and makes `fetch_board` raise `BoardNotFound`. A feed with the wrong shape raises `FeedSchemaError` naming the field. See [the board adapters architecture](architecture.md#board-adapters) and [ADR 0020](adr/0020-adapter-failure-modes.md).
+
+The real-network check runs the same adapter against the board, a made-up slug and the probe. It needs the internet and fails, never skips, when the network is unreachable:
+
+```bash
+uv run pytest tests/integration/test_greenhouse_network.py -q
+```
+
+Real output from the same day: `5 passed in 5.88s`.
