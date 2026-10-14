@@ -1,8 +1,10 @@
 # ABOUTME: The Greenhouse board adapter: fetches a public board feed and maps it to listings.
 # ABOUTME: The feed is hostile input. It is validated, normalized and never echoed in errors.
 import html
+import json
+import re
 from datetime import UTC, datetime
-from typing import Annotated
+from typing import Annotated, Any
 from urllib.parse import quote, urlsplit
 
 from pydantic import (
@@ -14,11 +16,15 @@ from pydantic import (
 )
 
 from cypress_creek.discovery.adapters.base import (
+    BoardFetch,
     BoardNotFound,
     ExistenceResult,
     FeedSchemaError,
     Listing,
     ListingState,
+    SkippedJob,
+    SkipReason,
+    check_skip_budget,
     listing_id,
 )
 from cypress_creek.discovery.polite_client import CachedResponse, NotFound, PoliteClient
@@ -41,6 +47,8 @@ GREENHOUSE_FETCH_LIMITS = FetchLimits(
 _MAX_FIELD_CHARS = 1000
 _MAX_URL_CHARS = 2048
 _ShortText = Annotated[str, StringConstraints(max_length=_MAX_FIELD_CHARS)]
+# A job id is kept in a skip only when it is short and plain, so that no feed text rides along.
+_PLAIN_JOB_ID = re.compile(r"[A-Za-z0-9_-]{1,64}")
 
 
 class _FeedModel(BaseModel):
@@ -69,7 +77,9 @@ class _Job(_FeedModel):
 
 
 class _JobsResponse(_FeedModel):
-    jobs: list[_Job]
+    """The top level of a jobs response. Each job is validated on its own, later."""
+
+    jobs: list[Any]
 
 
 class _BoardInfo(_FeedModel):
@@ -101,15 +111,45 @@ def _plain_line(raw: str) -> str:
     return " ".join(text.split())
 
 
-def _job_to_listing(slug: str, index: int, job: _Job, fetched_at: datetime) -> Listing:
+def _skip(index: int, raw: object, field: str, reason: SkipReason) -> SkippedJob:
+    return SkippedJob(index=index, job_id=_plain_job_id(raw), field=field, reason_code=reason)
+
+
+def _plain_job_id(raw: object) -> str | None:
+    """The job's own id as text, only when it is a plain int or a short plain string."""
+    job_id = raw.get("id") if isinstance(raw, dict) else None
+    if isinstance(job_id, bool) or not isinstance(job_id, int | str):
+        return None
+    text = str(job_id)
+    return text if _PLAIN_JOB_ID.fullmatch(text) else None
+
+
+def _validated_job(raw: object) -> _Job | str:
+    """The job model for one raw job, or the field path of its first problem."""
+    try:
+        # Validated as JSON text so that strict typing still accepts a date string.
+        return _Job.model_validate_json(json.dumps(raw))
+    except ValidationError as error:
+        # Only the location of the first problem is used, never its message or input value.
+        return _field_path(error.errors()[0]["loc"])
+
+
+def _map_job(slug: str, index: int, raw: object, fetched_at: datetime) -> Listing | SkippedJob:
+    job = _validated_job(raw)
+    if isinstance(job, str):
+        return _skip(index, raw, job, SkipReason.INVALID_FIELD)
     title = _plain_line(job.title)
     if not title:
-        raise FeedSchemaError(f"jobs[{index}].title")
+        return _skip(index, raw, "title", SkipReason.EMPTY_TEXT)
     try:
         description = html_to_text(html.unescape(job.content).encode("utf-8")).text
         content_text, _ = normalize(description)
-    except (EmptyPosting, PostingTooLong, HtmlTextError):
-        raise FeedSchemaError(f"jobs[{index}].content") from None
+    except EmptyPosting:
+        return _skip(index, raw, "content", SkipReason.EMPTY_TEXT)
+    except PostingTooLong:
+        return _skip(index, raw, "content", SkipReason.CONTENT_TOO_LONG)
+    except HtmlTextError:
+        return _skip(index, raw, "content", SkipReason.CONTENT_UNREADABLE)
     return Listing(
         id=listing_id(ATS, slug, str(job.id)),
         ats=ATS,
@@ -125,12 +165,23 @@ def _job_to_listing(slug: str, index: int, job: _Job, fetched_at: datetime) -> L
     )
 
 
-def parse_jobs_response(slug: str, body: bytes, fetched_at: datetime) -> list[Listing]:
-    """Map a board jobs response to listings. Raises FeedSchemaError naming the bad field."""
+def parse_jobs_response(slug: str, body: bytes, fetched_at: datetime) -> BoardFetch:
+    """Map a board jobs response to listings, skipping each malformed job.
+
+    A body or jobs list of the wrong shape raises FeedSchemaError for the whole board. So does a
+    board that loses more jobs than the skip budget allows.
+    """
     response = _validated(_JobsResponse, body)
-    return [
-        _job_to_listing(slug, index, job, fetched_at) for index, job in enumerate(response.jobs)
-    ]
+    listings: list[Listing] = []
+    skipped: list[SkippedJob] = []
+    for index, raw in enumerate(response.jobs):
+        mapped = _map_job(slug, index, raw, fetched_at)
+        if isinstance(mapped, SkippedJob):
+            skipped.append(mapped)
+        else:
+            listings.append(mapped)
+    check_skip_budget(len(response.jobs), len(skipped))
+    return BoardFetch(listings=tuple(listings), skipped=tuple(skipped))
 
 
 def parse_board_name(body: bytes) -> str:
@@ -148,8 +199,8 @@ class GreenhouseAdapter:
         self._client = client
         self._base_url = base_url.rstrip("/")
 
-    def fetch_board(self, slug: str) -> list[Listing]:
-        """Every job on the board. Raises BoardNotFound when Greenhouse has no such board."""
+    def fetch_board(self, slug: str) -> BoardFetch:
+        """Every job on the board, and the jobs skipped. Raises BoardNotFound when it is missing."""
         board = self._board_url(slug)
         response = self._get(f"{board}/jobs?content=true", slug)
         fetched_at = datetime.fromtimestamp(response.fetched_at, UTC)

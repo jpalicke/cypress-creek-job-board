@@ -5,7 +5,12 @@ from datetime import datetime
 
 import pytest
 
-from cypress_creek.discovery.adapters.base import BoardNotFound, Listing, ListingState
+from cypress_creek.discovery.adapters.base import (
+    MAX_SKIPPED_FRACTION,
+    BoardFetch,
+    BoardNotFound,
+    ListingState,
+)
 from cypress_creek.discovery.adapters.greenhouse import GREENHOUSE_FETCH_LIMITS, GreenhouseAdapter
 from cypress_creek.discovery.cache import ResponseCache
 from cypress_creek.discovery.fetch_policy import FetchPolicy
@@ -35,13 +40,13 @@ def adapter(tmp_path_factory: pytest.TempPathFactory) -> GreenhouseAdapter:
 
 
 @pytest.fixture(scope="module")
-def board(adapter: GreenhouseAdapter) -> list[Listing]:
+def board(adapter: GreenhouseAdapter) -> BoardFetch:
     return adapter.fetch_board(LARGE_PUBLIC_BOARD)
 
 
-def test_a_large_public_board_maps_to_normalized_listings(board: list[Listing]) -> None:
-    assert board
-    for listing in board:
+def test_a_large_public_board_maps_to_normalized_listings(board: BoardFetch) -> None:
+    assert board.listings
+    for listing in board.listings:
         assert listing.id.startswith(f"greenhouse:{LARGE_PUBLIC_BOARD}:")
         assert listing.ats == "greenhouse"
         assert listing.slug == LARGE_PUBLIC_BOARD
@@ -54,8 +59,14 @@ def test_a_large_public_board_maps_to_normalized_listings(board: list[Listing]) 
         assert listing.posted_at is None or _is_aware(listing.posted_at)
 
 
-def test_listing_ids_are_unique_on_a_real_board(board: list[Listing]) -> None:
-    ids = [listing.id for listing in board]
+def test_a_real_board_stays_within_the_skip_budget(board: BoardFetch) -> None:
+    total = len(board.listings) + len(board.skipped)
+
+    assert len(board.skipped) <= total * MAX_SKIPPED_FRACTION
+
+
+def test_listing_ids_are_unique_on_a_real_board(board: BoardFetch) -> None:
+    ids = [listing.id for listing in board.listings]
 
     assert len(ids) == len(set(ids))
 

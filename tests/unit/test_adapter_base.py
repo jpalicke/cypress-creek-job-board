@@ -1,18 +1,23 @@
 # ABOUTME: Tests the adapter base types: listing ids and rows, existence results and typed errors.
-# ABOUTME: Covers each invariant and that schema errors never echo hostile feed values.
+# ABOUTME: Covers each invariant, the skip budget, and that errors never echo hostile feed values.
 import dataclasses
 from datetime import UTC, datetime
 
 import pytest
 
 from cypress_creek.discovery.adapters.base import (
+    MAX_SKIPPED_FRACTION,
     AdapterError,
     BoardAdapter,
+    BoardFetch,
     BoardNotFound,
     ExistenceResult,
     FeedSchemaError,
     Listing,
     ListingState,
+    SkippedJob,
+    SkipReason,
+    check_skip_budget,
     listing_id,
 )
 from cypress_creek.discovery.tombstones import InvalidBoard
@@ -129,3 +134,97 @@ def test_board_not_found_carries_ats_and_slug_and_its_reason_code() -> None:
 
 def test_board_adapter_protocol_declares_fetch_board_and_probe() -> None:
     assert {"fetch_board", "probe"} <= set(vars(BoardAdapter))
+
+
+def make_skipped(**overrides: object) -> SkippedJob:
+    fields: dict[str, object] = {
+        "index": 3,
+        "job_id": "4100003",
+        "field": "title",
+        "reason_code": SkipReason.EMPTY_TEXT,
+    }
+    return SkippedJob(**{**fields, **overrides})  # type: ignore[arg-type]
+
+
+def test_skipped_job_carries_where_and_why() -> None:
+    skipped = make_skipped()
+    assert (skipped.index, skipped.job_id, skipped.field) == (3, "4100003", "title")
+    assert skipped.reason_code == "empty_text"
+
+
+def test_skipped_job_may_lack_a_job_id() -> None:
+    assert make_skipped(job_id=None).job_id is None
+
+
+def test_skipped_job_rejects_a_negative_index() -> None:
+    with pytest.raises(ValueError, match="index"):
+        make_skipped(index=-1)
+
+
+def test_skipped_job_rejects_an_empty_field() -> None:
+    with pytest.raises(ValueError, match="field"):
+        make_skipped(field="")
+
+
+def test_skipped_job_is_frozen() -> None:
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        make_skipped().index = 9  # type: ignore[misc]
+
+
+def test_skipped_job_text_names_the_place_and_never_a_feed_value() -> None:
+    # Every argument is chosen by our code, so no feed text can reach the text of a skip.
+    skipped = make_skipped(field="location.name", reason_code=SkipReason.INVALID_FIELD)
+    for text in (str(skipped), repr(skipped)):
+        assert "location.name" in text
+        assert "invalid_field" in text
+        assert HOSTILE not in text
+    assert {f.name for f in dataclasses.fields(SkippedJob)} == {
+        "index",
+        "job_id",
+        "field",
+        "reason_code",
+    }
+
+
+def test_skip_reason_values_are_stable() -> None:
+    assert [r.value for r in SkipReason] == [
+        "invalid_field",
+        "empty_text",
+        "content_too_long",
+        "content_unreadable",
+    ]
+
+
+def test_board_fetch_holds_listings_and_skipped_jobs() -> None:
+    listing, skipped = make_listing(), make_skipped()
+    fetch = BoardFetch(listings=(listing,), skipped=(skipped,))
+    assert fetch.listings == (listing,)
+    assert fetch.skipped == (skipped,)
+
+
+def test_board_fetch_is_frozen() -> None:
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        BoardFetch(listings=(), skipped=()).listings = ()  # type: ignore[misc]
+
+
+def test_the_skip_budget_is_ten_percent() -> None:
+    assert MAX_SKIPPED_FRACTION == 0.1
+
+
+@pytest.mark.parametrize(("total", "skipped"), [(0, 0), (20, 0), (20, 2), (10, 1), (30, 3)])
+def test_a_board_within_the_skip_budget_passes(total: int, skipped: int) -> None:
+    check_skip_budget(total, skipped)
+
+
+@pytest.mark.parametrize(("total", "skipped"), [(20, 3), (10, 2), (3, 1), (1, 1), (5, 5)])
+def test_a_board_over_the_skip_budget_fails_naming_the_jobs_field(total: int, skipped: int) -> None:
+    with pytest.raises(FeedSchemaError) as caught:
+        check_skip_budget(total, skipped)
+    assert caught.value.field == "jobs"
+    assert caught.value.reason_code == "feed_schema"
+
+
+@pytest.mark.parametrize(("total", "skipped"), [(-1, 0), (3, -1), (2, 3), (0, 1)])
+def test_a_skip_budget_check_rejects_impossible_counts(total: int, skipped: int) -> None:
+    with pytest.raises(ValueError, match="count"):
+        check_skip_budget(total, skipped)
