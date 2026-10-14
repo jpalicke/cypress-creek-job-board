@@ -7,7 +7,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [codebase.md](codebase.md) | Start here if you are new: layout, how the pieces fit, ideas to know, how a card goes |
 | [data-model.md](data-model.md) | The fact bank, Posting and Requirement, and the tag alias table (`config/aliases.yaml`) the company name key (`company_key`), the SQLite storage and migrations, and the discovery tables (watchlist, denied companies, blacklist and its filter) |
 | [pipeline.md](pipeline.md) | HTML posting text extraction, posting normalization, the prompt builder (extraction and entailment prompts), accepting extraction output, stage 1 extraction, stage 2 retrieval, stage 3 entailment, stages 4 and 5 score and report, running the pipeline and the derived run id, the support gate, the score |
-| [evals.md](evals.md) | The typed JSONL run record and resume contract, fictional sample fact bank and planted gaps |
+| [evals.md](evals.md) | Typed eval records, SQLite resume and JSONL audit exports, fictional sample fact bank and planted gaps |
 | [validators.md](validators.md) | The grounding validators V1 to V14: what each rejects and its known limits |
 | [providers.md](providers.md) | The provider interface, typed errors, retry policy, backend config, the loopback rule, the Ollama adapter and the budget guard |
 | [setup.md](setup.md) | Fetch one public posting link, inspect raw bytes and provenance, and understand network behavior and typed failures. Also fetch a job board politely, the fetch cache location, the three fetch environment variables and how to clear the cache |
@@ -39,7 +39,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [0015](adr/0015-link-fetch-browser-signals.md) | Only clear HTTP authentication signals need browser guidance during raw link fetching |
 | [0016](adr/0016-html-text-parsing.md) | Bounded standard-library HTML parsing and best-effort visible text rules |
 | [0017](adr/0017-tombstones-are-removed-only-by-a-human-call.md) | Denied companies are tombstoned by key and board, and only an explicit call lifts one |
-| [0018](adr/0018-eval-run-identity.md) | Eval resume identity includes every audited input and remains distinct from the pipeline run id |
+| [0018](adr/0018-eval-run-identity.md) | Eval resume identity includes every audited input, stays distinct from the pipeline run id, and uses SQLite for live runs with JSONL exports |
 | [0019](adr/0019-polite-fetch-timing-and-clocks.md) | Polite fetch delay counts from the end of the previous request, wall time stamps the cache and monotonic time drives the limiter, and the transport passes 304, 429 and 5xx through only on request |
 
 ## Configuration

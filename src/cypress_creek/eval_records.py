@@ -1,7 +1,8 @@
-# ABOUTME: Defines the typed JSONL contract for reproducible evaluation runs.
+# ABOUTME: Defines typed eval records shared by SQLite storage and JSONL exports.
 # ABOUTME: Run identity includes every input whose change must invalidate resume.
 import hashlib
 import json
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Literal
@@ -127,12 +128,6 @@ class RunState:
         return self.terminal.status if self.terminal else "incomplete"
 
 
-def write_header(path: Path, header: RunHeader) -> None:
-    """Create a run file without replacing one that may already contain evidence."""
-    with path.open("x", encoding="utf-8", newline="\n") as output:
-        output.write(header.model_dump_json() + "\n")
-
-
 def _check_case(header: RunHeader, case: CaseRecord, seen: set[tuple[str, int]]) -> None:
     if case.run_id != header.run_id:
         raise ValueError("case run identity does not match header")
@@ -153,69 +148,46 @@ def _check_case(header: RunHeader, case: CaseRecord, seen: set[tuple[str, int]])
             raise ValueError("call prompt or schema identity does not match header")
 
 
-def load_run(path: Path, expected_header: RunHeader | None = None) -> RunState:
-    """Validate every JSONL row and return only complete case pairs for resume."""
-    with path.open(encoding="utf-8") as source:
-        first = source.readline()
-        if not first:
-            raise ValueError("run file has no header")
-        header_row = json.loads(first)
-        required_fields = {"record_type", "format_version"}
-        if not isinstance(header_row, dict) or not required_fields <= header_row.keys():
-            raise ValueError("header format fields are required")
-        header = RunHeader.model_validate(header_row)
-        if expected_header is not None and header != expected_header:
-            raise ValueError("run identity does not match expected header")
-        cases: list[CaseRecord] = []
-        seen: set[tuple[str, int]] = set()
-        terminal: RunTerminal | None = None
-        for line in source:
-            row = json.loads(line)
-            if not isinstance(row, dict):
-                raise ValueError("run row must be an object")
-            if terminal is not None and terminal.status == "complete":
-                raise ValueError("complete run cannot have later records")
-            if row.get("record_type") == "case":
-                case = CaseRecord.model_validate(row)
-                _check_case(header, case, seen)
-                seen.add((case.case_id, case.repeat))
-                cases.append(case)
-                terminal = None
-            elif row.get("record_type") == "terminal":
-                terminal = RunTerminal.model_validate(row)
-                if terminal.run_id != header.run_id:
-                    raise ValueError("terminal run identity does not match header")
-                if (
-                    terminal.status == "complete"
-                    and len(seen) != len(header.case_ids) * header.repeats
-                ):
-                    raise ValueError("complete run has missing case pairs")
-            else:
-                raise ValueError("unknown run record type")
+def parse_run_rows(rows: Iterable[str], expected_header: RunHeader | None = None) -> RunState:
+    """Validate ordered run rows from a database snapshot or a JSONL export."""
+    source = iter(rows)
+    first = next(source, "")
+    if not first:
+        raise ValueError("run file has no header")
+    header_row = json.loads(first)
+    required_fields = {"record_type", "format_version"}
+    if not isinstance(header_row, dict) or not required_fields <= header_row.keys():
+        raise ValueError("header format fields are required")
+    header = RunHeader.model_validate(header_row)
+    if expected_header is not None and header != expected_header:
+        raise ValueError("run identity does not match expected header")
+    cases: list[CaseRecord] = []
+    seen: set[tuple[str, int]] = set()
+    terminal: RunTerminal | None = None
+    for line in source:
+        row = json.loads(line)
+        if not isinstance(row, dict):
+            raise ValueError("run row must be an object")
+        if terminal is not None and terminal.status == "complete":
+            raise ValueError("complete run cannot have later records")
+        if row.get("record_type") == "case":
+            case = CaseRecord.model_validate(row)
+            _check_case(header, case, seen)
+            seen.add((case.case_id, case.repeat))
+            cases.append(case)
+            terminal = None
+        elif row.get("record_type") == "terminal":
+            terminal = RunTerminal.model_validate(row)
+            if terminal.run_id != header.run_id:
+                raise ValueError("terminal run identity does not match header")
+            if terminal.status == "complete" and len(seen) != len(header.case_ids) * header.repeats:
+                raise ValueError("complete run has missing case pairs")
+        else:
+            raise ValueError("unknown run record type")
     return RunState(header=header, cases=tuple(cases), terminal=terminal)
 
 
-def _append(path: Path, record: CaseRecord | RunTerminal) -> None:
-    with path.open("a", encoding="utf-8", newline="\n") as output:
-        output.write(record.model_dump_json() + "\n")
-
-
-def append_case(path: Path, header: RunHeader, case: CaseRecord) -> None:
-    """Append a finished case only if its identity and pair are valid."""
-    state = load_run(path, expected_header=header)
-    if state.status == "complete":
-        raise ValueError("complete run cannot accept more cases")
-    _check_case(header, case, {(item.case_id, item.repeat) for item in state.cases})
-    _append(path, case)
-
-
-def append_terminal(path: Path, header: RunHeader, terminal: RunTerminal) -> None:
-    """Mark the run complete only after every planned pair has a case row."""
-    state = load_run(path, expected_header=header)
-    if state.status == "complete":
-        raise ValueError("complete run cannot accept another terminal")
-    if terminal.run_id != header.run_id:
-        raise ValueError("terminal run identity does not match header")
-    if terminal.status == "complete" and state.pending_pairs:
-        raise ValueError("complete run has missing case pairs")
-    _append(path, terminal)
+def load_run(path: Path, expected_header: RunHeader | None = None) -> RunState:
+    """Read and validate a JSONL export without changing live run state."""
+    with path.open(encoding="utf-8") as source:
+        return parse_run_rows(source, expected_header=expected_header)

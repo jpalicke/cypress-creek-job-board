@@ -104,14 +104,14 @@ One interface, three adapters, and the guards that sit between the pipeline and 
 
 ### 3.5 Eval flow diagram
 
-Fixtures and labels in, run files in the middle, the published table out. The eval harness drives the same pipeline the app uses.
+Fixtures and labels in, SQLite run records in the middle, the published table out. The eval harness drives the same pipeline the app uses.
 
 &#91;embedded content: eval flow · fixtures to published table\]
 
 ### 3.6 Process and storage
 
 - One FastAPI process, loopback only. The Svelte bundle is static files served by it.
-- SQLite holds mutable state (postings, reports, watchlist, blacklist, suggestions, cache index). The fact bank and config are YAML files under version control or in the user's data directory. Eval runs are JSONL files.
+- SQLite holds mutable state (postings, reports, watchlist, blacklist, suggestions, cache index, eval runs). The fact bank and config are YAML files under version control or in the user's data directory. Published eval runs are exported as JSONL.
 - No background workers in the first version. Discovery refresh is a request.
 - Logs carry IDs and hashes, not personal text.
 
@@ -408,13 +408,13 @@ One row per backend and model, columns are the headline numbers plus cost.
 | anthropic sonnet | measured | measured | measured | measured | measured | measured |
 | openai (chosen model) | measured | measured | measured | measured | measured | measured |
 
-The table is regenerated from run files by a script, never hand edited. The README embeds the latest published table.
+The table is regenerated from published JSONL exports by a script, never hand edited. The README embeds the latest published table.
 
 ### 8.4 Method rules
 
 - Temperature 0. Fixed seed where the backend allows it. Each case runs 3 times, and the matrix reports the mean and the worst run, since grounding violations are a worst case concern.
 - A run records: git commit, backend, exact model string, prompt version hash, schema version, fixture set hash, per-call usage and every validator verdict.
-- Run output is JSONL, one row per case and call, committed under `evals/results/` only for published runs.
+- Live run records are stored transactionally in SQLite. Published runs are exported as JSONL with a header, one row per case and repeat, and a terminal row, then committed under `evals/results/`.
 - Hand labels live in the repo as YAML next to the fixture. Labels are written before any model is run on a case, and are never adjusted to match a backend. Label changes are a reviewed change with a reason.
 - Scoring code is deterministic and unit tested with real recorded outputs as inputs.
 - Honest reporting: small sample size is stated, confidence is not claimed beyond what 8 to 12 postings support, and failures are shown rather than averaged away.
@@ -422,7 +422,7 @@ The table is regenerated from run files by a script, never hand edited. The READ
 
 ### 8.5 Eval flow
 
-Fixture set and labels feed the harness. The harness runs the real pipeline against one backend at a time. Per-stage validator verdicts and usage are written to a run file. The scorer reads the run file and labels and emits metrics. The report script builds the comparison table and the injection summary. The diagram for this flow is in section 3.
+Fixture set and labels feed the harness. The harness runs the real pipeline against one backend at a time. Per-stage validator verdicts and usage are written to the SQLite run store. Published runs are exported as JSONL. The scorer reads those exports and labels and emits metrics. The report script builds the comparison table and the injection summary. The diagram for this flow is in section 3.
 
 ### 8.6 Eval decisions still open
 
@@ -431,7 +431,7 @@ Fixture set and labels feed the harness. The harness runs the real pipeline agai
 | Repeats per case | 3 | More repeats are costlier on hosted backends. One is too noisy to trust a worst case number. |
 | Who labels | Joe P, with the spec's label guide | It is the only way labels are trustworthy, but it takes real time. Start with 6 postings. |
 | Real posting candidates | Claude proposes 6 to 8, Joe P approves | Real postings carry a takedown risk, mitigated by NOTICE and attribution. |
-| Publishing results | Commit published runs, keep scratch runs gitignored | Repo size grows slowly. Fine for JSONL. |
+| Publishing results | Commit published JSONL exports, keep live SQLite runs local | Repo size grows slowly. |
 
 ## 9. Threat model
 
@@ -943,7 +943,7 @@ Every card follows TDD: the first failing test is named, it is shown failing, th
 | ID | Card | First failing test | Acceptance criteria | Depends |
 | --- | --- | --- | --- | --- |
 | E1 ★ | Sample fictional fact bank (about 25 facts, planted gaps), built together | The bank passes the loader and has the planned gap set | Validates, gaps documented, no real employer or industry | B1 |
-| E2 ★ | Harness runner and run file format | A run writes a JSONL row with commit, model string and prompt hash | Deterministic, resumable, records usage and verdicts | C2, D5 |
+| E2 ★ | Harness runner and run record format | A run stores a SQLite header with commit, model string and prompt hash | Deterministic, resumable, records usage and verdicts; published JSONL export | C2, D5 |
 | E3 ★ | Posting fixtures and hand labels (first 6) | A label file with an invalid span fails validation | Joe P labels before any model runs, third party items in NOTICE | E1 |
 | E4 ★ | Scorer and E1 to E4 metrics | A recorded output scores to a hand computed value | Metrics deterministic, "not run" reported for missing backends | E2, E3 |
 | E5 | Injection corpus and E6 metrics | An attacked fixture pairs with its clean twin | All attack classes in 8.2 present, score shift computed | E4 |
