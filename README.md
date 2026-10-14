@@ -4,7 +4,7 @@ Tailors a job application to a posting without ever stating a claim the author h
 
 It reads a posting, extracts requirements, maps each requirement to facts in a curated bank, reports gaps honestly, and only then helps draft. Every claim cites verified fact IDs, enforced by deterministic validators rather than prompting. There is no auto apply, and a human reviews every draft.
 
-Status: early implementation. The fact bank, the posting normalizer, the tag alias table, the deterministic support gate, the score formula, the company name normalizer, the SQLite migration runner, the grounding validators, the provider interface, the provider config, the Ollama adapter, the budget guard, the prompt builder (extraction and entailment prompts), the extraction stage, candidate retrieval, the entailment stage, the gap report, the pipeline run, URL target validation, guarded HTTP transport, link fetcher, HTML text extractor, fictional sample fact bank for evals, typed eval run records with SQLite resume and JSONL export, and the discovery tables with the watchlist exist as libraries. The link fetcher returns bounded raw bytes with provenance and typed errors. HTML text extraction is a separate library step that drops hidden content and reports warnings; the eval runner, PDF text extraction and an app workflow are still to come. There is no app to start yet. Work is tracked as a kanban in this repo's issues (one issue per card, labeled by lane). Cards marked `core` are the smallest set that makes the repo credible and demoable on its own.
+Status: early implementation. The fact bank, the posting normalizer, the tag alias table, the deterministic support gate, the score formula, the company name normalizer, the SQLite migration runner, the grounding validators, the provider interface, the provider config, the Ollama adapter, the budget guard, the prompt builder (extraction and entailment prompts), the extraction stage, candidate retrieval, the entailment stage, the gap report, the pipeline run, URL target validation, guarded HTTP transport, link fetcher, HTML text extractor, fictional sample fact bank for evals, typed eval run records with SQLite resume and JSONL export, and the discovery tables with the watchlist, the blacklist table with its deterministic filter, and the polite fetch layer (fetch policy, per-host rate limiter, ETag disk cache and polite client) exist as libraries. The link fetcher returns bounded raw bytes with provenance and typed errors. HTML text extraction is a separate library step that drops hidden content and reports warnings; the eval runner, PDF text extraction and an app workflow are still to come. There is no app to start yet. Work is tracked as a kanban in this repo's issues (one issue per card, labeled by lane). Cards marked `core` are the smallest set that makes the repo credible and demoable on its own.
 
 License: MIT.
 
@@ -44,12 +44,36 @@ Each command is copy and paste, and lives with its documentation:
 | Compute a score from requirement supports | [docs/pipeline.md](docs/pipeline.md#score) |
 | Normalize a company name to its comparison key | [docs/data-model.md](docs/data-model.md#try-company_key) |
 | Add a company to the watchlist and see a denied one refused | [docs/data-model.md](docs/data-model.md#try-the-discovery-tables) |
+| Block a company, board slug or domain and see a lookalike filtered | [docs/data-model.md](docs/data-model.md#try-the-blacklist) |
 | Create the local database and apply migrations | [docs/data-model.md](docs/data-model.md#try-the-database) |
 | Run a grounding validator on model output | [docs/validators.md](docs/validators.md#try-it-locally) |
 | See the provider errors and retry policy, load backend config, run the Ollama adapter, print a projected cost | [docs/providers.md](docs/providers.md#try-it-locally) |
 | Validate a URL or fetch a bounded public page | [docs/threat-model.md](docs/threat-model.md#try-it-locally) |
 | Fetch one public posting link as bounded raw bytes | [docs/setup.md](docs/setup.md#fetch-a-posting-link) |
 | Extract readable text from HTML bytes | [docs/pipeline.md](docs/pipeline.md#html-posting-text) |
+| Fetch a public job board feed politely: download, cache hit, then a 304 revalidation | [docs/setup.md](docs/setup.md#fetch-a-job-board-politely) |
+
+## Discovery findings and sources
+Discovery reads the public job board feeds of three applicant tracking systems. These are findings from reading each provider's documentation and robots.txt on 2026-10-01, not guarantees. None of this is legal advice. The conclusion drawn here is that the three feeds are public by design and that a small personal tool polling an approved list is low risk. Their documentation is silent on terms and limits in some cases, so polite behavior is the mitigation.
+
+| ATS | Endpoint | Company name in feed | Cache signals | Docs and robots findings (checked 2026-10-01) |
+| --- | --- | --- | --- | --- |
+| [Greenhouse](https://developers.greenhouse.io/job-board.html) | `boards-api.greenhouse.io/v1/boards/{token}/jobs` (board info gives the org name, `?content=true` adds descriptions) | Yes, `company_name` per job | `ETag` present, `max-age=0, must-revalidate`, gzip. No pagination: one response held all 714 jobs of a large board. | Docs say no auth for any GET. robots.txt disallows only `/embed/`. No published terms or rate limits for the feed. |
+| [Lever](https://github.com/lever/postings-api) | `api.lever.co/v0/postings/{slug}` (EU accounts: `api.eu.lever.co`) | No. Slug is the identity. | `ETag` present. Pagination by `skip` and `limit`. | README says published postings are public. robots.txt allows all with `Crawl-delay: 1`. The 2 per second limit applies to application POSTs only. |
+| [Ashby](https://developers.ashbyhq.com/docs/public-job-posting-api) | `api.ashbyhq.com/posting-api/job-board/{name}` | No. Board name is the identity. | `Cache-Control: public, max-age=60`, weak `ETag`, CORS open. | Docs silent on terms and limits. robots.txt for the API host returned 401. Customer ToS has a general no-overburden clause. |
+
+Workable and SmartRecruiters are candidates for later (documentation read only, not live tested). Recruitee is skipped because its own docs say authentication is required while third party sources disagree.
+
+How the tool behaves, whatever a provider says:
+- An honest `User-Agent` (`cypress-creek/<version> (personal job search tool; +<repo URL>)`) and `Accept-Encoding: gzip` on every request.
+- At least 1 second between requests to one host, one request at a time. This matches Lever's `Crawl-delay: 1`.
+- A board is refreshed at most once per 15 minutes by default (configurable). Ashby's cache lifetime is 60 seconds, so polling faster gains nothing.
+- Responses are cached on disk. The stored `ETag` is sent as `If-None-Match`, and a 304 means no change.
+- Exponential backoff with jitter on 429 and 5xx, a hard retry cap, and `Retry-After` honored when present.
+- List endpoints only. A single job request happens only when the list lacks a description.
+- Every request goes through the SSRF guard, and the source URL is kept so a posting can link back to its original.
+
+Settings and the cache location are in [docs/setup.md](docs/setup.md#polite-fetch-settings-and-cache). The design is in [docs/architecture.md](docs/architecture.md#polite-fetching) and [ADR 0019](docs/adr/0019-polite-fetch-timing-and-clocks.md).
 
 ## What a report looks like
 This is a real run of the "whole run against a local model" command in [docs/pipeline.md](docs/pipeline.md#try-a-whole-run-against-a-local-model): the sample posting, a two fact bank and the `qwen3.5:0.8b` model. The model is small, so its answers vary from run to run, and the report shows exactly what it could and could not back up.

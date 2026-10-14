@@ -64,6 +64,28 @@ def http_server() -> Iterator[tuple[int, Requests]]:
                     fields = [("Content-Type", "image/png")]
                 elif route == "/json":
                     fields = [("Content-Type", "application/json")]
+                    body = b'{"jobs": []}'
+                elif route == "/etag":
+                    fields.append(("ETag", '"v1"'))
+                    if headers.get("if-none-match") == '"v1"':
+                        status = "304 Not Modified"
+                        fields = [("ETag", '"v1"')]
+                        body = b""
+                elif route == "/rate-limited":
+                    status = "429 Too Many Requests"
+                    fields.append(("Retry-After", "120"))
+                    body = b"private throttle details"
+                elif route == "/unavailable":
+                    status = "503 Service Unavailable"
+                    fields.append(("Retry-After", "Wed, 21 Oct 2026 07:28:00 GMT"))
+                    body = b"private outage details"
+                elif route == "/hostile-headers":
+                    status = "503 Service Unavailable"
+                    fields += [("Retry-After", "5\t5"), ("ETag", "x" * 600)]
+                elif route == "/teapot":
+                    status = "418 I'm a teapot"
+                elif route == "/missing":
+                    status = "404 Not Found"
                 elif route == "/html":
                     fields = [("Content-Type", "text/html; charset=utf-8")]
                     body = b"<main>Public posting</main>"

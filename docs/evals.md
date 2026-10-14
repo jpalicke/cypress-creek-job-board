@@ -29,7 +29,7 @@ report. The module records outcomes supplied by the runner, without making model
 inventing validator verdicts.
 
 Each append commits as one SQLite transaction, so an interrupted write cannot leave a partial
-case record. The `0003_eval_runs.sql` migration adds these tables to the existing database in
+case record. The `0004_eval_runs.sql` migration adds these tables to the existing database in
 `CYPRESS_CREEK_DATA_DIR` (default `data/`, gitignored). `EvalStore.export_jsonl(header, path)`
 validates a database snapshot and creates a JSONL audit file without overwriting an existing
 file. `load_run(path, expected_header=header)` validates an export but never changes live run

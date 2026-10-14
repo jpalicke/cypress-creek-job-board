@@ -70,10 +70,16 @@ src/cypress_creek/       The library
   storage/               Mutable state: the company name key and the SQLite database
     company_key.py       company_key, load_confusables: the one company name normalizer
     db.py                data_dir, connect, migrate, schema_version, MigrationError
-    migrations/          Numbered .sql files, including 0003_eval_runs.sql
-  discovery/             Discovery state in SQLite, no network
+    migrations/          Numbered .sql files, including 0003_blacklist.sql and 0004_eval_runs.sql
+  discovery/             Discovery state in SQLite, plus the polite fetch layer over the guarded transport
     watchlist.py         WatchlistEntry, Watchlist, Tombstoned, AlreadyWatched, IdentityEvidence
     tombstones.py        Tombstones, Denial, DenialReason, normalize_board: denied companies kept as denied suggestion rows
+    blacklist.py         The pure filter: is_blacklisted, Candidate, BlacklistEntry, BlockReason, normalize_slug, normalize_domain, InvalidBlacklistValue
+    blacklist_repository.py  Blacklist (add, remove, rows, entries) and AlreadyBlacklisted: stores and loads entries, no matching
+    fetch_policy.py      FetchPolicy, FetchConfigError, parse_retry_after: refresh window, host delay, retries and backoff, read from env
+    rate_limiter.py      Clock, SystemClock, ManualClock, HostRateLimiter: per host spacing over an injectable clock
+    cache.py             ResponseCache, CacheEntry, default_cache_dir: disk cache keyed by a hash of the URL
+    polite_client.py     PoliteClient, CachedResponse, PoliteFetchError, RetriesExhausted, UnexpectedNotModified: the one discovery fetch entry
   scoring/               Deterministic scoring, no model calls
     aliases.py           AliasTable, load_aliases
     support.py           candidate_facts, merged_years, support_ceiling
@@ -83,10 +89,10 @@ evals/
   scratch/               Gitignored local JSONL exports
   results/               Published labeled JSONL exports when the runner arrives
 tests/
-  unit/                  Pure functions and models, no I/O beyond tmp files
-  component/             Real files and real environment, several modules together
-  integration/           Real public DNS (needs_network) and real Ollama requests (live)
-  e2e/                   URL guard, posting fetch and HTML text extraction from separate processes
+  unit/                  Pure functions and models, no I/O beyond tmp files (test_fetch_policy.py also covers ManualClock and HostRateLimiter)
+  component/             Real files and real environment, several modules together (test_response_cache.py on a real temp directory, test_polite_client.py against real local servers)
+  integration/           Real public DNS (needs_network), including the blacklist making no lookup, real Ollama requests (live), and test_polite_client_network.py (a real public feed, needs_network)
+  e2e/                   URL guard, posting fetch, HTML text extraction and the blacklist filter from separate processes
   http_support.py        Test-only real HTTP and UDP DNS servers, with a loopback resolver
   fixtures/              Recorded or hand written inputs
     extraction/          A posting and a recorded real model output for the accept step
@@ -127,10 +133,16 @@ flowchart LR
     ceiling --> score["scoring.score()"]
     score --> result["score, supported of total, inputs"]
     reqs -. model output .-> val["validators (V1 to V14)"]
+    discovery[Discovery caller] --> polite["discovery.polite_client.PoliteClient.get()"]
+    polite --> cachefile[(fetch_cache/ by URL hash)]
+    polite --> limiter["HostRateLimiter and FetchPolicy"]
+    polite --> transport
 ```
 The diagram shows library components, not a running app workflow. The link fetcher returns raw bytes, and a caller can pass HTML bytes separately to the HTML text extractor before normalization. PDF text extraction, a user-facing app workflow and drafting remain later cards (see the issue board and the spec).
 
-URL validation is a separate library entry point. It rejects unsafe syntax, resolves a hostname once, checks every address, and returns connection coordinates without fetching anything. `fetch_url` uses that selected IP for the connection while retaining the hostname for Host and TLS verification. It revalidates every redirect, bounds the final response and gives DNS resolution a whole-fetch deadline in a child process. The test audit restricts HTTP client imports to this transport and the separate Ollama provider adapter. See [the fetching architecture](architecture.md), [the SSRF rules and limits](threat-model.md), [ADR 0009](adr/0009-url-target-validation.md) and [ADR 0013](adr/0013-pinned-http-transport.md).
+URL validation is a separate library entry point. It rejects unsafe syntax, resolves a hostname once, checks every address, and returns connection coordinates without fetching anything. `fetch_url` uses that selected IP for the connection while retaining the hostname for Host and TLS verification. It revalidates every redirect, bounds the final response and gives DNS resolution a whole-fetch deadline in a child process. The test audit restricts HTTP client imports to this transport and the separate Ollama provider adapter. `PoliteClient.get(url)` is the one entry point for repeat discovery fetches. It sits over the same `fetch_url` transport and adds a per host delay, a refresh window, an ETag disk cache and backoff on 429 and 5xx, then returns a `CachedResponse`. No discovery code calls `fetch_url` directly. See [Polite fetching](architecture.md#polite-fetching), [the setup guide](setup.md#fetch-a-job-board-politely) and [ADR 0019](adr/0019-polite-fetch-timing-and-clocks.md).
+
+See [the fetching architecture](architecture.md), [the SSRF rules and limits](threat-model.md), [ADR 0009](adr/0009-url-target-validation.md) and [ADR 0013](adr/0013-pinned-http-transport.md).
 
 `fetch_posting(url)` is the one-off, user-initiated library caller. It applies the fixed transport policy and returns HTML, plain text or PDF bytes with requested and final URL provenance. Typed failures distinguish blocked targets, disallowed content, size limits, authentication and empty responses. HTML callers can then use `html_to_text` as a separate step. See [the setup guide](setup.md), [HTML extraction](pipeline.md#html-posting-text) and [ADR 0015](adr/0015-link-fetch-browser-signals.md).
 
@@ -156,10 +168,18 @@ URL validation is a separate library entry point. It rejects unsafe syntax, reso
 - **Retrieval is not a model.** `retrieve` matches tags and aliases, ranks and caps the candidates, and sets the support ceiling. A requirement with no candidate is a gap and costs no model call. See `pipeline.md`.
 - **The sample bank and its gap table cannot drift.** `PLANTED_GAPS.md` is parsed by a test that runs each row through `retrieve`, so a bank edit that changes a gap fails the build. See `evals.md`.
 - **A denial is permanent until a human removes it.** A denied company is a tombstone matched by `company_key` and by normalized board, and `Watchlist.add` refuses it. Only `Tombstones.remove` lifts one. See [ADR 0017](adr/0017-tombstones-are-removed-only-by-a-human-call.md).
+- **The blacklist filter is pure and runs first.** `is_blacklisted(candidate, entries)` takes everything as arguments, touches no database and no network, and returns the `BlockReason` (company key, slug or domain) or `None`. It is meant to run on a discovered company before any fetch. Entries are normalized when created, and `Blacklist` only stores them. See [data-model.md](data-model.md#discovery-the-blacklist).
+- **Delay is measured from the end of the previous request.** `HostRateLimiter.wait` sleeps until `delay` seconds after the last request to that host finished, and `PoliteClient` calls `finished` in a `finally` after every attempt, so a slow response never eats into the gap. See [ADR 0019](adr/0019-polite-fetch-timing-and-clocks.md).
+- **Wall time and monotonic time do different jobs.** Spacing and backoff use `Clock.monotonic` and `Clock.sleep`, which never go backwards. `Clock.time` is wall clock and is used only to stamp cache entries, age them against the refresh window and read an HTTP-date `Retry-After`. A cache entry with a future timestamp counts as stale.
+- **Status passthrough is opt in.** `fetch_url` raises on 304, 429 and 5xx unless the caller passes `pass_through_statuses=True`, in which case it returns an empty-body `FetchResponse` carrying `status`, `etag` and `retry_after`. `fetch_posting` never sets it, so posting fetches behave as before. `PoliteClient` always sets it.
+- **Cache keys are hashes.** `ResponseCache` names each file by the SHA-256 of the URL, so a URL never becomes a path or a file name. Writes go to a temp file and `os.replace`. A corrupt, truncated or foreign file is a miss that the next write overwrites, never an exception.
+- **The retry cap is 8.** `max_retries` is 0 to 8 (`MAX_RETRIES_CAP`), the backoff window and any `Retry-After` are capped at 60 seconds, and `parse_retry_after` ignores anything unparseable, so a hostile header or env value cannot stall the client.
+- **Fetch errors never carry remote bodies.** `PoliteFetchError` subclasses hold a stable `reason_code` (and `RetriesExhausted` the last status number) behind a generic message. They never include the response body or the URL. `FetchConfigError` names a setting, never its value.
+- **ManualClock is time, not a mock.** `ManualClock` is a controllable clock: sleeping advances it and records the request. Everything else in the polite tests is real (files, HTTP servers, the transport). Do not add a fake HTTP layer or a fake provider.
 - **One retry place.** Providers raise typed errors and `providers.call_with_retry` is the only code that retries them. Adapters never loop on their own.
 - **Frozen models.** Pydantic models are frozen and reject unknown fields, so a typo or smuggled field is an error.
 - **Two stores, on purpose.** The fact bank and config are hand edited YAML (reviewable, diffable, versioned). Mutable app state, including eval runs, is SQLite behind numbered migrations. JSONL eval files are audit exports.
-- **Shared normalization.** `terms.normalize_term` is used for bank tags, requirement terms and the alias table, so they always compare under the same rules. Company names have their own single normalizer, `company_key`, which every blacklist, denied list and watchlist comparison must use.
+- **Shared normalization.** `terms.normalize_term` is used for bank tags, requirement terms and the alias table, so they always compare under the same rules. Company names have their own single normalizer, `company_key`, which every blacklist, denied list and watchlist comparison must use. Blacklist slugs and domains likewise have one normalizer each, `normalize_slug` and `normalize_domain` in `discovery/blacklist.py`.
 
 ## Working in the repo
 Setup and the quality gates are in [contributing.md](contributing.md). In short:
@@ -191,12 +211,14 @@ Conventions you will trip over if you do not know them:
 ## Adding a new thing, by example
 - **Different score weights:** edit `config/weights.yaml`. `tests/component/test_weights_loader.py` shows the rules, and `docs/pipeline.md#score` must match if you change the defaults.
 - **A new legal suffix for company names:** add it to `LEGAL_SUFFIXES` in `storage/company_key.py`, with a row in `tests/unit/test_company_key.py` first. **Newer Unicode confusables:** see the update steps in `docs/data-model.md`.
-- **A new table or column:** add the next numbered file to `src/cypress_creek/storage/migrations/` (for example `0004_postings.sql`, with `-- ABOUTME: ` header lines), never edit an applied one, and add a test in `tests/component/test_migrations.py` or beside the new code. See `docs/data-model.md#storage-sqlite-and-migrations`.
+- **A new table or column:** add the next numbered file to `src/cypress_creek/storage/migrations/` (for example `0005_postings.sql`, with `-- ABOUTME: ` header lines), never edit an applied one, and add a test in `tests/component/test_migrations.py` or beside the new code. See `docs/data-model.md#storage-sqlite-and-migrations`.
+- **A new blacklist match kind:** add a `BlockReason` member and its normalizer in `discovery/blacklist.py`, write the failing unit rows in `tests/unit/test_blacklist_filter.py` first, then add the kind to the `CHECK` list with the next numbered migration (never edit `0003_blacklist.sql`) and update [data-model.md](data-model.md#discovery-the-blacklist).
 - **A new tag alias:** add it to `config/aliases.yaml`. The tests in `tests/unit/test_aliases.py` show the rules (an alias belongs to one canonical tag).
 - **A new fact field:** change `facts/models.py`, add a failing test in `tests/unit/test_fact_models.py` first, write an ADR if it is a design decision, and update `docs/data-model.md`.
 - **A new pipeline stage:** a new module under the right package, typed errors beside it, tests in all relevant tiers, and a section in `docs/pipeline.md`.
 - **A change to URL policy:** start with a hostile or accepted input in `tests/unit/test_url_guard.py`, then change `ingest/url_guard.py`. Keep the real-resolver, public-DNS and process tests passing and update [threat-model.md](threat-model.md). Never add an environment or config switch that permits private URLs.
 - **A new posting fetch caller:** use `ingest.fetch.fetch_posting` and handle its typed `FetchError` subclasses. Discovery transport work may call `ingest.safe_http.fetch_url` directly. Do not import an HTTP client in another module. Keep the transport's unit, component, public-network and process tests passing, and update [architecture.md](architecture.md) if the boundary changes.
+- **An ATS adapter (cards H3 to H5) fetching a board feed:** take a `PoliteClient` as a constructor argument and call `client.get(feed_url)`. Never call `fetch_url` or import an HTTP client. Build the client once per run and share it, so the cache and the per host spacing are shared. Pass `FetchLimits(content_types=frozenset({"application/json"}))` for a JSON feed, since the default limits allow only HTML, plain text and PDF. Give `HostRateLimiter` the same delay as the policy, as in `HostRateLimiter(clock, policy.per_host_delay_seconds)`, so the two never disagree. Parse `response.body` as hostile input, and handle `RetriesExhausted`, `UnexpectedNotModified`, `SafeHttpError` and `UrlGuardError` as stable reason codes. Test it against a real local server with a `ManualClock`, as `tests/component/test_polite_client.py` does, and run the `needs_network` test for a real feed. The worked call is in [setup.md](setup.md#fetch-a-job-board-politely).
 - **A change to HTML extraction:** start with hostile markup in `tests/unit/test_html_text.py`, then update `ingest/html_text.py`. Keep the ATS layout component cases in `tests/component/test_html_fixtures.py` and the public-network and process tests passing. Update [pipeline.md](pipeline.md#html-posting-text) and [threat-model.md](threat-model.md#html-content-boundary) when visibility or limits change.
 
 ## Where to look when something is unclear

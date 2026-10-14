@@ -18,9 +18,14 @@ New here or handing a card to someone else? [handoff.md](handoff.md) is the comp
 - Every code file starts with two comment lines, each beginning with `ABOUTME: `.
 - Keep it simple and match the surrounding style. Names are evergreen: no "new", "improved" or "enhanced".
 - No mocks or fake providers. An unreachable backend fails the test loudly, it is never skipped.
+- Time goes through the `Clock` protocol in `discovery/rate_limiter.py`. Code that waits or ages data takes a `Clock`, production passes `SystemClock`, and tests pass `ManualClock`, which advances only when told to and records each sleep. That is the one allowed time abstraction. It controls time and is not a mocked collaborator, so do not patch `time.sleep` or add another fake.
 
 ## Tests
 Four tiers exist: unit, component, integration and e2e. Markers `live` (needs a real model backend) and `needs_network` (needs the internet) select tests. The `live` tests need a running Ollama with `qwen3.5:0.8b` (see [providers.md](providers.md#try-it-locally)) and are not in the gated unit and component run. Property tests use Hypothesis, and they run with the rest of the suite.
+
+The polite fetch layer has a `needs_network` integration test that fetches a real public job board feed through the real transport, then revalidates a stale cache entry and expects a real 304: `uv run pytest tests/integration/test_polite_client_network.py -q`. It needs the internet and fails, never skips, when the network is unreachable. Run it when you touch `discovery/polite_client.py`, `cache.py` or the transport's conditional request handling.
+
+The integration and e2e tiers are not in the gated run, so run them by hand when you touch what they cover. For the blacklist: `uv run pytest tests/e2e/test_blacklist_process.py tests/integration/test_blacklist_dns.py -q`. The e2e file starts real child Python processes against a real temp SQLite file. The integration file is marked `needs_network` and resolves a real host, so an unreachable network makes it fail, never skip.
 
 ## Documentation checklist
 Before a PR is ready, in the same PR:
@@ -28,7 +33,7 @@ Before a PR is ready, in the same PR:
 - README.md status and "Try what exists" reflect what now works.
 - The docs index (docs/README.md) lists any new doc or decision record.
 - docs/codebase.md matches the code: layout, the flow diagram and the module list.
-- A new design decision has an ADR in `docs/adr/`.
+- A new design decision has an ADR in `docs/adr/`. Numbers are sequential and the latest is 0019, so the next free number is 0020. Check `ls docs/adr` before you pick one.
 - Configuration files (for example `config/aliases.yaml`) are described in the doc that owns them.
 
 ## Setup
@@ -36,6 +41,16 @@ Before a PR is ready, in the same PR:
 uv sync
 uv run pytest
 ```
+
+Polite fetching reads three optional environment variables. Unset or blank means the default, and a bad value raises `FetchConfigError` naming the variable. The full table is in [setup.md](setup.md#polite-fetch-settings-and-cache).
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `CYPRESS_CREEK_FETCH_REFRESH_SECONDS` | `900` | A cached response younger than this is served with no request. |
+| `CYPRESS_CREEK_FETCH_HOST_DELAY_SECONDS` | `1.0` | Minimum gap between requests to one host. |
+| `CYPRESS_CREEK_FETCH_MAX_RETRIES` | `4` | Retries on 429 and 5xx, a whole number from 0 to 8. |
+
+The response cache is the `fetch_cache` directory under the data directory: `data/fetch_cache/`, or `$CYPRESS_CREEK_DATA_DIR/fetch_cache/` when that variable is set. It is gitignored. Delete it to force a fresh download.
 
 ## Quality gates
 Install the hooks once per clone:
