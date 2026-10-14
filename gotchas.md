@@ -31,3 +31,7 @@ Never infer the full input token count from Ollama's `prompt_eval_count` when it
 Why: a 50,000-character posting returned 16,386 prompt tokens at `num_ctx` 32,768 because Ollama had already cut it to about half the window; that number did not measure the full posting.
 
 - After resolving a merge, grep every touched file for conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`) before `git add`. A resolver script that asserts and fails must stop the commit, never be chained to it.
+
+## Keep live eval state in SQLite
+Store resumable eval runs in SQLite transactions. Preserve each record's JSON payload there, and write JSONL only as an audit export. Never make an exported file the live state store.
+Why: direct JSONL append could leave a torn final row, and rewriting the whole file to avoid that defect adds file-level recovery work already handled by SQLite transactions.

@@ -5,9 +5,12 @@ format is available now. The runner, postings and hand labels come in later card
 
 ## Run record format
 
-`cypress_creek.eval_records` defines version 1 of the JSONL format. One file starts with a
+`cypress_creek.eval_records` defines version 1 of the run record format. Live runs use the
+project SQLite database: `eval_run` holds the header JSON and `eval_event` holds ordered case
+and terminal JSON. `EvalStore` in `cypress_creek.eval_store` creates a run, appends records in
+transactions and reconstructs resume state from the database. A JSONL export starts with a
 `header` row, contains one `case` row for each completed case and repeat, and ends with a
-`terminal` row when the run succeeds or fails. A file without a terminal is incomplete. A
+`terminal` row when the run succeeds or fails. A run without a terminal is incomplete. A
 `failed` terminal carries a reason and can be followed by later case rows and a `complete`
 terminal when the same run resumes. A `complete` terminal requires every planned pair.
 
@@ -18,16 +21,23 @@ terminal when the same run resumes. A `complete` terminal requires every planned
 | `terminal` | Run ID, `complete` or `failed` status, and a reason for failure. |
 
 The run ID is a SHA-256 digest of the canonical header. A changed commit, model, prompt,
-schema, fixture, bank, case plan or repeat count changes that ID. `load_run` rejects a
-mismatched header, duplicate or out-of-plan case pair, malformed row, and a false complete
+schema, fixture, bank, case plan or repeat count changes that ID. The store rejects a
+mismatched header, duplicate or out-of-plan case pair, malformed record, and a false complete
 marker. `RunState.pending_pairs` lists only pairs without a complete case row. An incomplete
 pipeline report can still be a completed measurement for its case; its failure remains in the
 report. The module records outcomes supplied by the runner, without making model calls or
 inventing validator verdicts.
 
-Scratch runs belong under `evals/scratch/`, which Git ignores. Only published runs with
+Each append commits as one SQLite transaction, so an interrupted write cannot leave a partial
+case record. The `0004_eval_runs.sql` migration adds these tables to the existing database in
+`CYPRESS_CREEK_DATA_DIR` (default `data/`, gitignored). `EvalStore.export_jsonl(header, path)`
+validates a database snapshot and creates a JSONL audit file without overwriting an existing
+file. `load_run(path, expected_header=header)` validates an export but never changes live run
+state. An export is not a resume store.
+
+Scratch exports belong under `evals/scratch/`, which Git ignores. Only published exports with
 hand labels belong under `evals/results/`, named with date, backend and model. E2b adds the
-CLI that fills these records from real providers. E3 supplies the labels, so no E2a file is
+CLI that fills the database from real providers. E3 supplies the labels, so no E2a file is
 benchmark evidence.
 
 Check the record contract locally with:

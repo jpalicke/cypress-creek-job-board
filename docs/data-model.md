@@ -107,7 +107,7 @@ uv run python -c "from cypress_creek.storage.company_key import company_key; pri
 ```
 
 ## Storage: SQLite and migrations
-Two stores, on purpose. The fact bank and config (`config/*.yaml`) are hand edited YAML: reviewable, diffable and the source of truth for what the tool may claim. Everything that changes while the app runs (postings, drafts, watchlists, later cards) is SQLite, one file, no server, in the standard library. See [ADR 0005](adr/0005-sqlite-and-migrations.md).
+Two stores, on purpose. The fact bank and config (`config/*.yaml`) are hand edited YAML: reviewable, diffable and the source of truth for what the tool may claim. Everything that changes while the app runs (eval runs, postings, drafts, watchlists) is SQLite, one file, no server, in the standard library. JSONL eval files are exports, not another live store. See [ADR 0005](adr/0005-sqlite-and-migrations.md) and [the eval record guide](evals.md#run-record-format).
 
 Code is `src/cypress_creek/storage/db.py`:
 - `data_dir()` is `CYPRESS_CREEK_DATA_DIR` or `data/` (gitignored). `database_path()` is `<data dir>/cypress_creek.sqlite3`.
@@ -120,7 +120,7 @@ Migration rules:
 - Each file runs in one transaction together with its row in `schema_version`. If it fails, nothing from that file is kept and `MigrationError` names the file. Do not put `BEGIN` or `COMMIT` in a migration.
 - A whole folder is checked before anything runs, so a bad name, a gap or a file that is not utf-8 changes nothing.
 - A database newer than the code, or one whose applied name differs from the file of that number, is refused. Never edit or rename a migration that has been applied; add a new one.
-- `0001_schema_version.sql` creates the version table and holds no domain data. Each card that needs tables adds its own file. `0002_discovery.sql` creates the watchlist, listing and suggestion tables and `0003_blacklist.sql` creates the blacklist table, both described below.
+- `0001_schema_version.sql` creates the version table and holds no domain data. Each card that needs tables adds its own file. `0002_discovery.sql` creates the watchlist, listing and suggestion tables, `0003_blacklist.sql` creates the blacklist table, and `0004_eval_runs.sql` stores eval headers and ordered JSON events with a unique case and repeat pair per run.
 
 Known limits: there are no checksums, so an edited applied migration is not detected (only a renamed one is). There is no downgrade path. The database file is not encrypted.
 
@@ -216,4 +216,4 @@ It prints `already blacklisted as a company_key, reason: not a fit` (the match k
 ```bash
 uv run python -c "from cypress_creek.storage.db import connect, database_path, migrate, schema_version; c = connect(database_path()); print('applied', migrate(c), 'now at version', schema_version(c)); print('again', migrate(c))"
 ```
-The first run prints `applied [1, 2, 3]` and creates `data/cypress_creek.sqlite3`. Running it again prints `applied []`. Delete the `data/` folder to start over.
+On a fresh database, the first run prints `applied [1, 2, 3, 4]` and creates `data/cypress_creek.sqlite3`. An existing database applies only pending migrations. Running it again prints `applied []`.
