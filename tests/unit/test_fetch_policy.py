@@ -63,6 +63,16 @@ def test_different_hosts_do_not_wait_for_each_other() -> None:
     assert clock.sleeps == []
 
 
+def test_the_delay_runs_from_the_end_of_the_previous_request() -> None:
+    clock = ManualClock()
+    limiter = HostRateLimiter(clock, delay_seconds=1.0)
+    limiter.wait("example.org")
+    clock.advance(0.5)
+    limiter.finished("Example.ORG")
+    limiter.wait("example.org")
+    assert clock.sleeps == [pytest.approx(1.0)]
+
+
 def test_host_names_are_case_folded() -> None:
     clock = ManualClock()
     limiter = HostRateLimiter(clock, delay_seconds=1.0)
@@ -82,6 +92,21 @@ def test_the_system_clock_really_sleeps() -> None:
     start = time.monotonic()
     clock.sleep(0.05)
     assert time.monotonic() - start >= 0.045
+
+
+def test_the_system_clock_reports_wall_time() -> None:
+    before = time.time()
+    reading = SystemClock().time()
+    assert before <= reading <= time.time()
+
+
+def test_the_manual_clock_wall_time_starts_where_told_and_moves_with_the_clock() -> None:
+    clock = ManualClock(wall_start=1000.0)
+    assert clock.time() == 1000.0
+    clock.advance(5.0)
+    clock.sleep(2.0)
+    assert clock.time() == 1007.0
+    assert clock.monotonic() == 7.0
 
 
 def test_the_limiter_works_on_the_system_clock() -> None:

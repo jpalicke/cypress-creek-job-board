@@ -9,6 +9,10 @@ from typing import Protocol
 class Clock(Protocol):
     def monotonic(self) -> float: ...
 
+    def time(self) -> float:
+        """Wall clock seconds since the epoch, for stamping stored data."""
+        ...
+
     def sleep(self, seconds: float) -> None: ...
 
 
@@ -18,26 +22,37 @@ class SystemClock:
     def monotonic(self) -> float:
         return time.monotonic()
 
+    def time(self) -> float:
+        return time.time()
+
     def sleep(self, seconds: float) -> None:
         time.sleep(seconds)
 
 
 class ManualClock:
-    """Time that only moves when told to. Sleeping advances it and is recorded."""
+    """Time that only moves when told to. Sleeping advances it and is recorded.
 
-    def __init__(self, start: float = 0.0) -> None:
+    Wall time starts at wall_start and moves together with the monotonic reading.
+    """
+
+    def __init__(self, start: float = 0.0, wall_start: float = 0.0) -> None:
         self._now = start
+        self._wall = wall_start
         self.sleeps: list[float] = []
 
     def monotonic(self) -> float:
         return self._now
 
+    def time(self) -> float:
+        return self._wall
+
     def sleep(self, seconds: float) -> None:
         self.sleeps.append(seconds)
-        self._now += seconds
+        self.advance(seconds)
 
     def advance(self, seconds: float) -> None:
         self._now += seconds
+        self._wall += seconds
 
 
 class HostRateLimiter:
@@ -69,3 +84,8 @@ class HostRateLimiter:
                 if remaining > 0:
                     self._clock.sleep(remaining)
             self._last_request[key] = self._clock.monotonic()
+
+    def finished(self, host: str) -> None:
+        """Note that a request to this host just ended, so the delay counts from here."""
+        with self._lock:
+            self._last_request[host.lower()] = self._clock.monotonic()
