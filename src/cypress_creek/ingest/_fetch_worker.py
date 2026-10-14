@@ -14,12 +14,23 @@ def run_worker(resolve: Callable[[str], ValidatedTarget]) -> None:
         request = json.load(sys.stdin)
         configuration = request["limits"]
         configuration["content_types"] = frozenset(configuration["content_types"])
-        response = _fetch(request["url"], FetchLimits(**configuration), resolve=resolve)
+        pass_through = request.get("pass_through_statuses", False)
+        if not isinstance(pass_through, bool):
+            raise ValueError("pass_through_statuses must be a boolean")
+        response = _fetch(
+            request["url"],
+            FetchLimits(**configuration),
+            resolve=resolve,
+            if_none_match=request.get("if_none_match"),
+            pass_through_statuses=pass_through,
+        )
         result = {
             "url": response.url,
             "status": response.status,
             "content_type": response.content_type,
             "body": base64.b64encode(response.body).decode("ascii"),
+            "etag": response.etag,
+            "retry_after": response.retry_after,
         }
     except UrlGuardError as error:
         result = {"error": "url_guard", "reason": error.reason_code}

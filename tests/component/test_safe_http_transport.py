@@ -1,5 +1,6 @@
 # ABOUTME: Exercises transport limits, redirects and deadlines against real loopback HTTP servers.
 # ABOUTME: Production refuses local destinations even when test-looking environment is set.
+import json
 import os
 import subprocess
 import sys
@@ -12,8 +13,10 @@ from http_support import http_server, local_target
 from cypress_creek import __version__
 from cypress_creek.ingest.safe_http import (
     FetchLimits,
+    FetchResponse,
     SafeHttpError,
     _fetch,
+    _parse_worker_result,
     _run_worker,
     fetch_url,
 )
@@ -193,3 +196,232 @@ def test_refused_connection_is_redacted() -> None:
         _fetch(url, FetchLimits(), resolve=local_target)
     assert caught.value.reason_code == "network_error"
     assert "fixture.test" not in str(caught.value)
+
+
+def test_fetch_response_positional_construction_keeps_working() -> None:
+    response = FetchResponse("https://example.org/", 200, "text/plain", b"x")
+    assert response.etag is None
+    assert response.retry_after is None
+
+
+def test_if_none_match_is_sent_and_etag_is_returned() -> None:
+    with http_server() as (port, requests):
+        url = f"http://fixture.test:{port}/etag"
+        first = _fetch(url, FetchLimits(), resolve=local_target)
+        second = _fetch(url, FetchLimits(), resolve=local_target, if_none_match='W/"v 1"')
+    assert first.etag == '"v1"'
+    assert "if-none-match" not in requests.received[0][1]
+    assert requests.received[1][1]["if-none-match"] == 'W/"v 1"'
+    assert second.status == 200
+
+
+def test_not_modified_passes_through_with_empty_body() -> None:
+    with http_server() as (port, _):
+        response = _fetch(
+            f"http://fixture.test:{port}/etag",
+            FetchLimits(),
+            resolve=local_target,
+            if_none_match='"v1"',
+            pass_through_statuses=True,
+        )
+    assert response.status == 304
+    assert response.body == b""
+    assert response.content_type == ""
+    assert response.etag == '"v1"'
+
+
+@pytest.mark.parametrize(
+    ("path", "status", "retry_after"),
+    [
+        ("/rate-limited", 429, "120"),
+        ("/unavailable", 503, "Wed, 21 Oct 2026 07:28:00 GMT"),
+        ("/error", 500, None),
+    ],
+)
+def test_throttle_and_server_errors_pass_through_without_reading_the_body(
+    path: str, status: int, retry_after: str | None
+) -> None:
+    with http_server() as (port, _):
+        response = _fetch(
+            f"http://fixture.test:{port}{path}",
+            FetchLimits(),
+            resolve=local_target,
+            pass_through_statuses=True,
+        )
+    assert response.status == status
+    assert response.retry_after == retry_after
+    assert response.body == b""
+    assert response.content_type == ""
+
+
+@pytest.mark.parametrize("path", ["/rate-limited", "/unavailable", "/error"])
+def test_throttle_and_server_errors_are_http_status_unless_passed_through(path: str) -> None:
+    with http_server() as (port, _), pytest.raises(SafeHttpError) as caught:
+        _fetch(f"http://fixture.test:{port}{path}", FetchLimits(), resolve=local_target)
+    assert caught.value.reason_code == "http_status"
+
+
+@pytest.mark.parametrize("path", ["/missing", "/teapot", "/forbidden"])
+def test_other_statuses_stay_http_status_even_when_passing_through(path: str) -> None:
+    with http_server() as (port, _), pytest.raises(SafeHttpError) as caught:
+        _fetch(
+            f"http://fixture.test:{port}{path}",
+            FetchLimits(),
+            resolve=local_target,
+            pass_through_statuses=True,
+        )
+    assert caught.value.reason_code == "http_status"
+
+
+def test_unauthorized_stays_authentication_required_when_passing_through() -> None:
+    with http_server() as (port, _), pytest.raises(SafeHttpError) as caught:
+        _fetch(
+            f"http://fixture.test:{port}/login",
+            FetchLimits(),
+            resolve=local_target,
+            pass_through_statuses=True,
+        )
+    assert caught.value.reason_code == "authentication_required"
+
+
+def test_hostile_or_oversized_response_headers_become_none() -> None:
+    with http_server() as (port, _):
+        response = _fetch(
+            f"http://fixture.test:{port}/hostile-headers",
+            FetchLimits(),
+            resolve=local_target,
+            pass_through_statuses=True,
+        )
+    assert response.status == 503
+    assert response.retry_after is None
+    assert response.etag is None
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "",
+        " leading",
+        "trailing ",
+        'a"\r\nHost: evil',
+        "tab\tinside",
+        "nul\x00",
+        "del\x7f",
+        "café",
+        "x" * 513,
+        7,
+        b'"v1"',
+    ],
+)
+def test_bad_if_none_match_is_refused_before_any_request(value: object) -> None:
+    with http_server() as (port, requests), pytest.raises(SafeHttpError) as caught:
+        _fetch(
+            f"http://fixture.test:{port}/etag",
+            FetchLimits(),
+            resolve=local_target,
+            if_none_match=value,  # type: ignore[arg-type]
+        )
+    assert caught.value.reason_code == "invalid_validator"
+    assert requests.received == []
+
+
+def test_public_entry_refuses_bad_if_none_match_without_a_worker() -> None:
+    with pytest.raises(SafeHttpError) as caught:
+        fetch_url("https://1.1.1.1/", if_none_match="bad\nvalue")
+    assert caught.value.reason_code == "invalid_validator"
+
+
+def test_if_none_match_is_sent_on_every_redirect_hop() -> None:
+    with http_server() as (port, requests):
+        _fetch(
+            f"http://fixture.test:{port}/redirect/2",
+            FetchLimits(),
+            resolve=local_target,
+            if_none_match='"v1"',
+        )
+    assert len(requests.received) == 3
+    assert all(headers["if-none-match"] == '"v1"' for _, headers in requests.received)
+
+
+def test_worker_carries_validator_and_passes_statuses_back() -> None:
+    with http_server() as (port, requests):
+        response = _run_worker(
+            f"http://fixture.test:{port}/etag",
+            FetchLimits(),
+            WORKER,
+            if_none_match='"v1"',
+            pass_through_statuses=True,
+        )
+        throttled = _run_worker(
+            f"http://fixture.test:{port}/rate-limited",
+            FetchLimits(),
+            WORKER,
+            pass_through_statuses=True,
+        )
+    assert requests.received[0][1]["if-none-match"] == '"v1"'
+    assert (response.status, response.body, response.etag) == (304, b"", '"v1"')
+    assert (throttled.status, throttled.retry_after, throttled.body) == (429, "120", b"")
+
+
+def test_worker_revalidates_the_validator() -> None:
+    request = {
+        "url": "http://fixture.test:1/etag",
+        "limits": {
+            "max_wire_bytes": 10,
+            "max_decoded_bytes": 10,
+            "max_ratio": 2.0,
+            "connect_timeout": 1.0,
+            "total_timeout": 1.0,
+            "content_types": ["text/plain"],
+        },
+        "if_none_match": "bad\nvalue",
+        "pass_through_statuses": True,
+    }
+    result = subprocess.run(
+        WORKER, input=json.dumps(request).encode(), capture_output=True, timeout=10
+    )
+    assert json.loads(result.stdout) == {"error": "safe_http", "reason": "invalid_validator"}
+
+
+def test_json_feed_passes_through_the_worker_with_custom_limits() -> None:
+    limits = FetchLimits(content_types=frozenset({"application/json"}))
+    with http_server() as (port, _):
+        response = _run_worker(f"http://fixture.test:{port}/json", limits, WORKER)
+    assert response.content_type == "application/json"
+    assert json.loads(response.body) == {"jobs": []}
+
+
+def test_default_limits_still_refuse_json() -> None:
+    assert "application/json" not in FetchLimits().content_types
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"url": "u", "status": 304, "content_type": "", "body": "Zm9v"},
+        {"url": "u", "status": 429, "content_type": "text/plain", "body": ""},
+        {"url": "u", "status": 404, "content_type": "", "body": ""},
+        {"url": "u", "status": 200, "content_type": "image/png", "body": ""},
+        {"url": "u", "status": 600, "content_type": "", "body": ""},
+        {"url": "u", "status": 429, "content_type": "", "body": "", "retry_after": "a\nb"},
+        {"url": "u", "status": 429, "content_type": "", "body": "", "retry_after": 5},
+        {"url": "u", "status": 200, "content_type": "text/plain", "body": "", "etag": "x" * 513},
+    ],
+)
+def test_worker_result_rejects_malformed_pass_through_records(payload: object) -> None:
+    with pytest.raises(SafeHttpError) as caught:
+        _parse_worker_result(json.dumps(payload).encode(), FetchLimits())
+    assert caught.value.reason_code == "network_error"
+
+
+def test_worker_result_accepts_pass_through_records() -> None:
+    payload = {
+        "url": "u",
+        "status": 503,
+        "content_type": "",
+        "body": "",
+        "etag": None,
+        "retry_after": "30",
+    }
+    response = _parse_worker_result(json.dumps(payload).encode(), FetchLimits())
+    assert response == FetchResponse("u", 503, "", b"", None, "30")
