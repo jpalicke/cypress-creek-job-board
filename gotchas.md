@@ -31,3 +31,7 @@ Never infer the full input token count from Ollama's `prompt_eval_count` when it
 Why: a 50,000-character posting returned 16,386 prompt tokens at `num_ctx` 32,768 because Ollama had already cut it to about half the window; that number did not measure the full posting.
 
 - After resolving a merge, grep every touched file for conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`) before `git add`. A resolver script that asserts and fails must stop the commit, never be chained to it.
+
+## Preserve completed eval rows across interrupted writes
+Append eval JSONL rows with atomic replacement. Keep normal reads strict, and require explicit recovery of an unterminated tail with the discarded bytes saved for audit. Never skip a malformed complete line.
+Why: direct append could leave a torn final row after interruption, preventing resume despite earlier completed case pairs.

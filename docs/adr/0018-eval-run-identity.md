@@ -6,11 +6,13 @@ Status: accepted (Joe P, card E2a)
 - An eval JSONL file has one header with the git commit, provider, exact model, prompt hashes, schema versions, fixture set hash, bank hash, ordered case IDs and repeat count.
 - `RunHeader.run_id` is SHA-256 over canonical JSON of that header, including the record format version. Resume requires the same header and skips only case and repeat pairs already recorded as complete rows.
 - A complete terminal record is valid only after every planned pair has a case row. A failed terminal retains its reason and the completed pairs, so the same run can resume.
+- Appended rows use an atomic replacement. Recovery of an unterminated final row is explicit, validates all retained rows, and preserves discarded bytes in a sibling file. A malformed complete line is never silently skipped.
 - The eval run ID is distinct from the pipeline report ID in [ADR 0014](0014-run-id-is-derived-from-the-inputs.md). The report ID groups the same posting, bank, backend and model even across prompt changes; eval resume must separate those changes.
 
 ## Why
 - Reusing a row after a prompt, schema, fixture or code change would mix different experiments in one run file.
 - A terminal record distinguishes a finished run from a process that stopped after writing some valid rows.
+- Atomic replacement prevents a process interruption from corrupting previously completed case rows; explicit recovery handles files damaged before that guarantee or by other writers.
 - Keeping the report ID's existing meaning avoids changing product provenance to satisfy eval bookkeeping.
 
 ## Consequences

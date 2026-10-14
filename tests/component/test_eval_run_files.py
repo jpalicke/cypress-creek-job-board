@@ -14,6 +14,7 @@ from cypress_creek.eval_records import (
     append_case,
     append_terminal,
     load_run,
+    recover_run,
     write_header,
 )
 from cypress_creek.pipeline.report import GapReport, Provenance, ReportStatus
@@ -141,3 +142,53 @@ def test_malformed_jsonl_tail_is_not_silently_treated_as_a_complete_pair(tmp_pat
         output.write('{"record_type":"case"')
     with pytest.raises(ValueError):
         load_run(path)
+
+
+def test_recovery_preserves_completed_pairs_and_damaged_tail(tmp_path: Path) -> None:
+    path = tmp_path / "run.jsonl"
+    header = _header()
+    write_header(path, header)
+    append_case(path, header, _case(header, 1))
+    damaged = b'{"record_type":"case","unfinished":'
+    with path.open("ab") as output:
+        output.write(damaged)
+
+    state = recover_run(path, expected_header=header)
+
+    assert state.pending_pairs == {("case-1", 2)}
+    backups = list(tmp_path.glob("run.jsonl.partial-*"))
+    assert len(backups) == 1
+    assert backups[0].read_bytes() == damaged
+    assert load_run(path, expected_header=header).cases == (_case(header, 1),)
+    append_case(path, header, _case(header, 2))
+    append_terminal(path, header, RunTerminal(run_id=header.run_id, status="complete"))
+    assert load_run(path).status == "complete"
+
+
+def test_recovery_keeps_a_valid_unterminated_last_row(tmp_path: Path) -> None:
+    path = tmp_path / "run.jsonl"
+    header = _header()
+    write_header(path, header)
+    append_case(path, header, _case(header, 1))
+    path.write_bytes(path.read_bytes().rstrip(b"\n"))
+
+    state = recover_run(path, expected_header=header)
+
+    assert state.pending_pairs == {("case-1", 2)}
+    assert not list(tmp_path.glob("run.jsonl.partial-*"))
+    assert path.read_bytes().endswith(b"\n")
+
+
+def test_recovery_refuses_malformed_complete_row_without_changing_file(tmp_path: Path) -> None:
+    path = tmp_path / "run.jsonl"
+    header = _header()
+    write_header(path, header)
+    with path.open("ab") as output:
+        output.write(b'{"record_type":"case"\n')
+    original = path.read_bytes()
+
+    with pytest.raises(ValueError):
+        recover_run(path, expected_header=header)
+
+    assert path.read_bytes() == original
+    assert not list(tmp_path.glob("run.jsonl.partial-*"))

@@ -2,6 +2,8 @@
 # ABOUTME: Run identity includes every input whose change must invalidate resume.
 import hashlib
 import json
+import os
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Literal
@@ -195,9 +197,67 @@ def load_run(path: Path, expected_header: RunHeader | None = None) -> RunState:
     return RunState(header=header, cases=tuple(cases), terminal=terminal)
 
 
+def _write_temp(path: Path, content: bytes) -> Path:
+    descriptor, name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    temporary = Path(name)
+    try:
+        with os.fdopen(descriptor, "wb") as output:
+            output.write(content)
+            output.flush()
+            os.fsync(output.fileno())
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
+    return temporary
+
+
+def _replace(path: Path, content: bytes) -> None:
+    temporary = _write_temp(path, content)
+    try:
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def recover_run(path: Path, expected_header: RunHeader | None = None) -> RunState:
+    """Preserve a torn final row, then restore the last validated JSONL boundary."""
+    content = path.read_bytes()
+    if content.endswith(b"\n"):
+        return load_run(path, expected_header=expected_header)
+    prefix, separator, tail = content.rpartition(b"\n")
+    if not separator:
+        raise ValueError("run file has no complete header")
+    damaged: bytes | None
+    try:
+        json.loads(tail)
+    except (ValueError, UnicodeDecodeError):
+        candidate = prefix + separator
+        damaged = tail
+    else:
+        candidate = content + b"\n"
+        damaged = None
+    temporary = _write_temp(path, candidate)
+    try:
+        state = load_run(temporary, expected_header=expected_header)
+        if damaged is not None:
+            if state.status == "complete":
+                raise ValueError("complete run has a damaged tail")
+            digest = hashlib.sha256(damaged).hexdigest()[:16]
+            backup = path.with_name(f"{path.name}.partial-{digest}")
+            if backup.exists():
+                if backup.read_bytes() != damaged:
+                    raise ValueError("damaged tail backup does not match")
+            else:
+                _replace(backup, damaged)
+        os.replace(temporary, path)
+        return state
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 def _append(path: Path, record: CaseRecord | RunTerminal) -> None:
-    with path.open("a", encoding="utf-8", newline="\n") as output:
-        output.write(record.model_dump_json() + "\n")
+    row = (record.model_dump_json() + "\n").encode("utf-8")
+    _replace(path, path.read_bytes() + row)
 
 
 def append_case(path: Path, header: RunHeader, case: CaseRecord) -> None:

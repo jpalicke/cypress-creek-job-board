@@ -25,6 +25,14 @@ pipeline report can still be a completed measurement for its case; its failure r
 report. The module records outcomes supplied by the runner, without making model calls or
 inventing validator verdicts.
 
+Each appended row is installed by an atomic file replacement, so an interrupted write leaves
+the previous complete rows intact. For a legacy or externally damaged file with an unterminated
+last row, call `recover_run(path, expected_header=header)` explicitly before resuming. It
+validates the retained rows first, saves discarded tail bytes in a sibling
+`.partial-<digest>` file, and leaves malformed complete lines untouched for investigation.
+If the last JSON row is valid but lacks its newline, recovery keeps the row and adds the newline.
+`load_run` remains read-only and rejects malformed rows; recovery is never implicit.
+
 Scratch runs belong under `evals/scratch/`, which Git ignores. Only published runs with
 hand labels belong under `evals/results/`, named with date, backend and model. E2b adds the
 CLI that fills these records from real providers. E3 supplies the labels, so no E2a file is
