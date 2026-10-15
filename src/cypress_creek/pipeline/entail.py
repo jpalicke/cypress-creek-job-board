@@ -13,6 +13,7 @@ from cypress_creek.pipeline.extract import failure_label
 from cypress_creek.pipeline.prompt import Prompt, Stage, build_prompt, prompt_facts
 from cypress_creek.pipeline.retrieve import RequirementCandidates
 from cypress_creek.pipeline.schemas import EntailmentOutput, EntailmentVerdict
+from cypress_creek.pipeline.trace import PipelineTrace
 from cypress_creek.providers import ProviderError
 from cypress_creek.providers.base import Capabilities, Provider, Usage
 from cypress_creek.providers.retry import RetryPolicy, call_with_retry
@@ -25,8 +26,10 @@ from cypress_creek.validators.citations import (
 )
 from cypress_creek.validators.claims import check_citation_required, check_novel_terms
 from cypress_creek.validators.consistency import check_entities, check_numbers
+from cypress_creek.validators.verdict import Verdict
 
 ENTAIL_MAX_OUTPUT_TOKENS = 500
+SCHEMA_VERSION = 1
 RATIONALE_WITHHELD = "rationale withheld: failed grounding check"
 
 _VERDICT_SUPPORT = {
@@ -70,7 +73,11 @@ class _Claim:
 
 
 def _valid_citations(
-    cited: Sequence[str], candidate_ids: Sequence[str], bank: Bank, capabilities: Capabilities
+    cited: Sequence[str],
+    candidate_ids: Sequence[str],
+    bank: Bank,
+    capabilities: Capabilities,
+    trace: PipelineTrace | None,
 ) -> list[str]:
     """Cited ids that were sent to the model and pass V4, V5 and V6, each once, in cited order."""
     sent = set(candidate_ids)
@@ -78,14 +85,28 @@ def _valid_citations(
         fact_id
         for fact_id in dict.fromkeys(cited)
         if fact_id in sent
-        and check_fact_exists([fact_id], bank).passed
-        and check_fact_verified([fact_id], bank).passed
-        and check_fact_shareable([fact_id], bank, hosted=not capabilities.local).passed
+        and _checked(check_fact_exists([fact_id], bank), fact_id, trace)
+        and _checked(check_fact_verified([fact_id], bank), fact_id, trace)
+        and _checked(
+            check_fact_shareable([fact_id], bank, hosted=not capabilities.local), fact_id, trace
+        )
     ]
 
 
+def _checked(verdict: Verdict, subject: str, trace: PipelineTrace | None) -> bool:
+    if trace is not None:
+        trace.record_validator(Stage.ENTAIL, subject, verdict)
+    return verdict.passed
+
+
 def _rationale_is_grounded(
-    text: str, cited: Sequence[Fact], requirement: Requirement, bank: Bank, *, positive: bool
+    text: str,
+    cited: Sequence[Fact],
+    requirement: Requirement,
+    bank: Bank,
+    *,
+    positive: bool,
+    trace: PipelineTrace | None,
 ) -> bool:
     """V7, V8 and V10 on the text. A positive verdict's rationale also needs a citation (V9)."""
     verdicts = [
@@ -95,6 +116,9 @@ def _rationale_is_grounded(
     ]
     if positive:
         verdicts.append(check_citation_required([_Claim(text, [fact.id for fact in cited])]))
+    if trace is not None:
+        for verdict in verdicts:
+            trace.record_validator(Stage.ENTAIL, requirement.id, verdict)
     return all(verdict.passed for verdict in verdicts)
 
 
@@ -105,12 +129,14 @@ def judge(
     ceiling: Support,
     bank: Bank,
     capabilities: Capabilities,
+    *,
+    trace: PipelineTrace | None = None,
 ) -> EntailedMatch:
     """Apply the model's answer to the ceiling. Pure: every rule of the stage is decided here.
 
     Support is the lower of the ceiling and the verdict. A positive verdict with no valid
     citation counts as does_not_support, because a model that shows no fact has shown nothing."""
-    valid = _valid_citations(output.fact_ids, candidate_ids, bank, capabilities)
+    valid = _valid_citations(output.fact_ids, candidate_ids, bank, capabilities, trace)
     claimed = _VERDICT_SUPPORT[output.verdict]
     uncited = claimed is not Support.NONE and not valid
     proposed = Support.NONE if uncited else claimed
@@ -123,7 +149,7 @@ def judge(
     if not text:
         rationale = None
     elif uncited or not _rationale_is_grounded(
-        text, cited, requirement, bank, positive=claimed is not Support.NONE
+        text, cited, requirement, bank, positive=claimed is not Support.NONE, trace=trace
     ):
         rationale = RATIONALE_WITHHELD
     else:
@@ -156,6 +182,7 @@ def entail(
     *,
     sleep: Callable[[float], None] = time.sleep,
     policy: RetryPolicy | None = None,
+    trace: PipelineTrace | None = None,
 ) -> EntailedMatch:
     """Ask the model once whether the candidate facts support the requirement, then judge it.
 
@@ -181,9 +208,29 @@ def entail(
 
     def attempt(feedback: str | None) -> tuple[EntailmentOutput, Usage]:
         used = build(feedback)
-        result = provider.complete_structured(
-            used.system, used.user_message, EntailmentOutput, entail_cap(capabilities)
-        )
+        try:
+            result = provider.complete_structured(
+                used.system, used.user_message, EntailmentOutput, entail_cap(capabilities)
+            )
+        except ProviderError as error:
+            if trace is not None and error.request_attempted:
+                trace.record_call(
+                    stage=Stage.ENTAIL,
+                    prompt_hash=used.prompt_hash,
+                    schema_version=SCHEMA_VERSION,
+                    usage=error.usage,
+                    cost_per_mtok=capabilities.cost_per_mtok,
+                    error_type=type(error).__name__,
+                )
+            raise
+        if trace is not None:
+            trace.record_call(
+                stage=Stage.ENTAIL,
+                prompt_hash=used.prompt_hash,
+                schema_version=SCHEMA_VERSION,
+                usage=result.usage,
+                cost_per_mtok=capabilities.cost_per_mtok,
+            )
         return result.parsed, result.usage
 
     prompt_hash = build().prompt_hash
@@ -194,7 +241,9 @@ def entail(
         if label is None:
             raise
         return _unjudged(requirement, ceiling, Entailment.NOT_RUN, label, prompt_hash)
-    judged = judge(output, requirement, candidates.fact_ids, ceiling, bank, capabilities)
+    judged = judge(
+        output, requirement, candidates.fact_ids, ceiling, bank, capabilities, trace=trace
+    )
     return judged.model_copy(update={"usage": usage, "prompt_hash": prompt_hash})
 
 

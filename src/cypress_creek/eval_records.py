@@ -10,12 +10,11 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 from cypress_creek.pipeline.report import GapReport
-from cypress_creek.providers.base import Usage
-from cypress_creek.validators.verdict import Verdict
+from cypress_creek.pipeline.trace import CallRecord as CallRecord
+from cypress_creek.pipeline.trace import Digest, Name
+from cypress_creek.pipeline.trace import ValidatorRecord as ValidatorRecord
 
-Digest = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{64}$")]
 Commit = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{40}$")]
-Name = Annotated[str, StringConstraints(min_length=1)]
 
 
 class RunHeader(BaseModel):
@@ -50,28 +49,6 @@ class RunHeader(BaseModel):
         """Hash a canonical form of the complete header, including the format version."""
         payload = json.dumps(self.model_dump(), sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
-
-
-class CallRecord(BaseModel):
-    """One actual provider call, including retries as separate entries."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    stage: Name
-    prompt_hash: Digest
-    schema_version: int = Field(gt=0)
-    usage: Usage
-    cost_usd: float = Field(ge=0)
-
-
-class ValidatorRecord(BaseModel):
-    """A validator verdict with the stage and subject it checked."""
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    stage: Name
-    subject: Name
-    verdict: Verdict
 
 
 class CaseRecord(BaseModel):

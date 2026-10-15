@@ -6,6 +6,10 @@ It reads a posting, extracts requirements, maps each requirement to facts in a c
 
 Status: early implementation. The fact bank, the posting normalizer, the tag alias table, the deterministic support gate, the score formula, the company name normalizer, the SQLite migration runner, the grounding validators, the provider interface, the provider config, the Ollama adapter, the budget guard, the prompt builder (extraction and entailment prompts), the extraction stage, candidate retrieval, the entailment stage, the gap report, the pipeline run, URL target validation, guarded HTTP transport, link fetcher, HTML text extractor, fictional sample fact bank for evals, typed eval run records with SQLite resume and JSONL export, and the discovery tables with the watchlist, the blacklist table with its deterministic filter, the polite fetch layer (fetch policy, per-host rate limiter, ETag disk cache and polite client) and the ATS adapter interface with the Greenhouse adapter (board listings and board probe) exist as libraries. The link fetcher returns bounded raw bytes with provenance and typed errors. HTML text extraction is a separate library step that drops hidden content and reports warnings; the eval runner, PDF text extraction and an app workflow are still to come. There is no app to start yet. Work is tracked as a kanban in this repo's issues (one issue per card, labeled by lane). Cards marked `core` are the smallest set that makes the repo credible and demoable on its own.
 
+The pipeline also exposes an in-memory trace of attempted provider calls and actual validator
+verdicts. Failed requests count toward the run budget; missing token usage stays unknown and
+blocks later calls. The eval CLI that saves traces to SQLite is still to come.
+
 License: MIT.
 
 ## Quick start (developers)
@@ -39,7 +43,7 @@ Each command is copy and paste, and lives with its documentation:
 | Judge a model's entailment answer, with no model | [docs/pipeline.md](docs/pipeline.md#try-judging-an-answer) |
 | Ask a local model whether facts support a requirement | [docs/pipeline.md](docs/pipeline.md#try-entailment-against-a-local-model) |
 | Assemble and print a gap report, with no model | [docs/pipeline.md](docs/pipeline.md#try-the-report) |
-| Run a posting through every stage against a local model and print the gap report | [docs/pipeline.md](docs/pipeline.md#try-a-whole-run-against-a-local-model) |
+| Run a posting through every stage against a local model and inspect its trace | [docs/pipeline.md](docs/pipeline.md#try-a-whole-run-against-a-local-model) |
 | Run the support gate on a requirement | [docs/pipeline.md](docs/pipeline.md#try-it-locally) |
 | Compute a score from requirement supports | [docs/pipeline.md](docs/pipeline.md#score) |
 | Normalize a company name to its comparison key | [docs/data-model.md](docs/data-model.md#try-company_key) |

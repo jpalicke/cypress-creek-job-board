@@ -5,8 +5,10 @@ from datetime import UTC, date, datetime
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from cypress_creek.config import parse_settings
+from cypress_creek.eval_records import CallRecord
 from cypress_creek.facts import load_bank
 from cypress_creek.facts.hashing import bank_hash
 from cypress_creek.facts.models import Bank
@@ -20,10 +22,16 @@ from cypress_creek.ingest.models import (
     RequirementKind,
 )
 from cypress_creek.pipeline.entail import Entailment
-from cypress_creek.pipeline.extract import ExtractionResult, ExtractionStatus, finish_extraction
+from cypress_creek.pipeline.extract import (
+    ExtractionResult,
+    ExtractionStatus,
+    extract_requirements,
+    finish_extraction,
+)
 from cypress_creek.pipeline.report import ReportStatus
 from cypress_creek.pipeline.run import analyze, assess, run_id
 from cypress_creek.pipeline.schemas import ExtractionOutput
+from cypress_creek.pipeline.trace import PipelineTrace
 from cypress_creek.providers import (
     Budget,
     BudgetedProvider,
@@ -31,7 +39,7 @@ from cypress_creek.providers import (
     BudgetTracker,
     OllamaProvider,
 )
-from cypress_creek.providers.base import Usage
+from cypress_creek.providers.base import CostPerMtok, Usage
 from cypress_creek.scoring.support import Support
 
 FIXTURES = Path(__file__).parent.parent / "fixtures" / "extraction"
@@ -250,4 +258,98 @@ def test_a_spent_budget_stops_the_run_instead_of_giving_a_report(bank: Bank) -> 
             model=MODEL,
             today=TODAY,
             sleep=_no_sleep,
+        )
+
+
+def test_extraction_trace_keeps_unknown_usage_for_a_failed_attempt() -> None:
+    trace = PipelineTrace()
+    result = extract_requirements(POSTING_TEXT, _unreachable_provider(), trace=trace)
+
+    assert result.status is ExtractionStatus.INCOMPLETE
+    assert len(trace.calls) == 1
+    call = trace.calls[0]
+    assert isinstance(call, CallRecord)
+    assert call.stage == "extract"
+    assert call.prompt_hash == result.prompt_hash
+    assert call.schema_version == result.schema_version
+    assert call.outcome == "error"
+    assert call.error_type == "ProviderUnavailable"
+    assert call.usage is None
+    assert call.cost_usd is None
+    assert trace.validators == []
+
+
+def test_extraction_trace_has_no_call_for_a_budget_refusal() -> None:
+    inner = _unreachable_provider()
+    tracker = BudgetTracker(Budget(max_input_tokens=1), inner.capabilities.cost_per_mtok)
+    trace = PipelineTrace()
+    with pytest.raises(BudgetExceeded):
+        extract_requirements(POSTING_TEXT, BudgetedProvider(inner, tracker), trace=trace)
+    assert trace.calls == []
+
+
+def test_analyze_passes_one_trace_from_extraction_through_report(bank: Bank) -> None:
+    trace = PipelineTrace()
+    report = analyze(
+        POSTING,
+        bank,
+        _unreachable_provider(),
+        backend=BACKEND,
+        model=MODEL,
+        today=TODAY,
+        sleep=_no_sleep,
+        trace=trace,
+    )
+
+    assert report.status is ReportStatus.INCOMPLETE
+    assert [call.stage for call in trace.calls] == ["extract"]
+    assert [(item.stage, item.verdict.validator) for item in trace.validators] == [
+        ("report", "V4"),
+        ("report", "V5"),
+        ("report", "V9"),
+    ]
+
+
+def test_assess_passes_trace_through_entailment_and_report(bank: Bank) -> None:
+    trace = PipelineTrace()
+    extraction = _extraction([_requirement(1, "python", Importance.REQUIRED)])
+    report = assess(
+        POSTING,
+        extraction,
+        bank,
+        _unreachable_provider(),
+        backend=BACKEND,
+        model=MODEL,
+        today=TODAY,
+        sleep=_no_sleep,
+        trace=trace,
+    )
+
+    assert report.status is ReportStatus.INCOMPLETE
+    assert [call.stage for call in trace.calls] == ["entail"]
+    assert [item.verdict.validator for item in trace.validators] == ["V4", "V5", "V9"]
+    assert all(item.stage == "report" for item in trace.validators)
+
+
+def test_trace_cost_and_call_record_require_observed_usage() -> None:
+    trace = PipelineTrace()
+    trace.record_call(
+        stage="extract",
+        prompt_hash="a" * 64,
+        schema_version=1,
+        usage=Usage(input_tokens=1_000, output_tokens=500),
+        cost_per_mtok=CostPerMtok(input=2, output=4),
+    )
+    assert trace.calls[0].cost_usd == pytest.approx(0.004)
+    assert trace.calls[0].outcome == "success"
+    assert trace.calls[0].error_type is None
+    with pytest.raises(ValidationError):
+        CallRecord(
+            stage="extract",
+            prompt_hash="a" * 64,
+            schema_version=1,
+            outcome="error",
+            error_type="ProviderUnavailable",
+            usage=None,
+            cost_usd=0,
         )
