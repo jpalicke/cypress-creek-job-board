@@ -11,6 +11,7 @@ from cypress_creek.ingest.models import Importance, Posting, PostingWarning
 from cypress_creek.pipeline.entail import EntailedMatch, Entailment
 from cypress_creek.pipeline.extract import Dropped, ExtractionResult, ExtractionStatus
 from cypress_creek.pipeline.retrieve import RequirementCandidates
+from cypress_creek.pipeline.trace import PipelineTrace
 from cypress_creek.providers.base import Usage
 from cypress_creek.scoring.score import ScoreResult, Weights, score
 from cypress_creek.scoring.support import Gate, Support
@@ -86,17 +87,21 @@ class _Claim:
     fact_ids: list[str]
 
 
-def verify_report(report: GapReport, bank: Bank) -> None:
+def verify_report(report: GapReport, bank: Bank, *, trace: PipelineTrace | None = None) -> None:
     """V4, V5 and V9 over every citation in the report. Raises ReportRefused on a failure."""
     cited = [fact_id for row in report.rows for fact_id in row.fact_ids]
     claims = [
         _Claim(row.text, row.fact_ids) for row in report.rows if row.support is not Support.NONE
     ]
-    for verdict in (
+    verdicts = (
         check_fact_exists(cited, bank),
         check_fact_verified(cited, bank),
         check_citation_required(claims),
-    ):
+    )
+    if trace is not None:
+        for verdict in verdicts:
+            trace.record_validator("report", report.posting_id, verdict)
+    for verdict in verdicts:
         if not verdict.passed:
             raise ReportRefused(f"{verdict.validator}: {verdict.reason}: {verdict.offending}")
 
@@ -142,6 +147,8 @@ def build_report(
     bank: Bank,
     provenance: Provenance,
     weights: Weights | None = None,
+    *,
+    trace: PipelineTrace | None = None,
 ) -> GapReport:
     """Assemble the report and refuse it if any citation fails V4, V5 or V9.
 
@@ -181,5 +188,5 @@ def build_report(
         rule_only_ids=rule_only,
         provenance=provenance,
     )
-    verify_report(report, bank)
+    verify_report(report, bank, trace=trace)
     return report

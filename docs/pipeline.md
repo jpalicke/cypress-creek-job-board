@@ -299,7 +299,7 @@ The numbering in this file is one scheme: 0 normalize, 1 extract, 2 retrieve, 3 
 | `warnings` | The posting's own warnings. |
 | `score`, `score_disclaimer` | The `ScoreResult` (or `None`) and the text `triage only, not a probability`. |
 | `rule_only_ids` | Requirements whose score rests on the rule ceiling alone because entailment did not run. |
-| `provenance` | Backend, model, run id, prompt hashes and total usage. |
+| `provenance` | Backend, model, run id, prompt hashes and usage from successful stage results. |
 
 - **Fail closed.** If extraction failed there are no rows and no score, and the reason is stated. If entailment failed for some requirements the score still uses their rule ceilings, their rows are flagged `not_model_checked` and the report is `incomplete`. No requirements gives a complete report with no score.
 - **Every claim cites.** `build_report` ends by calling `verify_report`, which runs V4, V5 and V9 over every citation and raises `ReportRefused` for a fabricated, unverified or missing one. A row that is not support `none` must cite facts. A requirement whose entailment did not run cites its candidate facts, the basis of its ceiling.
@@ -354,7 +354,15 @@ It prints a complete report with the score `64.3` (3 for a strong required, 1.5 
 ## Running the pipeline
 `analyze(posting, bank, provider, backend=..., model=...)` in `pipeline/run.py` runs a normalized posting through extraction, retrieval, entailment and report assembly, and returns the `GapReport`. `assess(posting, extraction, bank, provider, ...)` does the same from an extraction you already have, which is how the tests run the stages with no model. Wrap the provider in `BudgetedProvider` to enforce a budget: a spent budget raises `BudgetExceeded` and the run stops, with no report.
 
-- **Provenance.** `report.provenance` has the backend, the model, the prompt hashes (`extract`, and `entail` when a call was made) and the usage summed over every call.
+Pass an optional `PipelineTrace` as `trace=` to either entry point to collect the actual provider
+attempts and validator verdicts without changing the report. Each retry has its own call record.
+Call records keep stage, prompt hash, schema version and observed usage or error type, not the
+provider's prompt or answer. Validator verdicts can include offending text. Unknown usage and
+cost remain `None`. Citation checks retain their
+short-circuit order, and report verification records all three verdicts even when one fails.
+See [the eval guide](evals.md#run-record-format) for the record shape.
+
+- **Provenance.** `report.provenance` has the backend, the model, the prompt hashes (`extract`, and `entail` when a call was made) and usage summed from successful stage results. Failed attempts with reported usage remain in the trace and budget tracker.
 - **A derived run id.** `run_id` is `run-` and 16 hex characters of a sha256 over the posting hash, the bank hash (`facts/hashing.py`, independent of fact order), the backend and the model. The same inputs give the same id, so a rerun is traceable, and a changed fact, posting, backend or model gives a new one. The prompt hashes are separate on purpose, so a prompt change is visible without changing the id.
 - **No crash on a model failure.** A typed provider failure gives an incomplete report with the reason (see the fail closed rules above). Only a spent budget, or a bug that `build_report` refuses, stops the run.
 
@@ -370,17 +378,22 @@ from cypress_creek.ingest.hashing import text_hash
 from cypress_creek.ingest.models import Extractor, Posting, PostingSource
 from cypress_creek.pipeline.render import render_text
 from cypress_creek.pipeline.run import analyze
+from cypress_creek.pipeline.trace import PipelineTrace
 from cypress_creek.providers import OllamaProvider
 
 bank = parse_bank({'facts': [{'id': 'F-0001', 'claim': 'Ran a fictional Python data service for 4 years.', 'kind': 'project', 'start': '2019-01-01', 'end': '2023-01-01', 'tags': [{'name': 'python', 'level': 'expert'}], 'verified_on': '2024-01-01', 'evidence': {'type': 'repo', 'pointer': 'https://example.invalid/a'}, 'share': 'shareable'}, {'id': 'F-0002', 'claim': 'Operated a fictional PostgreSQL cluster.', 'kind': 'project', 'tags': [{'name': 'postgresql', 'level': 'familiar'}], 'verified_on': '2024-01-01', 'evidence': {'type': 'repo', 'pointer': 'https://example.invalid/b'}, 'share': 'shareable'}]})
 text = Path('tests/fixtures/extraction/posting.txt').read_text(encoding='utf-8')
 posting = Posting(id='P-1', source=PostingSource.PASTE, text=text, text_hash=text_hash(text), extractor=Extractor(name='paste', version='1'), created_at=datetime(2024, 6, 1, tzinfo=UTC))
 provider = OllamaProvider(parse_settings({'provider': 'ollama', 'model': 'qwen3.5:0.8b', 'context_tokens': 4096}))
-report = analyze(posting, bank, provider, backend='ollama', model='qwen3.5:0.8b')
+trace = PipelineTrace()
+report = analyze(posting, bank, provider, backend='ollama', model='qwen3.5:0.8b', trace=trace)
 print(render_text(report))
-print(report.provenance.run_id)"
+print(report.provenance.run_id)
+print('calls:', len(trace.calls), 'validator verdicts:', len(trace.validators))"
 ```
-It prints the gap report for the sample posting and then the run id. Every cited fact is verified, a rationale that fails the grounding checks is replaced by `rationale withheld`, and the score is triage only.
+It prints the gap report, the run id and counts of observed calls and validator verdicts.
+Every cited fact is verified, a rationale that fails the grounding checks is replaced by
+`rationale withheld`, and the score is triage only.
 
 ## Try it locally
 ```bash

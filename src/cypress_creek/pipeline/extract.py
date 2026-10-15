@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 from cypress_creek.ingest.models import Requirement
 from cypress_creek.pipeline.prompt import Stage, build_prompt
 from cypress_creek.pipeline.schemas import ExtractionOutput
+from cypress_creek.pipeline.trace import PipelineTrace
 from cypress_creek.providers import (
     ContextTruncated,
     ProviderError,
@@ -161,6 +162,7 @@ def extract_requirements(
     *,
     sleep: Callable[[float], None] = time.sleep,
     policy: RetryPolicy | None = None,
+    trace: PipelineTrace | None = None,
 ) -> ExtractionResult:
     """Ask the model for requirements and accept only what the posting supports.
 
@@ -179,9 +181,29 @@ def extract_requirements(
             ExtractionOutput,
             retry_feedback=feedback,
         )
-        result = provider.complete_structured(
-            used.system, used.data_block, ExtractionOutput, output_cap(capabilities)
-        )
+        try:
+            result = provider.complete_structured(
+                used.system, used.data_block, ExtractionOutput, output_cap(capabilities)
+            )
+        except ProviderError as error:
+            if trace is not None and error.request_attempted:
+                trace.record_call(
+                    stage=Stage.EXTRACT,
+                    prompt_hash=used.prompt_hash,
+                    schema_version=SCHEMA_VERSION,
+                    usage=error.usage,
+                    cost_per_mtok=capabilities.cost_per_mtok,
+                    error_type=type(error).__name__,
+                )
+            raise
+        if trace is not None:
+            trace.record_call(
+                stage=Stage.EXTRACT,
+                prompt_hash=used.prompt_hash,
+                schema_version=SCHEMA_VERSION,
+                usage=result.usage,
+                cost_per_mtok=capabilities.cost_per_mtok,
+            )
         return result.parsed, result.usage
 
     try:

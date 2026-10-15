@@ -2,6 +2,8 @@
 # ABOUTME: Free text fields are scrubbed of secrets at construction so no message can leak a key.
 from collections.abc import Sequence
 
+from cypress_creek.providers.base import Usage
+
 REDACTED = "[redacted]"
 
 
@@ -14,7 +16,17 @@ def scrub(text: str, secrets: Sequence[str]) -> str:
 
 
 class ProviderError(Exception):
-    """Base class for every error a provider raises."""
+    """Base class for every error a provider raises, including observed attempt data."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+        self.request_attempted = False
+        self.usage: Usage | None = None
+
+    def mark_attempt(self, usage: Usage | None = None) -> None:
+        """Record that the adapter attempted a request and any complete reported usage."""
+        self.request_attempted = True
+        self.usage = usage
 
 
 class ContextTruncated(ProviderError):
