@@ -20,6 +20,7 @@ from cypress_creek.ingest.url_guard import ValidatedTarget, validate_url
 @dataclass
 class Requests:
     received: list[tuple[str, dict[str, str]]] = field(default_factory=list)
+    methods: list[str] = field(default_factory=list)
     failures: list[str] = field(default_factory=list)
 
 
@@ -36,13 +37,16 @@ def http_server(
                 request = self.rfile.readline().decode("ascii").strip()
                 if not request:
                     return
-                _, path, _ = request.split(" ")
+                method, path, _ = request.split(" ")
                 headers: dict[str, str] = {}
                 while line := self.rfile.readline().strip():
                     name, value = line.decode("ascii").split(":", 1)
                     headers[name.lower()] = value.strip()
                 requests.received.append((path, headers))
-                route = urlsplit(path).path
+                requests.methods.append(method)
+                # A route may name the query too, so that pages of one path can differ.
+                keyed = path in (json_routes or {}) or path in (status_routes or {})
+                route = path if keyed else urlsplit(path).path
                 body = b"public posting"
                 fields = [("Content-Type", "text/plain")]
                 status = "200 OK"

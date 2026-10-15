@@ -26,6 +26,12 @@ The original pages and API output did not state a reuse license. They are not
 redistributed here. Any recorded third-party posting added later needs its
 source and license listed here.
 
+tests/fixtures/lever/palantir_page.json is a byte for byte recording of three postings
+from a public Lever postings feed, recorded on 2026-10-14:
+https://api.lever.co/v0/postings/palantir?mode=json&limit=3
+It is included as a hostile input sample for tests. The posting text belongs to its
+publisher, and the feed did not state a reuse license.
+
 Takedown
 --------
 If you are the owner of material in this repository and want it removed, open
