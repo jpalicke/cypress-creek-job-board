@@ -535,7 +535,7 @@ Cost control: step 5 runs before step 6, scoring is cached by listing content ha
 
 ### 10.2 ATS adapters
 
-One adapter per ATS behind a common interface: `fetch_board(slug) -> list[Listing]`, plus `probe(slug) -> ExistenceResult` for the suggestion resolver. Adapters only issue GET requests and never touch apply endpoints.
+One adapter per ATS behind a common interface: `fetch_board(slug) -> BoardFetch` (the well formed listings and the malformed jobs skipped, with a 10 percent skip budget past which the board fails, see ADR 0021), plus `probe(slug) -> ExistenceResult` for the suggestion resolver. Adapters only issue GET requests and never touch apply endpoints.
 
 | ATS | Endpoint | Company name in feed | Cache signals | Docs and robots findings (checked 2026-10-01) |
 | --- | --- | --- | --- | --- |

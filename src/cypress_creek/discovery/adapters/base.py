@@ -83,9 +83,63 @@ class ExistenceResult:
             raise ValueError("a board that was not found cannot have an organization name")
 
 
+class SkipReason(StrEnum):
+    """Why one job was left out of a board. Stable strings, never a feed value."""
+
+    INVALID_FIELD = "invalid_field"
+    EMPTY_TEXT = "empty_text"
+    CONTENT_TOO_LONG = "content_too_long"
+    CONTENT_UNREADABLE = "content_unreadable"
+
+
+@dataclass(frozen=True)
+class SkippedJob:
+    """One job left out of a board because it was malformed, with where and why.
+
+    index is the position in the feed's jobs array. job_id is only set when the feed's own id is
+    short and plain. field is the path inside the job, such as title. No feed value is stored.
+    """
+
+    index: int
+    job_id: str | None
+    field: str
+    reason_code: SkipReason
+
+    def __post_init__(self) -> None:
+        if self.index < 0:
+            raise ValueError("a skipped job needs a non negative index")
+        if not self.field:
+            raise ValueError("a skipped job needs a field")
+
+
+@dataclass(frozen=True)
+class BoardFetch:
+    """What one board fetch produced: the mapped listings and the jobs skipped."""
+
+    listings: tuple[Listing, ...]
+    skipped: tuple[SkippedJob, ...]
+
+
+# A board whose skipped jobs exceed this fraction of its jobs fails entirely with
+# FeedSchemaError. A feed wide change must not shrink the board silently, because the missing
+# jobs would later look closed.
+MAX_SKIPPED_FRACTION = 0.1
+
+
+def check_skip_budget(total: int, skipped: int) -> None:
+    """Raise FeedSchemaError for the jobs field when skipped / total exceeds the budget.
+
+    An empty board is valid. The error names only the field, never a count or a feed value.
+    """
+    if total < 0 or skipped < 0 or skipped > total:
+        raise ValueError("job counts must satisfy 0 <= skipped <= total")
+    if skipped and skipped / total > MAX_SKIPPED_FRACTION:
+        raise FeedSchemaError("jobs")
+
+
 class BoardAdapter(Protocol):
     """What every ATS adapter offers: read a whole board, or check that a board exists."""
 
-    def fetch_board(self, slug: str) -> list[Listing]: ...
+    def fetch_board(self, slug: str) -> BoardFetch: ...
 
     def probe(self, slug: str) -> ExistenceResult: ...

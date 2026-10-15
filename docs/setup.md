@@ -117,9 +117,10 @@ adapter = GreenhouseAdapter(client)
 probe = adapter.probe("stripe")
 print(f"probe: found={probe.found} has_name={probe.organization_name is not None}")
 
-listings = adapter.fetch_board("stripe")
-first = listings[0]
-print(f"listings: {len(listings)}")
+board = adapter.fetch_board("stripe")
+first = board.listings[0]
+print(f"listings: {len(board.listings)}")
+print(f"skipped:  {len(board.skipped)}")
 print(f"id:       {first.id}")
 print(f"title:    {first.title}")
 print(f"location: {first.location}")
@@ -132,14 +133,15 @@ Real output from a run on 2026-10-14 (the count and the first listing change as 
 
 ```text
 probe: found=True has_name=True
-listings: 723
-id:       greenhouse:stripe:8172508
+listings: 724
+skipped:  0
+id:       greenhouse:stripe:8172510
 title:    Abuse Investigator
-location: Dublin
+location: Seattle, San Francisco, New York City
 excerpt:  'Who we are'
 ```
 
-What it shows: `probe` asks whether the board exists and reports its organization name, and `fetch_board` returns one `Listing` per job, with an id of the form `greenhouse:slug:job_id`, the description as plain text and a SHA-256 `content_hash` of that text. A slug that does not exist makes `probe` return `found=False` and makes `fetch_board` raise `BoardNotFound`. A feed with the wrong shape raises `FeedSchemaError` naming the field. See [the board adapters architecture](architecture.md#board-adapters) and [ADR 0020](adr/0020-adapter-failure-modes.md).
+What it shows: `probe` asks whether the board exists and reports its organization name, and `fetch_board` returns a `BoardFetch`: one `Listing` per well formed job in `listings`, and one `SkippedJob` per malformed job in `skipped`. Each listing has with an id of the form `greenhouse:slug:job_id`, the description as plain text and a SHA-256 `content_hash` of that text. A slug that does not exist makes `probe` return `found=False` and makes `fetch_board` raise `BoardNotFound`. A malformed job is skipped and reported by index, field and reason. A feed with the wrong shape, or one that skips more than 10 percent of its jobs, raises `FeedSchemaError` naming the field. See [the board adapters architecture](architecture.md#board-adapters) [ADR 0020](adr/0020-adapter-failure-modes.md) and [ADR 0021](adr/0021-per-job-skipping.md).
 
 The real-network check runs the same adapter against the board, a made-up slug and the probe. It needs the internet and fails, never skips, when the network is unreachable:
 

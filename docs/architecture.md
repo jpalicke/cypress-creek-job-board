@@ -91,10 +91,11 @@ flowchart TD
     text --> norm["normalize"]
     norm --> hash["text_hash: sha256 hex"]
     hash --> listing["Listing"]
+    listing --> result["BoardFetch: listings and skipped jobs"]
 ```
 
 **The interface.**
-- `fetch_board(slug) -> list[Listing]` returns every job on the board.
+- `fetch_board(slug) -> BoardFetch` returns every well formed job on the board as `listings`, and each malformed job as a `SkippedJob` in `skipped`. `SkippedJob` holds the job's `index` in the feed, its `job_id` when plain, the `field` and a `reason_code`, never a feed value.
 - `probe(slug) -> ExistenceResult` says whether the board exists. `ExistenceResult(found, organization_name)` carries the organization name the ATS reports, which is the strong identity evidence for a suggestion. A result with `found=False` cannot carry a name.
 - `Listing` is a frozen dataclass shaped like a row of the listing table: `id`, `ats`, `slug`, `title`, `location`, `url`, `posted_at` (timezone aware, or `None`), `fetched_at` (UTC), `content_text`, `content_hash` and `state` (`ListingState`: `new`, `seen`, `closed`; an adapter always emits `new`). `listing_id(ats, slug, job_id)` is the one id format, `ats:slug:job_id`, for example `greenhouse:acme:12345`.
 
@@ -102,12 +103,13 @@ flowchart TD
 - `FeedSchemaError` (`feed_schema`) names the field path of the first problem, such as `jobs[3].title`, and never the value or the validator message.
 - `BoardNotFound` (`board_not_found`) names the ATS and the slug the caller supplied.
 
-**The Greenhouse mapping.** `GreenhouseAdapter` reads `/v1/boards/{slug}/jobs?content=true` for a board and `/v1/boards/{slug}` for the probe. For each job it validates the shape, then turns the description into text in a fixed order: unescape the HTML entities exactly once (the feed escapes the description HTML inside JSON), `html_to_text`, `normalize`, then `text_hash` of the normalized text. Titles and locations are normalized to one plain line with control characters stripped. [ADR 0020](adr/0020-adapter-failure-modes.md) records the choices below.
+**The Greenhouse mapping.** `GreenhouseAdapter` reads `/v1/boards/{slug}/jobs?content=true` for a board and `/v1/boards/{slug}` for the probe. For each job it validates the shape on its own, then turns the description into text in a fixed order: unescape the HTML entities exactly once (the feed escapes the description HTML inside JSON), `html_to_text`, `normalize`, then `text_hash` of the normalized text. Titles and locations are normalized to one plain line with control characters stripped. [ADR 0020](adr/0020-adapter-failure-modes.md) and [ADR 0021](adr/0021-per-job-skipping.md) record the choices below.
 
 **Failure modes.**
 | Cause | What the adapter does |
 | --- | --- |
-| The feed has the wrong shape (a missing or mistyped field, an over long value, a non http(s) job URL, an empty title or description) | Raises `FeedSchemaError` naming the field. The whole board is skipped, visibly. Other boards are unaffected because the error is per call. |
+| One job is malformed (a missing or mistyped field, an over long value, a non http(s) job URL, an empty title or description) | The job is skipped and listed in `BoardFetch.skipped` with its index, field and reason. The rest of the board is returned. A caller must not treat a fetch with skips as a full snapshot. |
+| More than 10 percent of a board's jobs are malformed, or the body or `jobs` list has the wrong shape | Raises `FeedSchemaError` naming the field (`jobs` for the budget). The whole board is skipped, visibly. Other boards are unaffected because the error is per call. |
 | HTTP 404 for the slug | `fetch_board` raises `BoardNotFound` so the caller can mark the watchlist entry broken. `probe` returns `found=False` without raising. |
 | HTTP 403, 410 or any other refused status | Propagates as `SafeHttpError` (`http_status`). It is never reported as a missing board. |
 | 429 or 5xx after the allowed retries | Propagates as `RetriesExhausted`. |
