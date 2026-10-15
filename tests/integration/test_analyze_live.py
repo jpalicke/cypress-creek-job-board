@@ -8,11 +8,14 @@ import httpx
 import pytest
 
 from cypress_creek.config import parse_settings
+from cypress_creek.eval_records import CaseRecord, RunHeader
 from cypress_creek.facts import load_bank
+from cypress_creek.facts.hashing import bank_hash
 from cypress_creek.ingest.hashing import text_hash
 from cypress_creek.ingest.models import Extractor, Posting, PostingSource
 from cypress_creek.pipeline.report import TRIAGE_DISCLAIMER, ReportStatus, verify_report
 from cypress_creek.pipeline.run import analyze
+from cypress_creek.pipeline.trace import PipelineTrace
 from cypress_creek.providers import OllamaProvider
 from cypress_creek.providers.budget import Budget, BudgetedProvider, BudgetTracker
 from cypress_creek.providers.ollama import DEFAULT_BASE_URL
@@ -74,10 +77,23 @@ def test_a_whole_run_gives_a_complete_or_cleanly_incomplete_report_with_no_uncit
     )
     inner = OllamaProvider(settings)
     tracker = BudgetTracker(Budget(), inner.capabilities.cost_per_mtok)
+    trace = PipelineTrace()
 
-    report = analyze(posting, bank, BudgetedProvider(inner, tracker), backend="ollama", model=MODEL)
+    report = analyze(
+        posting,
+        bank,
+        BudgetedProvider(inner, tracker),
+        backend="ollama",
+        model=MODEL,
+        trace=trace,
+    )
 
     assert tracker.requests >= 1
+    assert len(trace.calls) == tracker.requests
+    assert trace.calls[0].stage == "extract"
+    assert {call.stage for call in trace.calls} <= {"extract", "entail"}
+    assert [item.verdict.validator for item in trace.validators[-3:]] == ["V4", "V5", "V9"]
+    assert all(item.stage == "report" for item in trace.validators[-3:])
     assert report.status in {ReportStatus.COMPLETE, ReportStatus.INCOMPLETE}
     assert (report.status is ReportStatus.INCOMPLETE) == bool(report.incomplete_reasons)
     assert report.score_disclaimer == TRIAGE_DISCLAIMER
@@ -85,6 +101,27 @@ def test_a_whole_run_gives_a_complete_or_cleanly_incomplete_report_with_no_uncit
     assert report.provenance.run_id.startswith("run-")
     assert report.provenance.usage.input_tokens > 0
     verify_report(report, bank)
+    header = RunHeader(
+        git_commit="a" * 40,
+        backend="ollama",
+        model=MODEL,
+        prompt_hashes={call.stage: call.prompt_hash for call in trace.calls},
+        schema_versions={call.stage: call.schema_version for call in trace.calls},
+        fixture_set_hash="b" * 64,
+        bank_hash=bank_hash(bank),
+        case_ids=["live-case"],
+        repeats=1,
+    )
+    case = CaseRecord(
+        run_id=header.run_id,
+        case_id="live-case",
+        repeat=1,
+        posting_hash=posting.text_hash,
+        report=report,
+        calls=trace.calls,
+        validators=trace.validators,
+    )
+    assert CaseRecord.model_validate_json(case.model_dump_json()) == case
     for row in report.rows:
         assert set(row.fact_ids) <= {"F-0001"}
         assert row.support is Support.NONE or row.fact_ids

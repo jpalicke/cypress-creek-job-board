@@ -36,6 +36,7 @@ src/cypress_creek/       The library
     report.py            GapReport, build_report, verify_report, ReportRefused: stage 4, the report as data
     render.py            render_text: stage 5, the plain text view of a report
     run.py               analyze, assess, run_id: the whole run, with provenance and a run id derived from its inputs
+    trace.py             PipelineTrace, CallRecord, ValidatorRecord: observed calls and validator verdicts
     prompts/             Versioned system texts, one file per stage and version (extract_v2.txt, entail_v1.txt)
   ingest/                Untrusted posting text in, clean models out
     models.py            Posting, Requirement, typed warnings
@@ -119,6 +120,7 @@ flowchart LR
     norm --> posting[Posting]
     posting --> extract["pipeline.extract_requirements()"]
     extract --> reqs[Requirements]
+    extract -. attempted calls .-> trace["PipelineTrace: calls + verdicts"]
     migs[(storage/migrations/*.sql)] --> migrate["storage.migrate()"]
     migrate --> db[(data/cypress_creek.sqlite3)]
     evalstore["EvalStore: transactional eval runs"] --> db
@@ -133,6 +135,7 @@ flowchart LR
     ceiling --> score["scoring.score()"]
     score --> result["score, supported of total, inputs"]
     reqs -. model output .-> val["validators (V1 to V14)"]
+    val -. actual verdicts .-> trace
     discovery[Discovery caller] --> polite["discovery.polite_client.PoliteClient.get()"]
     polite --> cachefile[(fetch_cache/ by URL hash)]
     polite --> limiter["HostRateLimiter and FetchPolicy"]
@@ -158,12 +161,14 @@ See [the fetching architecture](architecture.md), [the SSRF rules and limits](th
 - **Safe by default config.** Backends default to loopback only, going remote needs `allow_remote`, and keys come from the environment alone. Config errors never echo a submitted value.
 - **Measured truncation signatures are refused.** The Ollama adapter estimates before the call and checks the reported count after it. It raises `ContextTruncated` when the estimate exceeds the configured context or the count matches a measured truncation signature. Other server behavior may need additional detection.
 - **Spend is capped before it happens.** `BudgetedProvider` checks the worst case (estimate plus output cap) against the run limits before a call and records the server's real usage after it. Real usage above an estimate blocks the next call, so the guard fails closed.
+- **Attempted failures count.** A provider error identifies whether a request was attempted and carries complete reported usage when known. The budget counts attempted failed requests, including reported tokens and cost; unknown usage blocks later calls. A preflight refusal spends no request. See [providers.md](providers.md#the-budget-guard).
 - **Posting text never leaves its block.** `build_prompt` puts the posting between boundary lines carrying a random 128 bit token, keeps it out of the system message and shows extraction no facts. It is the first layer only, the validators are the control.
 - **The model proposes, code decides.** The extraction model gives text, kind and term. Spans, ids and importance are set by code, and text that is not in the posting is dropped with a reason. See `pipeline.md`.
 - **Entailment can only lower support.** The model's verdict is clamped to the rule ceiling by code, and `Match` refuses support above its ceiling. A drop of any size is allowed. See [ADR 0011](adr/0011-entailment-can-only-lower-support.md).
 - **A positive verdict must cite.** `judge` counts a `supports` or `partial` verdict with no valid citation (candidate, verified, shareable) as `does_not_support`, and withholds any rationale that fails V7 to V10. See `pipeline.md`.
 - **A run id is derived, not random.** `run_id` hashes the posting, the fact bank, the backend and the model, so the same inputs give the same id and a changed input gives a new one. See `pipeline.md`.
 - **Eval resume identity is stricter than report identity.** `RunHeader.run_id` hashes the complete eval header, including commit, prompts, schemas, fixture set, bank, case plan and repeats. `EvalStore` validates SQLite records and resumes only unrecorded case pairs; JSONL is a read-only export, and only a terminal record marks a run complete. This is separate from the pipeline report's `run_id`, which intentionally excludes prompt versions. See [evals.md](evals.md#run-record-format) and [ADR 0018](adr/0018-eval-run-identity.md).
+- **The pipeline trace records what ran.** Pass a `PipelineTrace` to `analyze` or `assess` for per-attempt provider records and the actual validator verdicts. Extraction, entailment and report assembly append to the same trace. Missing usage is nullable, never guessed. The later eval CLI will persist these records through `EvalStore`. See [evals.md](evals.md#run-record-format).
 - **A report cites or is refused.** `build_report` ends with `verify_report` (V4, V5, V9), so a fabricated or unverified fact id never reaches a report. Failed stages make the report incomplete rather than quietly partial. See `pipeline.md`.
 - **Retrieval is not a model.** `retrieve` matches tags and aliases, ranks and caps the candidates, and sets the support ceiling. A requirement with no candidate is a gap and costs no model call. See `pipeline.md`.
 - **The sample bank and its gap table cannot drift.** `PLANTED_GAPS.md` is parsed by a test that runs each row through `retrieve`, so a bank edit that changes a gap fails the build. See `evals.md`.

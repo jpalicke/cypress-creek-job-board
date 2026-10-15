@@ -12,6 +12,7 @@ from cypress_creek.pipeline.entail import entail
 from cypress_creek.pipeline.extract import ExtractionResult, ExtractionStatus, extract_requirements
 from cypress_creek.pipeline.report import GapReport, Provenance, build_report
 from cypress_creek.pipeline.retrieve import retrieve
+from cypress_creek.pipeline.trace import PipelineTrace
 from cypress_creek.providers.base import Provider, Usage
 from cypress_creek.providers.retry import RetryPolicy
 from cypress_creek.scoring.aliases import AliasTable, load_aliases
@@ -43,6 +44,7 @@ def assess(
     weights: Weights | None = None,
     sleep: Callable[[float], None] = time.sleep,
     policy: RetryPolicy | None = None,
+    trace: PipelineTrace | None = None,
 ) -> GapReport:
     """Stages 2 to 5 over an extraction: retrieve, one entailment call per candidate, the report.
 
@@ -58,7 +60,7 @@ def assess(
             aliases or load_aliases(),
         )
         entailed = [
-            entail(requirement, candidate, bank, provider, sleep=sleep, policy=policy)
+            entail(requirement, candidate, bank, provider, sleep=sleep, policy=policy, trace=trace)
             for requirement, candidate in zip(extraction.requirements, candidates, strict=True)
         ]
     used = [extraction.usage, *(outcome.usage for outcome in entailed)]
@@ -77,7 +79,9 @@ def assess(
         prompt_hashes=prompt_hashes,
         usage=usage,
     )
-    return build_report(posting, extraction, candidates, entailed, bank, provenance, weights)
+    return build_report(
+        posting, extraction, candidates, entailed, bank, provenance, weights, trace=trace
+    )
 
 
 def analyze(
@@ -92,9 +96,12 @@ def analyze(
     weights: Weights | None = None,
     sleep: Callable[[float], None] = time.sleep,
     policy: RetryPolicy | None = None,
+    trace: PipelineTrace | None = None,
 ) -> GapReport:
     """The whole run over a normalized posting: extract its requirements, then assess them."""
-    extraction = extract_requirements(posting.text, provider, sleep=sleep, policy=policy)
+    extraction = extract_requirements(
+        posting.text, provider, sleep=sleep, policy=policy, trace=trace
+    )
     return assess(
         posting,
         extraction,
@@ -107,4 +114,5 @@ def analyze(
         weights=weights,
         sleep=sleep,
         policy=policy,
+        trace=trace,
     )

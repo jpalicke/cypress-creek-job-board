@@ -31,6 +31,7 @@ from cypress_creek.pipeline.report import (
 )
 from cypress_creek.pipeline.retrieve import RequirementCandidates, retrieve
 from cypress_creek.pipeline.schemas import EntailmentOutput, EntailmentVerdict, ExtractionOutput
+from cypress_creek.pipeline.trace import PipelineTrace
 from cypress_creek.providers import OllamaProvider
 from cypress_creek.providers.base import Capabilities, CostPerMtok, Usage
 from cypress_creek.scoring.aliases import load_aliases
@@ -168,6 +169,53 @@ def _stages(
 def _report(bank: Bank) -> GapReport:
     candidates, entailed = _stages(bank, REQUIREMENTS)
     return build_report(POSTING, _extraction(REQUIREMENTS), candidates, entailed, bank, PROVENANCE)
+
+
+def test_report_trace_records_all_executed_verdicts(bank: Bank) -> None:
+    trace = PipelineTrace()
+    candidates, entailed = _stages(bank, REQUIREMENTS)
+    report = build_report(
+        POSTING, _extraction(REQUIREMENTS), candidates, entailed, bank, PROVENANCE, trace=trace
+    )
+
+    assert report.status is ReportStatus.COMPLETE
+    assert [record.verdict.validator for record in trace.validators] == ["V4", "V5", "V9"]
+    assert all(
+        record.stage == "report" and record.subject == POSTING.id for record in trace.validators
+    )
+    assert all(record.verdict.passed for record in trace.validators)
+
+
+def test_report_trace_keeps_every_executed_verdict_when_refused(bank: Bank) -> None:
+    trace = PipelineTrace()
+    report = _report(bank)
+    row = report.rows[0].model_copy(update={"fact_ids": ["F-9999"]})
+    altered = report.model_copy(update={"rows": [row, *report.rows[1:]]})
+
+    with pytest.raises(ReportRefused, match="F-9999"):
+        verify_report(altered, bank, trace=trace)
+
+    assert [(record.verdict.validator, record.verdict.passed) for record in trace.validators] == [
+        ("V4", False),
+        ("V5", False),
+        ("V9", True),
+    ]
+
+
+def test_entail_trace_records_a_failed_real_request(bank: Bank) -> None:
+    trace = PipelineTrace()
+    candidate = retrieve(REQUIREMENTS[:1], bank, LOCAL, TODAY, load_aliases())[0]
+    outcome = entail(REQUIREMENTS[0], candidate, bank, _unreachable_provider(), trace=trace)
+
+    assert outcome.entailment is Entailment.NOT_RUN
+    assert len(trace.calls) == 1
+    call = trace.calls[0]
+    assert call.stage == "entail"
+    assert call.schema_version == 1
+    assert call.outcome == "error"
+    assert call.error_type == "ProviderUnavailable"
+    assert call.usage is None and call.cost_usd is None
+    assert trace.validators == []
 
 
 def test_a_report_with_a_fabricated_fact_id_is_refused(bank: Bank) -> None:

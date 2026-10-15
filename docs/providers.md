@@ -14,6 +14,9 @@ The provider layer is how the pipeline talks to a model. Every backend (local or
 
 ## Typed errors
 All in `providers/errors.py`, all subclasses of `ProviderError`. Callers branch on the class and never on the message text.
+An error also carries `request_attempted` and nullable `usage`, so a caller can distinguish a
+preflight refusal from a request that reached the adapter. The adapter attaches usage only when
+the backend reported both token counts. Neither field is inferred from the error message.
 
 | Error | Fields | Retried? |
 | --- | --- | --- |
@@ -68,9 +71,9 @@ Code is `src/cypress_creek/providers/budget.py`. A run has four limits, and a ca
 | `max_requests` | 500 | Number of calls |
 | `max_usd` | 2.0 | Dollars, from the backend's `cost_per_mtok`. Local backends cost nothing, so only the three token and request caps bite there |
 
-- `BudgetTracker(budget, cost_per_mtok)` keeps the totals. `check_before(input_tokens, max_output_tokens)` raises `BudgetExceeded` when the estimate plus the output cap (the worst case) would pass a limit. `record(usage)` adds what the server reported and never raises, so real usage above an estimate blocks the next call. The guard fails closed.
-- `BudgetedProvider(inner, tracker)` wraps any provider. Each call is estimated with `estimate_input_tokens` (the same estimate the Ollama pre-flight check uses), checked, sent, then recorded. A call that fails is not recorded.
-- `BudgetExceeded` carries `limit_name` (`input_tokens`, `output_tokens`, `requests` or `usd`), `limit` and `would_reach`. It is never retried.
+- `BudgetTracker(budget, cost_per_mtok)` keeps the totals. `check_before(input_tokens, max_output_tokens)` raises `BudgetExceeded` when the estimate plus the output cap (the worst case) would pass a limit. `record(usage)` adds reported usage. `record_attempt(usage)` also counts a failed request and adds its reported usage when known. Unknown usage blocks the next call because the remaining budget cannot be proven. Both methods leave a later overrun to `check_before`, so an attempted call is never erased.
+- `BudgetedProvider(inner, tracker)` wraps any provider. Each call is estimated with `estimate_input_tokens` (the same estimate the Ollama pre-flight check uses), checked, then sent. Successful and attempted failed requests count against the request cap. A preflight or budget refusal does not count as a request.
+- `BudgetExceeded` carries `limit_name` (`input_tokens`, `output_tokens`, `requests`, `usd` or `unknown_usage`), `limit` and `would_reach`. It is never retried.
 - `dry_run_estimate(provider, budget, plan)` takes a list of `PlannedCall` (system text, data block, `output_schema`, output cap) and returns a `CostEstimate` with the projected input tokens, output tokens (every call at its cap), requests and dollars. A plan that does not fit raises `BudgetExceeded`, with no call made.
 - The limits are optional settings, see Configuration. `budget_from_settings(settings)` turns them into a `Budget`, with the defaults above for anything unset.
 

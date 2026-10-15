@@ -9,6 +9,7 @@ from cypress_creek.facts.models import Bank
 from cypress_creek.ingest.models import Importance, Requirement, RequirementKind
 from cypress_creek.pipeline.entail import RATIONALE_WITHHELD, EntailedMatch, Entailment, judge
 from cypress_creek.pipeline.schemas import EntailmentOutput, EntailmentVerdict
+from cypress_creek.pipeline.trace import PipelineTrace
 from cypress_creek.providers.base import Capabilities, CostPerMtok
 from cypress_creek.scoring.support import Support
 
@@ -99,6 +100,44 @@ def _judge(
         bank,
         capabilities,
     )
+
+
+def test_trace_records_the_validators_that_judged_a_cited_answer(bank: Bank) -> None:
+    trace = PipelineTrace()
+    result = judge(_output(), REQUIREMENT, CANDIDATES, STRONG, bank, LOCAL, trace=trace)
+
+    assert result.match.support is STRONG
+    assert [record.verdict.validator for record in trace.validators] == [
+        "V4",
+        "V5",
+        "V6",
+        "V7",
+        "V8",
+        "V10",
+        "V9",
+    ]
+    assert [record.subject for record in trace.validators] == ["F-0001"] * 3 + ["R-1"] * 4
+    assert all(record.stage == "entail" for record in trace.validators)
+    assert all(record.verdict.passed for record in trace.validators)
+
+
+def test_trace_preserves_citation_short_circuit_for_unverified_fact(bank: Bank) -> None:
+    trace = PipelineTrace()
+    result = judge(
+        _output(fact_ids=["F-0003"]),
+        REQUIREMENT,
+        ["F-0003"],
+        STRONG,
+        bank,
+        LOCAL,
+        trace=trace,
+    )
+
+    assert result.match.support is NONE
+    assert [(record.verdict.validator, record.verdict.passed) for record in trace.validators] == [
+        ("V4", True),
+        ("V5", False),
+    ]
 
 
 def test_a_model_attempt_to_raise_support_is_clamped_and_counted(bank: Bank) -> None:

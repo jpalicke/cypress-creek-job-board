@@ -16,6 +16,7 @@ from cypress_creek.providers.base import (
 )
 from cypress_creek.providers.errors import (
     ContextTruncated,
+    ProviderError,
     ProviderUnavailable,
     RateLimited,
     SchemaViolation,
@@ -94,18 +95,27 @@ class OllamaProvider:
     ) -> StructuredResult[T]:
         input_tokens = estimate_input_tokens(self, system, data_block, schema)
         check_pre_flight(input_tokens, max_output_tokens, self._num_ctx)
-        body = self._chat(system, data_block, schema, max_output_tokens)
-        reported = usage_count(body, "prompt_eval_count")
-        check_post_flight(reported, input_tokens, self._num_ctx)
-        content = body.get("message", {}).get("content")
-        if not isinstance(content, str):
-            raise ProviderUnavailable("ollama", "response has no message content")
+        observed_usage: Usage | None = None
         try:
-            parsed = schema.model_validate_json(content)
-        except ValidationError as error:
-            raise SchemaViolation(schema.__name__, describe_validation_error(error)) from None
-        usage = Usage(input_tokens=reported, output_tokens=usage_count(body, "eval_count"))
-        return StructuredResult(parsed=parsed, raw_text=content, usage=usage)
+            body = self._chat(system, data_block, schema, max_output_tokens)
+            reported = usage_count(body, "prompt_eval_count")
+            output = body.get("eval_count")
+            if isinstance(output, int) and not isinstance(output, bool) and output >= 0:
+                observed_usage = Usage(input_tokens=reported, output_tokens=output)
+            check_post_flight(reported, input_tokens, self._num_ctx)
+            message = body.get("message")
+            content = message.get("content") if isinstance(message, dict) else None
+            if not isinstance(content, str):
+                raise ProviderUnavailable("ollama", "response has no message content")
+            try:
+                parsed = schema.model_validate_json(content)
+            except ValidationError as error:
+                raise SchemaViolation(schema.__name__, describe_validation_error(error)) from None
+            usage = Usage(input_tokens=reported, output_tokens=usage_count(body, "eval_count"))
+            return StructuredResult(parsed=parsed, raw_text=content, usage=usage)
+        except ProviderError as error:
+            error.mark_attempt(observed_usage)
+            raise
 
     def _chat[T: BaseModel](
         self, system: str, data_block: str, schema: type[T], max_output_tokens: int

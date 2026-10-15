@@ -13,7 +13,7 @@ from cypress_creek.providers.base import (
     Usage,
     estimate_input_tokens,
 )
-from cypress_creek.providers.errors import BudgetExceeded
+from cypress_creek.providers.errors import BudgetExceeded, ProviderError
 
 TOKENS_PER_MTOK = 1_000_000
 
@@ -46,6 +46,7 @@ class BudgetTracker:
         self.input_tokens = 0
         self.output_tokens = 0
         self.requests = 0
+        self.unknown_usage_requests = 0
         self.usd = 0.0
 
     def cost_usd(self, input_tokens: int, output_tokens: int) -> float:
@@ -58,6 +59,8 @@ class BudgetTracker:
 
         The output cap is the worst case, so the dollar check is a ceiling on what the call costs.
         """
+        if self.unknown_usage_requests:
+            raise BudgetExceeded("unknown_usage", 0, self.unknown_usage_requests)
         limits = self.budget
         projected = {
             "input_tokens": (limits.max_input_tokens, self.input_tokens + input_tokens),
@@ -71,9 +74,16 @@ class BudgetTracker:
 
     def record(self, usage: Usage) -> None:
         """Add what the server reported. It never raises, the next check_before does."""
+        self.record_attempt(usage)
+
+    def record_attempt(self, usage: Usage | None) -> None:
+        """Count a sent attempt, keeping unreported usage distinct from zero usage."""
+        self.requests += 1
+        if usage is None:
+            self.unknown_usage_requests += 1
+            return
         self.input_tokens += usage.input_tokens
         self.output_tokens += usage.output_tokens
-        self.requests += 1
         self.usd += self.cost_usd(usage.input_tokens, usage.output_tokens)
 
 
@@ -96,7 +106,12 @@ class BudgetedProvider:
     ) -> StructuredResult[T]:
         estimate = estimate_input_tokens(self._inner, system, data_block, schema)
         self.tracker.check_before(estimate, max_output_tokens)
-        result = self._inner.complete_structured(system, data_block, schema, max_output_tokens)
+        try:
+            result = self._inner.complete_structured(system, data_block, schema, max_output_tokens)
+        except ProviderError as error:
+            if error.request_attempted:
+                self.tracker.record_attempt(error.usage)
+            raise
         self.tracker.record(result.usage)
         return result
 

@@ -1,7 +1,8 @@
 # Evals
 
 The eval harness measures the pipeline against a fixed, fictional fact bank. The run record
-format is available now. The runner, postings and hand labels come in later cards.
+format and production pipeline trace are available now. The CLI runner, postings and hand
+labels come in later cards.
 
 ## Run record format
 
@@ -17,7 +18,7 @@ terminal when the same run resumes. A `complete` terminal requires every planned
 | Row | Required audit data |
 | --- | --- |
 | `header` | Git commit, provider, exact model, prompt hashes and schema versions by stage, fixture set hash, bank hash, ordered case IDs and repeat count. `format_version` is 1. |
-| `case` | Run ID, case ID, repeat number, posting hash, full gap report, every recorded provider call with stage, prompt hash, schema version, token usage and dollar cost, and each recorded validator verdict with stage and subject. |
+| `case` | Run ID, case ID, repeat number, posting hash, full gap report, every attempted provider call with stage, prompt hash, schema version, outcome, error type when applicable, nullable observed token usage and dollar cost, and each recorded validator verdict with stage and subject. |
 | `terminal` | Run ID, `complete` or `failed` status, and a reason for failure. |
 
 The run ID is a SHA-256 digest of the canonical header. A changed commit, model, prompt,
@@ -27,6 +28,17 @@ marker. `RunState.pending_pairs` lists only pairs without a complete case row. A
 pipeline report can still be a completed measurement for its case; its failure remains in the
 report. The module records outcomes supplied by the runner, without making model calls or
 inventing validator verdicts.
+
+`PipelineTrace` in `cypress_creek.pipeline.trace` collects those call and validator records in
+memory for one analysis. Pass `trace=PipelineTrace()` to `analyze` or `assess` and read its
+`calls` and `validators` after the run. Extraction and entailment record each attempted provider
+call, including retry attempts and failures. A preflight or budget refusal makes no call record.
+Usage and cost stay `None` when the backend did not report complete usage; they are never
+estimated for the audit. Entailment records only validators actually reached by its citation
+and rationale checks. Report verification records V4, V5 and V9, including failed verdicts.
+Validator verdicts can contain offending text from a posting or model rationale, so treat a
+trace and its eventual audit export as sensitive run data.
+The CLI runner that persists these records in SQLite is a later card.
 
 Each append commits as one SQLite transaction, so an interrupted write cannot leave a partial
 case record. The `0004_eval_runs.sql` migration adds these tables to the existing database in
