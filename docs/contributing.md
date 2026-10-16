@@ -27,6 +27,8 @@ The polite fetch layer has a `needs_network` integration test that fetches a rea
 
 The Greenhouse adapter has a `needs_network` integration test that maps a real large public board to listings through the real polite client, checks that its skipped jobs stay within the skip budget, then probes a real board and a made-up slug: `uv run pytest tests/integration/test_greenhouse_network.py -q`. It needs the internet and fails, never skips, when the network is unreachable. Run it when you touch anything under `discovery/adapters/` or the transport's 404 handling.
 
+The Lever adapter has its own `needs_network` integration test: it reads a real large public board across pages (at a page size of 10, about 32 requests, so it takes about a minute and a half), probes it, probes and fetches a made-up slug, and finds a real board that lives only on the EU host: `uv run pytest tests/integration/test_lever_network.py -q`. It needs the internet and fails, never skips, when the network is unreachable. Run it when you touch `discovery/adapters/lever.py`, `discovery/adapters/feed_common.py` or the paging.
+
 The integration and e2e tiers are not in the gated run, so run them by hand when you touch what they cover. For the blacklist: `uv run pytest tests/e2e/test_blacklist_process.py tests/integration/test_blacklist_dns.py -q`. The e2e file starts real child Python processes against a real temp SQLite file. The integration file is marked `needs_network` and resolves a real host, so an unreachable network makes it fail, never skip.
 
 ## Documentation checklist
@@ -35,7 +37,7 @@ Before a PR is ready, in the same PR:
 - README.md status and "Try what exists" reflect what now works.
 - The docs index (docs/README.md) lists any new doc or decision record.
 - docs/codebase.md matches the code: layout, the flow diagram and the module list.
-- A new design decision has an ADR in `docs/adr/`. Numbers are sequential and the latest is 0019, so the next free number is 0020. Check `ls docs/adr` before you pick one.
+- A new design decision has an ADR in `docs/adr/`. Numbers are sequential and the latest is 0022, so the next free number is 0023. Check `ls docs/adr` before you pick one.
 - Configuration files (for example `config/aliases.yaml`) are described in the doc that owns them.
 
 ## Setup

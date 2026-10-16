@@ -150,3 +150,68 @@ uv run pytest tests/integration/test_greenhouse_network.py -q
 ```
 
 Real output from the same day: `5 passed in 5.88s`.
+
+## Fetch a Lever board
+
+`LeverAdapter` reads one public Lever board through `PoliteClient` and returns normalized `Listing` rows. It is a library call, like the Greenhouse one. A Lever feed is paged, so `fetch_board` makes one request per page: a board of a few hundred postings is a few requests at the default page size of 100, each a second apart, and a page with full descriptions is about 2 MB. The cache goes in a throwaway directory. The client must be built with `LEVER_FETCH_LIMITS`, because the default limits allow neither JSON nor a body this large. From the repository root, in a bash shell:
+
+```bash
+export CYPRESS_CREEK_DATA_DIR="$(mktemp -d)"
+uv run python - <<'PY'
+from cypress_creek.discovery.adapters.lever import LEVER_FETCH_LIMITS, LeverAdapter
+from cypress_creek.discovery.cache import ResponseCache, default_cache_dir
+from cypress_creek.discovery.fetch_policy import FetchPolicy
+from cypress_creek.discovery.polite_client import PoliteClient
+from cypress_creek.discovery.rate_limiter import HostRateLimiter, SystemClock
+
+policy = FetchPolicy()
+clock = SystemClock()
+client = PoliteClient(
+    policy,
+    ResponseCache(default_cache_dir()),
+    HostRateLimiter(clock, policy.per_host_delay_seconds),
+    clock,
+    limits=LEVER_FETCH_LIMITS,
+)
+adapter = LeverAdapter(client)
+
+probe = adapter.probe("palantir")
+print(f"probe: found={probe.found} has_name={probe.organization_name is not None}")
+print(f"region: {adapter.region_of('palantir')}")
+
+board = adapter.fetch_board("palantir")
+first = board.listings[0]
+print(f"listings: {len(board.listings)}")
+print(f"skipped:  {len(board.skipped)}")
+print(f"id:       {first.id}")
+print(f"title:    {first.title}")
+print(f"location: {first.location}")
+print(f"posted:   {first.posted_at:%Y-%m-%d}")
+print(f"excerpt:  {first.content_text[:10]!r}")
+PY
+unset CYPRESS_CREEK_DATA_DIR
+```
+
+Real output from a run on 2026-10-14 (the count and the first listing change as the board changes). The snippet prints only whether the board reported a name and a ten character excerpt, so the output stays generic:
+
+```text
+probe: found=True has_name=False
+region: us
+listings: 314
+skipped:  0
+id:       lever:palantir:6ed76ce8-4156-4b60-b120-403538bd66cd
+title:    Administrative Business Partner
+location: Singapore, Singapore
+posted:   2026-08-11
+excerpt:  'A World-Ch'
+```
+
+What it shows: `probe` asks whether the board exists. Lever reports no organization name, so `probe` returns `found=True` with `organization_name=None`, and the slug is the identity. `region` is where the adapter found the board (`us` or `eu`), kept in memory only. `fetch_board` returns a `BoardFetch` as the Greenhouse adapter does, with an id of the form `lever:slug:posting_id`, a timezone aware `posted_at` from the feed's epoch milliseconds, and the description as plain text (the description, each list heading and its content, then the additional text). An EU board is found the same way: the adapter asks the US host first, and only a 404 moves it on to `api.eu.lever.co`. A slug that exists on neither host makes `probe` return `found=False` and makes `fetch_board` raise `BoardNotFound`. A board still full after 50 pages raises `FeedSchemaError` naming `jobs` instead of returning part of the board. Pass `page_size` (1 to 100) to the adapter to use smaller pages. See [the board adapters architecture](architecture.md#board-adapters) and [ADR 0022](adr/0022-lever-pagination-and-region.md).
+
+The real-network check reads the board at a page size of 10 (about 32 requests, so it is slow), the probe, a made-up slug, and a board that lives only on the EU host. It needs the internet and fails, never skips, when the network is unreachable. The EU board had no open postings when it was recorded, so that test asserts the probe, the region and a clean fetch, not a posting count:
+
+```bash
+uv run pytest tests/integration/test_lever_network.py -q
+```
+
+Real output from the same day: `7 passed in 88.60s`.

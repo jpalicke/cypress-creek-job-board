@@ -78,7 +78,7 @@ See [the threat model](threat-model.md) for rules, error reasons and executable 
 
 ## Board adapters
 
-An adapter reads one ATS board and returns listings in the common shape. Adapters only issue GET requests, only through `PoliteClient`, and never touch an apply endpoint. Code that needs a board depends on the `BoardAdapter` protocol in `discovery/adapters/base.py`, not on a vendor.
+An adapter reads one ATS board and returns listings in the common shape. Adapters only issue GET requests, only through `PoliteClient`, and never touch an apply endpoint. Code that needs a board depends on the `BoardAdapter` protocol in `discovery/adapters/base.py`, not on a vendor. Two adapters exist, `GreenhouseAdapter` and `LeverAdapter`. They share the strict feed model base and the text cleanup in `discovery/adapters/feed_common.py` (`FeedModel`, `field_path`, `plain_line`).
 
 ```mermaid
 flowchart TD
@@ -86,7 +86,7 @@ flowchart TD
     adapter --> client["PoliteClient.get"]
     client --> feed["Public board feed: bytes, hostile input"]
     feed --> schema["pydantic feed models: strict, extra fields ignored"]
-    schema --> unescape["html.unescape, exactly once"]
+    schema --> unescape["Greenhouse only: html.unescape, exactly once"]
     unescape --> text["html_to_text"]
     text --> norm["normalize"]
     norm --> hash["text_hash: sha256 hex"]
@@ -96,7 +96,7 @@ flowchart TD
 
 **The interface.**
 - `fetch_board(slug) -> BoardFetch` returns every well formed job on the board as `listings`, and each malformed job as a `SkippedJob` in `skipped`. `SkippedJob` holds the job's `index` in the feed, its `job_id` when plain, the `field` and a `reason_code`, never a feed value.
-- `probe(slug) -> ExistenceResult` says whether the board exists. `ExistenceResult(found, organization_name)` carries the organization name the ATS reports, which is the strong identity evidence for a suggestion. A result with `found=False` cannot carry a name.
+- `probe(slug) -> ExistenceResult` says whether the board exists. `ExistenceResult(found, organization_name)` carries the organization name the ATS reports, which is the strong identity evidence for a suggestion. A result with `found=False` cannot carry a name. Lever reports no name, so its probe returns `found=True` with `organization_name=None` and the slug is the identity.
 - `Listing` is a frozen dataclass shaped like a row of the listing table: `id`, `ats`, `slug`, `title`, `location`, `url`, `posted_at` (timezone aware, or `None`), `fetched_at` (UTC), `content_text`, `content_hash` and `state` (`ListingState`: `new`, `seen`, `closed`; an adapter always emits `new`). `listing_id(ats, slug, job_id)` is the one id format, `ats:slug:job_id`, for example `greenhouse:acme:12345`.
 
 **Typed errors.** All derive from `AdapterError` and carry a stable `reason_code`. None echoes a value taken from a feed.
@@ -105,16 +105,45 @@ flowchart TD
 
 **The Greenhouse mapping.** `GreenhouseAdapter` reads `/v1/boards/{slug}/jobs?content=true` for a board and `/v1/boards/{slug}` for the probe. For each job it validates the shape on its own, then turns the description into text in a fixed order: unescape the HTML entities exactly once (the feed escapes the description HTML inside JSON), `html_to_text`, `normalize`, then `text_hash` of the normalized text. Titles and locations are normalized to one plain line with control characters stripped. [ADR 0020](adr/0020-adapter-failure-modes.md) and [ADR 0021](adr/0021-per-job-skipping.md) record the choices below.
 
-**Failure modes.**
+**The Lever mapping.** `LeverAdapter` reads `/v0/postings/{slug}?mode=json&limit=N&skip=M`. Each response page is a bare JSON array of postings. The adapter gathers every page, then maps the whole board at once, so the skip budget and the `SkippedJob.index` apply over the board and not per page. For each posting it validates the shape on its own. The title is `text`, the location is `categories.location`, the URL is `hostedUrl`, and `createdAt` (epoch milliseconds) becomes a timezone aware `posted_at`. The description is real HTML, not escaped HTML, so there is no `html.unescape` step. Its text is `description`, then each `lists` entry's heading (one plain line) and `content`, then `additional`. Each part goes through `html_to_text` on its own, the parts are joined by blank lines, and the result goes through `normalize` and `text_hash`. The posting id must be short and plain (letters, digits, `_` and `-`, at most 64), because it becomes part of the listing id `lever:slug:id`. [ADR 0022](adr/0022-lever-pagination-and-region.md) records the choices below.
+
+```mermaid
+flowchart TD
+    start["fetch_board(slug) or probe(slug)"] --> known{"region known in memory?"}
+    known -- yes --> one["ask that host only"]
+    known -- no --> us["GET api.lever.co first page"]
+    us -- 404 --> eu["GET api.eu.lever.co first page"]
+    us -- 200 --> paged
+    eu -- 200 --> paged
+    eu -- 404 --> missing["BoardNotFound, or found=False from probe"]
+    one -- 200 --> paged
+    one -- 404 --> forget["forget the region, BoardNotFound"]
+    paged{"page shorter than page_size?"}
+    paged -- yes --> done["map all postings once, check the skip budget, remember the region"]
+    paged -- no, fewer than 50 pages --> more["GET the next skip, drop repeated ids"]
+    more --> paged
+    paged -- no, 50 full pages --> cap["FeedSchemaError for jobs"]
+```
+
+- **Paging.** `page_size` is 1 to 100 (default 100). A page shorter than `page_size` ends the board, and an empty page ends a board whose size is an exact multiple. `MAX_PAGES` is 50, so a board still full after 50 pages raises `FeedSchemaError` for `jobs` instead of returning a truncated board. A posting id that arrives on a second page is dropped, and the first copy stays.
+- **Region.** `probe` and a first `fetch_board` ask the US host, then the EU host, one request at a time. Only a 404 moves on to the next host, and any other refusal propagates. `region_of(slug)` returns the host a board was found on (`LeverRegion.US` or `LeverRegion.EU`), or `None`. It lives in the adapter object only and is never written to disk. Persisting it on the watchlist entry is left to the discovery cards H1 (#40) and H8 (#47); a follow up issue will track it. A 404 from a remembered host, or on a later page, forgets the region and raises `BoardNotFound` without trying the other host.
+- **Probe.** `probe` requests one posting (`limit=1`). A board with no open postings answers 200 with `[]` and is found. A 404 from both hosts is `found=False`.
+
+**Failure modes.** The table applies to both adapters unless a row names one.
 | Cause | What the adapter does |
 | --- | --- |
 | One job is malformed (a missing or mistyped field, an over long value, a non http(s) job URL, an empty title or description) | The job is skipped and listed in `BoardFetch.skipped` with its index, field and reason. The rest of the board is returned. A caller must not treat a fetch with skips as a full snapshot. |
 | More than 10 percent of a board's jobs are malformed, or the body or `jobs` list has the wrong shape | Raises `FeedSchemaError` naming the field (`jobs` for the budget). The whole board is skipped, visibly. Other boards are unaffected because the error is per call. |
-| HTTP 404 for the slug | `fetch_board` raises `BoardNotFound` so the caller can mark the watchlist entry broken. `probe` returns `found=False` without raising. |
+| HTTP 404 for the slug (Lever: from both hosts) | `fetch_board` raises `BoardNotFound` so the caller can mark the watchlist entry broken. `probe` returns `found=False` without raising. |
+| Lever: the body is not a JSON array | Raises `FeedSchemaError` naming `$`, the whole body. |
+| Lever: the board is still full after 50 pages | Raises `FeedSchemaError` naming `jobs`. No partial board is returned. |
+| Lever: the same posting id on two pages | The first copy is kept and the later one is dropped. |
 | HTTP 403, 410 or any other refused status | Propagates as `SafeHttpError` (`http_status`). It is never reported as a missing board. |
 | 429 or 5xx after the allowed retries | Propagates as `RetriesExhausted`. |
 | A blocked address, wrong content type, timeout or oversize body | Propagates from the transport unchanged. |
 
 **Limits.** `GREENHOUSE_FETCH_LIMITS` allows 64 MiB on the wire and decoded, a 60 second total timeout and `application/json` only, because a large board with full descriptions is many megabytes. Titles, locations and board names are at most 1000 characters and a job URL at most 2048. There is no pagination: one response holds the whole board.
+
+`LEVER_FETCH_LIMITS` allows 16 MiB on the wire and decoded, a 60 second total timeout and `application/json` only. A real page of 100 postings with full descriptions measured 1.9 MB on 2026-10-14, so the cap is about eight times that. Titles, locations and list headings are at most 1000 characters and a posting URL at most 2048. The client must be built with these limits.
 
 The adapter does not decide what to do with an error. The caller (the scan, later cards) turns `BoardNotFound` into a broken watchlist entry and any other error into a visible failure for that board only.
