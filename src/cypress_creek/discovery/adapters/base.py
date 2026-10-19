@@ -114,10 +114,15 @@ class SkippedJob:
 
 @dataclass(frozen=True)
 class BoardFetch:
-    """What one board fetch produced: the mapped listings and the jobs skipped."""
+    """What one board fetch produced: the mapped listings and the jobs skipped.
+
+    unlisted is the count of jobs the feed marks as not listed. They are dropped on purpose, so
+    they are neither listings nor skipped jobs, and they do not count toward the skip budget.
+    """
 
     listings: tuple[Listing, ...]
     skipped: tuple[SkippedJob, ...]
+    unlisted: int = 0
 
 
 # A board whose skipped jobs exceed this fraction of its jobs fails entirely with
