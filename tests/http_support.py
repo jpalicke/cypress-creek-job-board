@@ -28,6 +28,7 @@ class Requests:
 def http_server(
     json_routes: dict[str, bytes] | None = None,
     status_routes: dict[str, str] | None = None,
+    etags: dict[str, str] | None = None,
 ) -> Iterator[tuple[int, Requests]]:
     requests = Requests()
 
@@ -56,6 +57,13 @@ def http_server(
                     elif route in json_routes:
                         fields = [("Content-Type", "application/json")]
                         body = json_routes[route]
+                        # A json route may carry an ETag, and answers 304 to a matching one.
+                        if etags is not None and route in etags:
+                            fields.append(("ETag", etags[route]))
+                            if headers.get("if-none-match") == etags[route]:
+                                status = "304 Not Modified"
+                                fields = [("ETag", etags[route])]
+                                body = b""
                     else:
                         status = "404 Not Found"
                 elif route.startswith("/redirect/"):

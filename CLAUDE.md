@@ -15,8 +15,8 @@ No auto apply. Ever. A human reviews every draft.
 - Before reporting a card done, audit every doc (docs/handoff.md has the list) and run each doc command.
 - A new contributor or assistant starts at docs/handoff.md, which is the full card routine.
 - Branch per task. Open a PR. Merge to main after review. No worktrees.
-- PRs aim for at most 10 changed files, hard cap 20. Split big cards into several PRs, each with its own docs. Propose the split before starting.
-- At most 5 files per phase. Run verification, then wait for approval.
+- PRs aim for roughly 20 changed files. Split a card that would go well past that into several PRs, each with its own docs. Propose the split before starting.
+- Phases may be up to about 20 files, as long as the PR stays near 20. Run verification, then wait for approval.
 - Development goes through the subagent development skill.
 - Never use --no-verify, --no-hooks or any hook bypass. If a hook fails, fix the cause.
 - Commit messages and PR text carry no attribution lines.

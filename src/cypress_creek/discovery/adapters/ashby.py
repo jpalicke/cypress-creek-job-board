@@ -2,14 +2,16 @@
 # ABOUTME: The feed is hostile input. It is validated, normalized and never echoed in errors.
 import json
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated, Any
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 from pydantic import AwareDatetime, StringConstraints, ValidationError, field_validator
 
 from cypress_creek.discovery.adapters.base import (
     BoardFetch,
+    BoardNotFound,
+    ExistenceResult,
     FeedSchemaError,
     Listing,
     ListingState,
@@ -19,10 +21,12 @@ from cypress_creek.discovery.adapters.base import (
     listing_id,
 )
 from cypress_creek.discovery.adapters.feed_common import FeedModel, field_path, plain_line
+from cypress_creek.discovery.polite_client import CachedResponse, NotFound, PoliteClient
 from cypress_creek.discovery.tombstones import normalize_board
 from cypress_creek.ingest.errors import EmptyPosting, PostingTooLong
 from cypress_creek.ingest.html_text import HtmlTextError, html_to_text
 from cypress_creek.ingest.normalize import normalize, text_hash
+from cypress_creek.ingest.safe_http import FetchLimits
 
 ATS = "ashby"
 
@@ -171,3 +175,58 @@ def parse_board_response(slug: str, body: bytes, fetched_at: datetime) -> BoardF
             listings.append(mapped)
     check_skip_budget(len(response.jobs) - unlisted, len(skipped))
     return BoardFetch(listings=tuple(listings), skipped=tuple(skipped), unlisted=unlisted)
+
+
+DEFAULT_BASE_URL = "https://api.ashbyhq.com/posting-api/job-board"
+# A real board of 63 jobs with full descriptions measured 1.95 MB on 2026-10-19. Ashby has no
+# page size, so a board is one response. The cap leaves about eight times that, for boards with
+# long descriptions.
+ASHBY_FETCH_LIMITS = FetchLimits(
+    max_wire_bytes=16 * 1024 * 1024,
+    max_decoded_bytes=16 * 1024 * 1024,
+    total_timeout=60.0,
+    content_types=frozenset({"application/json"}),
+)
+
+
+class AshbyAdapter:
+    """Reads public Ashby boards. Every request is a GET through the polite client.
+
+    A board is one response with no paging. No compensation data is asked for.
+    """
+
+    def __init__(self, client: PoliteClient, *, base_url: str = DEFAULT_BASE_URL) -> None:
+        self._client = client
+        self._base_url = base_url.rstrip("/")
+
+    def probe(self, slug: str) -> ExistenceResult:
+        """Whether the board exists. Ashby reports no organization name.
+
+        Only the status is judged, never the body, so a 200 means found even for a board with no
+        jobs or a body of an unexpected shape. Reading the body is fetch_board's job. Ashby has no
+        limit parameter, so this reads the whole board. It uses the same URL as fetch_board, so
+        that the cache serves the fetch that follows.
+        """
+        try:
+            self._get(slug)
+        except NotFound:
+            return ExistenceResult(found=False, organization_name=None)
+        return ExistenceResult(found=True, organization_name=None)
+
+    def fetch_board(self, slug: str) -> BoardFetch:
+        """Every listed job on the board, the jobs skipped, and the jobs left unlisted.
+
+        Raises BoardNotFound on a 404 and FeedSchemaError for a body of the wrong shape.
+        """
+        try:
+            response = self._get(slug)
+        except NotFound:
+            # Only a 404 means there is no such board. Any other refused status, such as a 403,
+            # propagates as a transport error and is never reported as missing.
+            raise BoardNotFound(ATS, slug) from None
+        fetched_at = datetime.fromtimestamp(response.fetched_at, UTC)
+        return parse_board_response(slug, response.body, fetched_at)
+
+    def _get(self, slug: str) -> CachedResponse:
+        board = normalize_board(ATS, slug)[1]
+        return self._client.get(f"{self._base_url}/{quote(board, safe='')}")
