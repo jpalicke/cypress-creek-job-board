@@ -7,13 +7,7 @@ from datetime import UTC, datetime
 from typing import Annotated, Any
 from urllib.parse import quote, urlsplit
 
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    StringConstraints,
-    ValidationError,
-    field_validator,
-)
+from pydantic import StringConstraints, ValidationError, field_validator
 
 from cypress_creek.discovery.adapters.base import (
     BoardFetch,
@@ -27,6 +21,7 @@ from cypress_creek.discovery.adapters.base import (
     check_skip_budget,
     listing_id,
 )
+from cypress_creek.discovery.adapters.feed_common import FeedModel, field_path, plain_line
 from cypress_creek.discovery.polite_client import CachedResponse, NotFound, PoliteClient
 from cypress_creek.discovery.tombstones import normalize_board
 from cypress_creek.ingest.errors import EmptyPosting, PostingTooLong
@@ -51,15 +46,11 @@ _ShortText = Annotated[str, StringConstraints(max_length=_MAX_FIELD_CHARS)]
 _PLAIN_JOB_ID = re.compile(r"[A-Za-z0-9_-]{1,64}")
 
 
-class _FeedModel(BaseModel):
-    model_config = ConfigDict(extra="ignore", strict=True, frozen=True)
-
-
-class _Location(_FeedModel):
+class _Location(FeedModel):
     name: _ShortText | None = None
 
 
-class _Job(_FeedModel):
+class _Job(FeedModel):
     id: int
     title: _ShortText
     location: _Location | None = None
@@ -76,39 +67,22 @@ class _Job(_FeedModel):
         return value
 
 
-class _JobsResponse(_FeedModel):
+class _JobsResponse(FeedModel):
     """The top level of a jobs response. Each job is validated on its own, later."""
 
     jobs: list[Any]
 
 
-class _BoardInfo(_FeedModel):
+class _BoardInfo(FeedModel):
     name: _ShortText
 
 
-def _field_path(location: tuple[int | str, ...]) -> str:
-    """A path such as jobs[3].title. An error on the whole body is named $."""
-    path = ""
-    for part in location:
-        path += f"[{part}]" if isinstance(part, int) else f"{'.' if path else ''}{part}"
-    return path or "$"
-
-
-def _validated[ModelT: _FeedModel](model: type[ModelT], body: bytes) -> ModelT:
+def _validated[ModelT: FeedModel](model: type[ModelT], body: bytes) -> ModelT:
     try:
         return model.model_validate_json(body)
     except ValidationError as error:
         # Only the location of the first problem is used, never its message or input value.
-        raise FeedSchemaError(_field_path(error.errors()[0]["loc"])) from None
-
-
-def _plain_line(raw: str) -> str:
-    """Hostile text as one plain line: control characters stripped, whitespace collapsed."""
-    try:
-        text, _ = normalize(raw)
-    except EmptyPosting:
-        return ""
-    return " ".join(text.split())
+        raise FeedSchemaError(field_path(error.errors()[0]["loc"])) from None
 
 
 def _skip(index: int, raw: object, field: str, reason: SkipReason) -> SkippedJob:
@@ -131,14 +105,14 @@ def _validated_job(raw: object) -> _Job | str:
         return _Job.model_validate_json(json.dumps(raw))
     except ValidationError as error:
         # Only the location of the first problem is used, never its message or input value.
-        return _field_path(error.errors()[0]["loc"])
+        return field_path(error.errors()[0]["loc"])
 
 
 def _map_job(slug: str, index: int, raw: object, fetched_at: datetime) -> Listing | SkippedJob:
     job = _validated_job(raw)
     if isinstance(job, str):
         return _skip(index, raw, job, SkipReason.INVALID_FIELD)
-    title = _plain_line(job.title)
+    title = plain_line(job.title)
     if not title:
         return _skip(index, raw, "title", SkipReason.EMPTY_TEXT)
     try:
@@ -155,7 +129,7 @@ def _map_job(slug: str, index: int, raw: object, fetched_at: datetime) -> Listin
         ats=ATS,
         slug=normalize_board(ATS, slug)[1],
         title=title,
-        location=_plain_line(job.location.name or "") if job.location else "",
+        location=plain_line(job.location.name or "") if job.location else "",
         url=job.absolute_url,
         posted_at=job.first_published,
         fetched_at=fetched_at,
@@ -186,7 +160,7 @@ def parse_jobs_response(slug: str, body: bytes, fetched_at: datetime) -> BoardFe
 
 def parse_board_name(body: bytes) -> str:
     """The organization name from a board info response, as one plain line."""
-    name = _plain_line(_validated(_BoardInfo, body).name)
+    name = plain_line(_validated(_BoardInfo, body).name)
     if not name:
         raise FeedSchemaError("name")
     return name
