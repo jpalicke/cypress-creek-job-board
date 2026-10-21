@@ -7,7 +7,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [codebase.md](codebase.md) | Start here if you are new: layout, how the pieces fit, ideas to know, how a card goes |
 | [data-model.md](data-model.md) | The fact bank, Posting and Requirement, and the tag alias table (`config/aliases.yaml`) the company name key (`company_key`), the SQLite storage and migrations, and the discovery tables (watchlist, denied companies, blacklist and its filter) |
 | [pipeline.md](pipeline.md) | HTML posting text extraction, posting normalization, the prompt builder (extraction and entailment prompts), accepting extraction output, stage 1 extraction, stage 2 retrieval, stage 3 entailment, stages 4 and 5 score and report, running the pipeline with an optional trace and a derived run id, the support gate, the score |
-| [evals.md](evals.md) | Typed eval records, observed pipeline calls and validator verdicts, SQLite resume and JSONL audit exports, fictional sample fact bank and planted gaps |
+| [evals.md](evals.md) | Eval CLI dry runs and real Ollama smoke runs, whole-run budgets, typed records and traces, SQLite resume, scratch JSONL audit exports, fictional sample fact bank and planted gaps |
 | [validators.md](validators.md) | The grounding validators V1 to V14: what each rejects and its known limits |
 | [providers.md](providers.md) | The provider interface, typed errors, retry policy, backend config, the loopback rule, the Ollama adapter and the budget guard |
 | [setup.md](setup.md) | Fetch one public posting link, inspect raw bytes and provenance, and understand network behavior and typed failures. Also fetch a job board politely, fetch a Greenhouse, a Lever or an Ashby board, the fetch cache location, the three fetch environment variables and how to clear the cache |
@@ -18,6 +18,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [lanes.md](lanes.md) | How the lanes depend on each other and which can be worked in parallel |
 | [handoff.md](handoff.md) | The card routine step by step, for a new contributor or assistant picking up a card |
 | [contributing.md](contributing.md) | How we work, quality gates, dependency audit, ABOUTME headers, docs checklist |
+| [E2b2 documentation audit](audits/AUDIT_REPORT_2026-10-17.md) | Verified runner and export claims against the implementation |
 
 ## Decision records
 | ADR | Decision |
@@ -51,6 +52,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 - `config/weights.yaml`: score weights and support values, described in [pipeline.md](pipeline.md#score).
 - `config/confusables.txt`: Unicode confusables data (do not hand edit), used for company names and described in [data-model.md](data-model.md#company-names-company_key).
 - `CYPRESS_CREEK_DATA_DIR` (default `data/`, gitignored): where the SQLite database lives, described in [data-model.md](data-model.md#storage-sqlite-and-migrations).
+- Eval `--out` selects that SQLite database, while optional `--export` writes a JSONL audit snapshot only under `evals/scratch/`; see [evals.md](evals.md#run-the-harness).
 - `config/provider.toml` (or the file named by `CYPRESS_CREEK_CONFIG`) and `CYPRESS_CREEK_<FIELD>` variables: which model backend to use and the run budget limits, described in [providers.md](providers.md#configuration). API keys are read only from the environment variable the file names.
 - `CYPRESS_CREEK_FETCH_REFRESH_SECONDS` (default `900`), `CYPRESS_CREEK_FETCH_HOST_DELAY_SECONDS` (default `1.0`) and `CYPRESS_CREEK_FETCH_MAX_RETRIES` (default `4`, at most `8`): the polite fetch policy, described in [setup.md](setup.md#polite-fetch-settings-and-cache). The fetch cache lives in `fetch_cache` under `CYPRESS_CREEK_DATA_DIR`.
 - `facts.private/bank.yaml` (gitignored) or the path in `CYPRESS_CREEK_BANK`: your fact bank.
