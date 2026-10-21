@@ -1,0 +1,9 @@
+{
+  "cases": [
+    {
+      "id": "technical-smoke",
+      "posting": "A backend role requires three years of Python experience and PostgreSQL. Kubernetes is preferred.",
+      "as_of": "2024-06-01"
+    }
+  ]
+}

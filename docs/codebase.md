@@ -92,14 +92,16 @@ src/cypress_creek/       The library
     score.py             Weights, load_weights, Match, downgrade, score, ScoreResult
 evals/
   bank/                  The fictional sample fact bank, its unverified lure file and PLANTED_GAPS.md (see evals.md)
+  cases/                 Dated fictional postings; technical-smoke.json is the CLI smoke case
+  harness/run.py         Dry-run planner and resumable real-provider CLI
   scratch/               Gitignored local JSONL exports
-  results/               Published labeled JSONL exports when the runner arrives
+  results/               Published labeled JSONL exports only after E3 labels exist
 tests/
-  unit/                  Pure functions and models, no I/O beyond tmp files (test_fetch_policy.py also covers ManualClock and HostRateLimiter; test_adapter_base.py covers the adapter contract; test_greenhouse_mapping.py and test_lever_mapping.py cover the feed mappings)
-  component/             Real files and real environment, several modules together (test_response_cache.py on a real temp directory, test_polite_client.py against real local servers, test_greenhouse_adapter.py and test_lever_adapter.py driving the adapters against real local servers, the Lever one on a US and an EU path prefix)
-  integration/           Real public DNS (needs_network), including the blacklist making no lookup, real Ollama requests (live), test_polite_client_network.py (a real public feed, needs_network) test_greenhouse_network.py (a real large public board through the adapter, needs_network) and test_lever_network.py (a real large public board read across pages, plus a real EU board, needs_network)
-  e2e/                   URL guard, posting fetch, HTML text extraction and the blacklist filter from separate processes
-  http_support.py        Test-only real HTTP and UDP DNS servers, with a loopback resolver. The HTTP server records each request's method, and a route key may include the query string so that pages of one path can differ
+  unit/                  Pure functions and models, including eval case loading and dry-run planning, fetch policy and limiter, adapter contract, and Greenhouse and Lever feed mappings
+  component/             Real files and local servers, including the no-network eval CLI dry run, response cache, polite client, and Greenhouse and Lever adapters on US and EU path prefixes
+  integration/           Public DNS and feeds (needs_network), real Ollama eval runs and failure persistence, and live Greenhouse and paged US and EU Lever boards
+  e2e/                   Separate-process flows for URL guard, posting fetch, HTML text, blacklist filtering, and eval CLI resume of pending cases
+  http_support.py        Test-only real HTTP and UDP DNS servers with a loopback resolver; the HTTP server records methods and can route by query string for paged paths
   fixtures/              Recorded or hand written inputs
     extraction/          A posting and a recorded real model output for the accept step
     html/postings.json   Anonymized excerpts of three public ATS posting layouts
@@ -130,8 +132,15 @@ flowchart LR
     extract -. attempted calls .-> trace["PipelineTrace: calls + verdicts"]
     migs[(storage/migrations/*.sql)] --> migrate["storage.migrate()"]
     migrate --> db[(data/cypress_creek.sqlite3)]
+    cases[(evals/cases/*.json)] --> evalrunner["evals.harness.run: dry run or live run"]
+    sample[(evals/bank/sample_bank.yaml)] --> evalrunner
+    evalrunner -->|dry run| plan["dry_run_plan: no provider calls"]
+    evalrunner -->|live run| budgeted["BudgetedProvider: whole-run cap"]
+    budgeted --> extract
+    trace --> evalrunner
+    evalrunner --> evalstore
     evalstore["EvalStore: transactional eval runs"] --> db
-    evalstore --> export[(JSONL audit export)]
+    evalstore --> export[(evals/scratch/*.jsonl audit export)]
     bank[(facts.private/bank.yaml)] --> load["facts.load_bank()"]
     load --> verified["Bank.verified_facts()"]
     aliases[(config/aliases.yaml)] --> table[AliasTable]
@@ -173,14 +182,14 @@ See [the fetching architecture](architecture.md), [the SSRF rules and limits](th
 - **Safe by default config.** Backends default to loopback only, going remote needs `allow_remote`, and keys come from the environment alone. Config errors never echo a submitted value.
 - **Measured truncation signatures are refused.** The Ollama adapter estimates before the call and checks the reported count after it. It raises `ContextTruncated` when the estimate exceeds the configured context or the count matches a measured truncation signature. Other server behavior may need additional detection.
 - **Spend is capped before it happens.** `BudgetedProvider` checks the worst case (estimate plus output cap) against the run limits before a call and records the server's real usage after it. Real usage above an estimate blocks the next call, so the guard fails closed.
-- **Attempted failures count.** A provider error identifies whether a request was attempted and carries complete reported usage when known. The budget counts attempted failed requests, including reported tokens and cost; unknown usage blocks later calls. A preflight refusal spends no request. See [providers.md](providers.md#the-budget-guard).
+- **Attempted failures count.** A provider error identifies whether a request was attempted and carries complete reported usage when known. The budget counts attempted failed requests, including reported tokens and cost. Unknown usage blocks later calls in that invocation; on eval resume, a context-sized input ceiling and the stage output cap are reserved for that attempt before another call. A preflight refusal spends no request. See [providers.md](providers.md#the-budget-guard) and [evals.md](evals.md#run-the-harness).
 - **Posting text never leaves its block.** `build_prompt` puts the posting between boundary lines carrying a random 128 bit token, keeps it out of the system message and shows extraction no facts. It is the first layer only, the validators are the control.
 - **The model proposes, code decides.** The extraction model gives text, kind and term. Spans, ids and importance are set by code, and text that is not in the posting is dropped with a reason. See `pipeline.md`.
 - **Entailment can only lower support.** The model's verdict is clamped to the rule ceiling by code, and `Match` refuses support above its ceiling. A drop of any size is allowed. See [ADR 0011](adr/0011-entailment-can-only-lower-support.md).
 - **A positive verdict must cite.** `judge` counts a `supports` or `partial` verdict with no valid citation (candidate, verified, shareable) as `does_not_support`, and withholds any rationale that fails V7 to V10. See `pipeline.md`.
 - **A run id is derived, not random.** `run_id` hashes the posting, the fact bank, the backend and the model, so the same inputs give the same id and a changed input gives a new one. See `pipeline.md`.
 - **Eval resume identity is stricter than report identity.** `RunHeader.run_id` hashes the complete eval header, including commit, prompts, schemas, fixture set, bank, case plan and repeats. `EvalStore` validates SQLite records and resumes only unrecorded case pairs; JSONL is a read-only export, and only a terminal record marks a run complete. This is separate from the pipeline report's `run_id`, which intentionally excludes prompt versions. See [evals.md](evals.md#run-record-format) and [ADR 0018](adr/0018-eval-run-identity.md).
-- **The pipeline trace records what ran.** Pass a `PipelineTrace` to `analyze` or `assess` for per-attempt provider records and the actual validator verdicts. Extraction, entailment and report assembly append to the same trace. Missing usage is nullable, never guessed. The later eval CLI will persist these records through `EvalStore`. See [evals.md](evals.md#run-record-format).
+- **The pipeline trace records what ran.** Pass a `PipelineTrace` to `analyze` or `assess` for per-attempt provider records and the actual validator verdicts. Extraction, entailment and report assembly append to the same trace. Missing usage is nullable, never guessed in the audit. The eval CLI persists completed case traces and failed terminal attempts through `EvalStore`; see [evals.md](evals.md#run-the-harness).
 - **A report cites or is refused.** `build_report` ends with `verify_report` (V4, V5, V9), so a fabricated or unverified fact id never reaches a report. Failed stages make the report incomplete rather than quietly partial. See `pipeline.md`.
 - **Retrieval is not a model.** `retrieve` matches tags and aliases, ranks and caps the candidates, and sets the support ceiling. A requirement with no candidate is a gap and costs no model call. See `pipeline.md`.
 - **The sample bank and its gap table cannot drift.** `PLANTED_GAPS.md` is parsed by a test that runs each row through `retrieve`, so a bank edit that changes a gap fails the build. See `evals.md`.
