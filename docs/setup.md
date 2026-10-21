@@ -215,3 +215,68 @@ uv run pytest tests/integration/test_lever_network.py -q
 ```
 
 Real output from the same day: `7 passed in 88.60s`.
+
+## Fetch an Ashby board
+
+`AshbyAdapter` reads one public Ashby job board through `PoliteClient` and returns normalized `Listing` rows. It is a library call, like the Greenhouse and Lever ones. An Ashby board is one response with no paging, so `probe` and `fetch_board` each make one request to the same URL (the second is served from the cache), and a board with full descriptions is about 2 MB. The cache goes in a throwaway directory. The client must be built with `ASHBY_FETCH_LIMITS`, because the default limits allow neither JSON nor a body this large. From the repository root, in a bash shell:
+
+```bash
+export CYPRESS_CREEK_DATA_DIR="$(mktemp -d)"
+uv run python - <<'PY'
+from cypress_creek.discovery.adapters.ashby import ASHBY_FETCH_LIMITS, AshbyAdapter
+from cypress_creek.discovery.cache import ResponseCache, default_cache_dir
+from cypress_creek.discovery.fetch_policy import FetchPolicy
+from cypress_creek.discovery.polite_client import PoliteClient
+from cypress_creek.discovery.rate_limiter import HostRateLimiter, SystemClock
+
+policy = FetchPolicy()
+clock = SystemClock()
+client = PoliteClient(
+    policy,
+    ResponseCache(default_cache_dir()),
+    HostRateLimiter(clock, policy.per_host_delay_seconds),
+    clock,
+    limits=ASHBY_FETCH_LIMITS,
+)
+adapter = AshbyAdapter(client)
+
+probe = adapter.probe("ashby")
+print(f"probe: found={probe.found} has_name={probe.organization_name is not None}")
+
+board = adapter.fetch_board("ashby")
+first = board.listings[0]
+print(f"listings: {len(board.listings)}")
+print(f"skipped:  {len(board.skipped)}")
+print(f"unlisted: {board.unlisted}")
+print(f"id:       {first.id}")
+print(f"title:    {first.title}")
+print(f"location: {first.location}")
+print(f"posted:   {first.posted_at:%Y-%m-%d}")
+print(f"excerpt:  {first.content_text[:10]!a}")
+PY
+unset CYPRESS_CREEK_DATA_DIR
+```
+
+Real output from a run on 2026-10-21 (the count and the first listing change as the board changes). The snippet prints only whether the board reported a name and a ten character excerpt, so the output stays generic. The excerpt is printed with `!a` so that a non ASCII character in a job description cannot break a console that is not UTF-8:
+
+```text
+probe: found=True has_name=False
+listings: 67
+skipped:  0
+unlisted: 0
+id:       ashby:ashby:7458d4e9-da2e-47bd-98cb-adfda43d42b2
+title:    Engineering Manager - EU
+location: Remote - European Union
+posted:   2024-03-04
+excerpt:  'Hi \U0001f44b I’m C'
+```
+
+What it shows: `probe` asks whether the board exists. Ashby reports no organization name, so `probe` returns `found=True` with `organization_name=None`, and the board name is the identity. It checks that the body is a JSON object with a `jobs` list and does not read individual jobs. `fetch_board` returns a `BoardFetch` as the other adapters do, with an id of the form `ashby:slug:job_id`, a timezone aware `posted_at` (or `None`), and the description as plain text (`descriptionPlain`, else `descriptionHtml` converted to text). `unlisted` counts the jobs the feed marks as not listed. They are dropped, they are not skips, and they do not count toward the skip budget. This board had none, so the unlisted path is covered by tests that edit a recorded board. A board name that does not exist makes `probe` return `found=False` and makes `fetch_board` raise `BoardNotFound`. A 200 that is not a board makes both raise `FeedSchemaError`. See [the board adapters architecture](architecture.md#board-adapters) and [ADR 0023](adr/0023-ashby-unlisted-jobs-probe-shape-and-weak-etag.md).
+
+The real-network check fetches the board, probes it, probes and fetches a made-up name, and revalidates the stored weak ETag against the real server, which must answer 304. It needs the internet and fails, never skips, when the network is unreachable:
+
+```bash
+uv run pytest tests/integration/test_ashby_network.py -q
+```
+
+Real output from 2026-10-21: `7 passed in 5.00s`.

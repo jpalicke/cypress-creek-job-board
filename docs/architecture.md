@@ -78,7 +78,7 @@ See [the threat model](threat-model.md) for rules, error reasons and executable 
 
 ## Board adapters
 
-An adapter reads one ATS board and returns listings in the common shape. Adapters only issue GET requests, only through `PoliteClient`, and never touch an apply endpoint. Code that needs a board depends on the `BoardAdapter` protocol in `discovery/adapters/base.py`, not on a vendor. Two adapters exist, `GreenhouseAdapter` and `LeverAdapter`. They share the strict feed model base and the text cleanup in `discovery/adapters/feed_common.py` (`FeedModel`, `field_path`, `plain_line`).
+An adapter reads one ATS board and returns listings in the common shape. Adapters only issue GET requests, only through `PoliteClient`, and never touch an apply endpoint. Code that needs a board depends on the `BoardAdapter` protocol in `discovery/adapters/base.py`, not on a vendor. Three adapters exist, `GreenhouseAdapter`, `LeverAdapter` and `AshbyAdapter`. They share the strict feed model base and the text cleanup in `discovery/adapters/feed_common.py` (`FeedModel`, `field_path`, `plain_line`).
 
 ```mermaid
 flowchart TD
@@ -91,12 +91,12 @@ flowchart TD
     text --> norm["normalize"]
     norm --> hash["text_hash: sha256 hex"]
     hash --> listing["Listing"]
-    listing --> result["BoardFetch: listings and skipped jobs"]
+    listing --> result["BoardFetch: listings, skipped jobs and unlisted count"]
 ```
 
 **The interface.**
-- `fetch_board(slug) -> BoardFetch` returns every well formed job on the board as `listings`, and each malformed job as a `SkippedJob` in `skipped`. `SkippedJob` holds the job's `index` in the feed, its `job_id` when plain, the `field` and a `reason_code`, never a feed value.
-- `probe(slug) -> ExistenceResult` says whether the board exists. `ExistenceResult(found, organization_name)` carries the organization name the ATS reports, which is the strong identity evidence for a suggestion. A result with `found=False` cannot carry a name. Lever reports no name, so its probe returns `found=True` with `organization_name=None` and the slug is the identity.
+- `fetch_board(slug) -> BoardFetch` returns every well formed job on the board as `listings`, and each malformed job as a `SkippedJob` in `skipped`. `SkippedJob` holds the job's `index` in the feed, its `job_id` when plain, the `field` and a `reason_code`, never a feed value. `BoardFetch.unlisted` is the number of jobs the feed marks as not listed. Those are dropped on purpose, so they are neither listings nor skips (it is `0` for an adapter whose feed has no such flag).
+- `probe(slug) -> ExistenceResult` says whether the board exists. `ExistenceResult(found, organization_name)` carries the organization name the ATS reports, which is the strong identity evidence for a suggestion. A result with `found=False` cannot carry a name. Lever and Ashby report no name, so their probes return `found=True` with `organization_name=None` and the slug is the identity.
 - `Listing` is a frozen dataclass shaped like a row of the listing table: `id`, `ats`, `slug`, `title`, `location`, `url`, `posted_at` (timezone aware, or `None`), `fetched_at` (UTC), `content_text`, `content_hash` and `state` (`ListingState`: `new`, `seen`, `closed`; an adapter always emits `new`). `listing_id(ats, slug, job_id)` is the one id format, `ats:slug:job_id`, for example `greenhouse:acme:12345`.
 
 **Typed errors.** All derive from `AdapterError` and carry a stable `reason_code`. None echoes a value taken from a feed.
@@ -129,6 +129,12 @@ flowchart TD
 - **Region.** `probe` and a first `fetch_board` ask the US host, then the EU host, one request at a time. Only a 404 moves on to the next host, and any other refusal propagates. `region_of(slug)` returns the host a board was found on (`LeverRegion.US` or `LeverRegion.EU`), or `None`. It lives in the adapter object only and is never written to disk. Persisting it on the watchlist entry is left to the discovery cards H1 (#40) and H8 (#47); a follow up issue will track it. A 404 from a remembered host, or on a later page, forgets the region and raises `BoardNotFound` without trying the other host.
 - **Probe.** `probe` requests one posting (`limit=1`). A board with no open postings answers 200 with `[]` and is found. A 404 from both hosts is `found=False`.
 
+**The Ashby mapping.** `AshbyAdapter` reads `{base}/{name}`, where the base defaults to `https://api.ashbyhq.com/posting-api/job-board` (`DEFAULT_BASE_URL`, overridable with `base_url`). A board is one response, a JSON object with a `jobs` list, so `fetch_board` and `probe` each make one GET with no query string, and no compensation data is requested. For each job it validates the shape on its own. The title is `title`, the location is `location` (optional, empty when missing), the URL is `jobUrl` (http or https), and `publishedAt` becomes a timezone aware `posted_at` (`None` when missing). `isListed` is required. The description is `descriptionPlain` when it has any text, else `descriptionHtml` through `html_to_text`, then `normalize` and `text_hash`. There is no `html.unescape` step. The job id must be short and plain (letters, digits, `_` and `-`, at most 64), because it becomes part of the listing id `ashby:slug:id`. [ADR 0023](adr/0023-ashby-unlisted-jobs-probe-shape-and-weak-etag.md) records the choices below.
+
+- **Unlisted jobs.** A job whose `isListed` is the JSON `false` is dropped and counted in `BoardFetch.unlisted`. The check runs before any other validation, so an unlisted job never causes a skip. The skip budget is counted over the listed jobs only (jobs minus unlisted), so a mostly unlisted board is not a schema failure. A job with `isListed` missing or not a boolean is malformed and is skipped, never assumed listed.
+- **Probe.** A 404 is `found=False`. A 200 is `found=True` with `organization_name=None` when its body is a JSON object with a `jobs` list, which may be empty. A 200 of any other shape raises `FeedSchemaError`. The probe does not read individual jobs, since a malformed job is a skip that `fetch_board` counts. Ashby has no limit parameter, so the probe reads the whole board from the same URL as `fetch_board`, and the polite client's cache serves the fetch that follows.
+- **Weak ETag.** Ashby sends `ETag: W/"job-board:..."`. The cache stores it as received and sends it back unchanged as `If-None-Match`, and the real server answers 304. A 304 revalidation and a hit inside the refresh window both report `from_cache` as true, with status 304 and status 200 respectively.
+
 **Failure modes.** The table applies to both adapters unless a row names one.
 | Cause | What the adapter does |
 | --- | --- |
@@ -136,6 +142,8 @@ flowchart TD
 | More than 10 percent of a board's jobs are malformed, or the body or `jobs` list has the wrong shape | Raises `FeedSchemaError` naming the field (`jobs` for the budget). The whole board is skipped, visibly. Other boards are unaffected because the error is per call. |
 | HTTP 404 for the slug (Lever: from both hosts) | `fetch_board` raises `BoardNotFound` so the caller can mark the watchlist entry broken. `probe` returns `found=False` without raising. |
 | Lever: the body is not a JSON array | Raises `FeedSchemaError` naming `$`, the whole body. |
+| Ashby: a job has `isListed` false | The job is dropped and counted in `BoardFetch.unlisted`. It is not a listing, not a skip, and not part of the skip budget. |
+| Ashby: the body is not an object with a `jobs` list | Raises `FeedSchemaError` naming `$` or `jobs`. `probe` raises it too for a 200 of that shape, so it is never reported as a board. |
 | Lever: the board is still full after 50 pages | Raises `FeedSchemaError` naming `jobs`. No partial board is returned. |
 | Lever: the same posting id on two pages | The first copy is kept and the later one is dropped. |
 | HTTP 403, 410 or any other refused status | Propagates as `SafeHttpError` (`http_status`). It is never reported as a missing board. |
@@ -145,5 +153,7 @@ flowchart TD
 **Limits.** `GREENHOUSE_FETCH_LIMITS` allows 64 MiB on the wire and decoded, a 60 second total timeout and `application/json` only, because a large board with full descriptions is many megabytes. Titles, locations and board names are at most 1000 characters and a job URL at most 2048. There is no pagination: one response holds the whole board.
 
 `LEVER_FETCH_LIMITS` allows 16 MiB on the wire and decoded, a 60 second total timeout and `application/json` only. A real page of 100 postings with full descriptions measured 1.9 MB on 2026-10-14, so the cap is about eight times that. Titles, locations and list headings are at most 1000 characters and a posting URL at most 2048. The client must be built with these limits.
+
+`ASHBY_FETCH_LIMITS` allows 16 MiB on the wire and decoded, a 60 second total timeout and `application/json` only. A real board of 63 jobs with full descriptions measured 1.95 MB on 2026-10-19, so the cap is about eight times that. Titles and locations are at most 1000 characters and a job URL at most 2048. There is no pagination: one response holds the whole board. The client must be built with these limits.
 
 The adapter does not decide what to do with an error. The caller (the scan, later cards) turns `BoardNotFound` into a broken watchlist entry and any other error into a visible failure for that board only.

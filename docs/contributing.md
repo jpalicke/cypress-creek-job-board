@@ -29,6 +29,8 @@ The Greenhouse adapter has a `needs_network` integration test that maps a real l
 
 The Lever adapter has its own `needs_network` integration test: it reads a real large public board across pages (at a page size of 10, about 32 requests, so it takes about a minute and a half), probes it, probes and fetches a made-up slug, and finds a real board that lives only on the EU host: `uv run pytest tests/integration/test_lever_network.py -q`. It needs the internet and fails, never skips, when the network is unreachable. Run it when you touch `discovery/adapters/lever.py`, `discovery/adapters/feed_common.py` or the paging.
 
+The Ashby adapter has its own `needs_network` integration test: it fetches a real public board, checks every listing, probes it, probes and fetches a made-up slug, and revalidates the stored weak ETag against the real server, which must answer 304: `uv run pytest tests/integration/test_ashby_network.py -q`. It takes a few seconds. It needs the internet and fails, never skips, when the network is unreachable. Run it when you touch `discovery/adapters/ashby.py`, `discovery/adapters/feed_common.py` or the polite client's conditional requests.
+
 The integration and e2e tiers are not in the gated run, so run them by hand when you touch what they cover. For the blacklist: `uv run pytest tests/e2e/test_blacklist_process.py tests/integration/test_blacklist_dns.py -q`. The e2e file starts real child Python processes against a real temp SQLite file. The integration file is marked `needs_network` and resolves a real host, so an unreachable network makes it fail, never skip.
 
 ## Documentation checklist
