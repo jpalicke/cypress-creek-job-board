@@ -149,6 +149,15 @@ def _map_job(slug: str, index: int, raw: object, fetched_at: datetime) -> Listin
     )
 
 
+def _load_board(body: bytes) -> _BoardResponse:
+    """The board response with its raw jobs. A body or jobs list of the wrong shape is an error."""
+    try:
+        return _BoardResponse.model_validate_json(body)
+    except ValidationError as error:
+        # Only the location of the first problem is used, never its message or input value.
+        raise FeedSchemaError(field_path(error.errors()[0]["loc"])) from None
+
+
 def parse_board_response(slug: str, body: bytes, fetched_at: datetime) -> BoardFetch:
     """Map a board response to listings, skipping each malformed job.
 
@@ -156,11 +165,7 @@ def parse_board_response(slug: str, body: bytes, fetched_at: datetime) -> BoardF
     feed marks as not listed are dropped and counted, not skipped. The skip budget is counted
     over the listed jobs only, so a board that is mostly unlisted is not a schema failure.
     """
-    try:
-        response = _BoardResponse.model_validate_json(body)
-    except ValidationError as error:
-        # Only the location of the first problem is used, never its message or input value.
-        raise FeedSchemaError(field_path(error.errors()[0]["loc"])) from None
+    response = _load_board(body)
     listings: list[Listing] = []
     skipped: list[SkippedJob] = []
     unlisted = 0
@@ -202,15 +207,18 @@ class AshbyAdapter:
     def probe(self, slug: str) -> ExistenceResult:
         """Whether the board exists. Ashby reports no organization name.
 
-        Only the status is judged, never the body, so a 200 means found even for a board with no
-        jobs or a body of an unexpected shape. Reading the body is fetch_board's job. Ashby has no
-        limit parameter, so this reads the whole board. It uses the same URL as fetch_board, so
-        that the cache serves the fetch that follows.
+        A 404 is not found. A 200 is found when its body has the shape of a board: a JSON object
+        with a list of jobs, which may be empty. The jobs themselves are not read, since a
+        malformed job is a skip for fetch_board to count. A 200 of any other shape raises
+        FeedSchemaError, so that it is never reported as a board. Ashby has no limit parameter,
+        so this reads the whole board. It uses the same URL as fetch_board, so that the cache
+        serves the fetch that follows.
         """
         try:
-            self._get(slug)
+            response = self._get(slug)
         except NotFound:
             return ExistenceResult(found=False, organization_name=None)
+        _load_board(response.body)
         return ExistenceResult(found=True, organization_name=None)
 
     def fetch_board(self, slug: str) -> BoardFetch:

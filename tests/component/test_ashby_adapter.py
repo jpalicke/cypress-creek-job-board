@@ -193,10 +193,20 @@ def test_probe_of_a_board_with_no_jobs_is_found(tmp_path: Path) -> None:
     assert result == ExistenceResult(found=True, organization_name=None)
 
 
-@pytest.mark.parametrize("body", [{"ok": False}, [], "text", {"jobs": 5}])
-def test_probe_judges_existence_only_so_it_does_not_read_the_body(
-    tmp_path: Path, body: object
+@pytest.mark.parametrize(
+    ("body", "field"),
+    [([], "$"), ("text", "$"), (None, "$"), ({"jobs": 5}, "jobs"), ({"ok": False}, "jobs")],
+)
+def test_probe_of_a_200_that_is_not_a_board_is_a_schema_error(
+    tmp_path: Path, body: object, field: str
 ) -> None:
+    with http_server(_board(body=body)) as (port, _), pytest.raises(FeedSchemaError) as caught:
+        _adapter(tmp_path, port).probe(SLUG)
+    assert caught.value.field == field
+
+
+def test_probe_checks_the_shape_of_the_board_but_not_each_job(tmp_path: Path) -> None:
+    body = {"jobs": [None, 5, {"id": "not plain!", "isListed": "yes"}]}
     with http_server(_board(body=body)) as (port, _):
         result = _adapter(tmp_path, port).probe(SLUG)
     assert result == ExistenceResult(found=True, organization_name=None)
