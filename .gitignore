@@ -15,5 +15,6 @@ data/
 # The private fact bank never lands in the repo
 facts.private/
 evals/scratch/
+.scratch/
 requirements-audit.txt
 licenses.json

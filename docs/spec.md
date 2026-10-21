@@ -839,7 +839,7 @@ No auto apply. Ever. A human reviews every draft.
 ## How we work
 - TDD. Write a failing test, see it fail, write the minimum code, see it pass, refactor.
 - Branch per task. Open a PR. Merge to main after review. No worktrees.
-- At most 5 files per phase. Run verification, then wait for approval.
+- A phase may cover one PR, with at most 20 changed files. Run verification, then wait for approval before another phase.
 - Development goes through the subagent development skill.
 - Never use --no-verify, --no-hooks or any hook bypass. If a hook fails, fix the cause.
 - Commit messages and PR text carry no attribution lines.
@@ -892,7 +892,7 @@ Notes for approval:
 
 ## 16. Task breakdown (kanban)
 
-The schedule is not fixed, so this is a dependency ordered board, not a calendar. Cards are pulled in order within a lane. Lanes are ordered by dependency. A card marked ★ is in the **Monday lane**: the smallest set that makes the repo credible and demoable on its own (guarded core, one local backend, a first eval). Each card is one branch and one PR, at most 5 files per phase, and pushable alone with green CI.
+The schedule is not fixed, so this is a dependency ordered board, not a calendar. Cards are pulled in order within a lane. Lanes are ordered by dependency. A card marked ★ is in the **Monday lane**: the smallest set that makes the repo credible and demoable on its own (guarded core, one local backend, a first eval). Each card is one branch and one PR, a phase may cover that PR up to the 20-file hard cap, and each PR is pushable alone with green CI.
 
 Every card follows TDD: the first failing test is named, it is shown failing, then minimal code. Every card also updates the doc it owns from the slate in 13.3, and every code file carries the ABOUTME header.
 

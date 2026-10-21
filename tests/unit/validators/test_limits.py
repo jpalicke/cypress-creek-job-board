@@ -7,6 +7,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from cypress_creek.ingest.models import Requirement
+from cypress_creek.validators import requirements as requirement_rules
 from cypress_creek.validators.fact_dates import check_fact_dates
 from cypress_creek.validators.requirements import (
     MAX_REQUIREMENTS,
@@ -109,6 +110,20 @@ def test_v13_accepts_when_every_cue_sentence_is_covered() -> None:
 
 def test_v13_reports_a_cue_sentence_with_no_requirement() -> None:
     assert uncovered_cue_sentences(CUE_POSTING, [PYTHON_SPAN]) == ["- Postgres is required."]
+
+
+def test_v13_keeps_the_offset_of_an_uncovered_cue_sentence() -> None:
+    start = CUE_POSTING.index("- Postgres is required.")
+    end = start + len("- Postgres is required.")
+    assert requirement_rules.uncovered_cue_spans(CUE_POSTING, [PYTHON_SPAN]) == [(start, end)]
+
+
+def test_v13_distinguishes_repeated_cue_sentences_by_offset() -> None:
+    text = "You must know Python.\nYou must know Python."
+    first_end = text.index("\n")
+    assert requirement_rules.uncovered_cue_spans(text, [(0, first_end)]) == [
+        (first_end + 1, len(text))
+    ]
 
 
 def test_v13_ignores_sentences_without_cues_and_cue_headings() -> None:

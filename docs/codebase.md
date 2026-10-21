@@ -173,6 +173,7 @@ See [the fetching architecture](architecture.md), [the SSRF rules and limits](th
 ## Ideas to know
 - **One source of truth.** The bank file is the only record of facts. Verification is derived from `verified_on` and is never stored as a separate flag. The pipeline only ever sees `Bank.verified_facts()`.
 - **Pure and deterministic.** Scoring functions take everything as arguments, including `today`. Nothing reads the clock or the network.
+- **Coverage is visible.** V3 and V13 read the same cue word list. The report keeps uncovered cue sentences and their source offsets in `not_assessed`; the text view puts the count by the score without changing that score.
 - **Data, not code.** Things a person should tune (the alias table, the score weights) or bundled third party data (the Unicode confusables) are YAML in `config/`, loaded and validated, never hard coded.
 - **Typed errors.** Failures are specific exception classes (`PostingTooLong`, `FactValidationError`), so callers and tests can tell them apart. Text is rejected, never silently cut or repaired.
 - **Public URL targets.** `validate_url` raises `UrlGuardError` with a stable `reason_code` and a generic message. It never echoes the URL or resolver error. Every DNS answer must pass the address checks before any one is selected; one private answer rejects the entire result.
@@ -228,7 +229,7 @@ uv run pre-commit run --all-files  # lint, format, strict types, tests with the 
 How a card goes:
 1. Branch from main, one branch per card. No worktrees.
 2. Write a failing test first and watch it fail. Then write the minimum code to pass, then refactor.
-3. Keep each phase to at most five files and each PR to about 10 (hard cap 20), run the gates, then continue.
+3. A phase may cover one PR. Aim for about 10 changed files per PR, with a hard cap of 20 per phase and PR; run the gates before continuing.
 4. Update docs in the same PR (see the checklist in contributing.md).
 5. Open a PR, get CI green, merge only after review.
 

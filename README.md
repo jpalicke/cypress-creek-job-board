@@ -55,6 +55,7 @@ Each command is copy and paste, and lives with its documentation:
 | Fetch a large public Lever board, page by page, and print its normalized listings | [docs/setup.md](docs/setup.md#fetch-a-lever-board) |
 | Create the local database and apply migrations | [docs/data-model.md](docs/data-model.md#try-the-database) |
 | Run a grounding validator on model output | [docs/validators.md](docs/validators.md#try-it-locally) |
+| Check which cue sentences extraction missed | [docs/validators.md](docs/validators.md#v13-cue-sentence-coverage) |
 | See the provider errors and retry policy, load backend config, run the Ollama adapter, print a projected cost | [docs/providers.md](docs/providers.md#try-it-locally) |
 | Validate a URL or fetch a bounded public page | [docs/threat-model.md](docs/threat-model.md#try-it-locally) |
 | Fetch one public posting link as bounded raw bytes | [docs/setup.md](docs/setup.md#fetch-a-posting-link) |
@@ -88,15 +89,19 @@ This is a real run of the "whole run against a local model" command in [docs/pip
 
 ```text
 Gap report for P-1: complete
-Score: 25.0 out of 100 (triage only, not a probability). Supported 1 of 2.
+Score: 25.0 out of 100 (triage only, not a probability). Supported 1 of 2. 3 cue sentences not assessed; the score does not cover them.
 [none] R-1 (required): You must have 3 years of Python experience.
 [partial] R-2 (required): Experience with PostgreSQL is required.
     facts: F-0002
     why: rationale withheld: failed grounding check
 Gaps: R-1, R-2
+Cue sentence not assessed at offset 224: You must be comfortable working in a small team.
+Cue sentence not assessed at offset 287: Kubernetes experience is preferred.
+Cue sentence not assessed at offset 323: A degree in computer science is a plus.
 ```
 
 Every supported row cites a verified fact. A model rationale that fails the grounding checks is withheld rather than shown. The report is also available as JSON (`report.model_dump_json()`), with the backend, model, prompt hashes, usage and a run id derived from the inputs.
+The cue warning identifies posting sentences that extraction omitted. Those sentences do not enter the displayed score, so read the warning before using the number for triage.
 
 ## What the score means
 The score (0 to 100) ranks postings so you can triage them. It is a weighted share of requirements your verified facts support. It is not a probability of getting the job, and a posting with no extractable requirements gets no score at all.

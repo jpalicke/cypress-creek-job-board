@@ -296,6 +296,7 @@ The numbering in this file is one scheme: 0 normalize, 1 extract, 2 retrieve, 3 
 | `rows` | One `ReportRow` per requirement: text, importance, ceiling, final support, gate, cited `fact_ids`, the rationale that passed the grounding checks, the `entailment` status and `not_model_checked`. |
 | `gaps` | Ids of requirements whose support is partial or none. |
 | `not_assessed_count`, `dropped` | Requirements over the cap, and proposals extraction dropped. |
+| `not_assessed` | Every cue sentence untouched by a requirement span, with its original text, character offsets and `cue_sentence_uncovered` reason. Older stored reports default to an empty list. |
 | `warnings` | The posting's own warnings. |
 | `score`, `score_disclaimer` | The `ScoreResult` (or `None`) and the text `triage only, not a probability`. |
 | `rule_only_ids` | Requirements whose score rests on the rule ceiling alone because entailment did not run. |
@@ -304,9 +305,10 @@ The numbering in this file is one scheme: 0 normalize, 1 extract, 2 retrieve, 3 
 - **Fail closed.** If extraction failed there are no rows and no score, and the reason is stated. If entailment failed for some requirements the score still uses their rule ceilings, their rows are flagged `not_model_checked` and the report is `incomplete`. No requirements gives a complete report with no score.
 - **Every claim cites.** `build_report` ends by calling `verify_report`, which runs V4, V5 and V9 over every citation and raises `ReportRefused` for a fabricated, unverified or missing one. A row that is not support `none` must cite facts. A requirement whose entailment did not run cites its candidate facts, the basis of its ceiling.
 - **One score.** `build_report` computes the score from the matches it is given, so a score that disagrees with the rows cannot be passed in.
+- **Unassessed cue sentences.** After successful extraction, V13 checks the shared cue word list and records a verdict in the optional trace. `build_report` lists every uncovered cue sentence in `not_assessed`; the text view prints their count beside the score and each sentence with its offset. They do not enter score arithmetic or change report status. A failed extraction has no cue coverage assessment.
 - **The stage outputs must line up.** The requirements, the candidates and the entailment results must have the same ids in the same order, otherwise `build_report` raises `ValueError`.
 - **Text is flattened.** `render_text` puts posting and model text on one line, so a line break cannot forge a row. HTML escaping is the future UI's job, from the same data.
-- Known limit: hitting the requirement cap does not make a report incomplete. It is shown as `not_assessed_count`. The cue coverage check (V13) is a later card.
+- Known limit: hitting the requirement cap does not make a report incomplete. It is shown as `not_assessed_count`, separate from the uncovered cue sentence list.
 
 ### Try the report
 No model is called. A gap needs no call, and the other two answers are written by hand and judged by the real validators.
