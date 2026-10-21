@@ -1,8 +1,8 @@
 # Evals
 
-The eval harness measures the pipeline against a fixed, fictional fact bank. The run record
-format and production pipeline trace are available now. The CLI runner, postings and hand
-labels come in later cards.
+The eval harness runs dated, fictional postings against the sample fact bank and a real model.
+Its CLI saves resumable runs in SQLite and can export JSONL for audit. Hand labels come in E3;
+these runs are not benchmark evidence yet.
 
 ## Run record format
 
@@ -19,7 +19,7 @@ terminal when the same run resumes. A `complete` terminal requires every planned
 | --- | --- |
 | `header` | Git commit, provider, exact model, prompt hashes and schema versions by stage, fixture set hash, bank hash, ordered case IDs and repeat count. `format_version` is 1. |
 | `case` | Run ID, case ID, repeat number, posting hash, full gap report, every attempted provider call with stage, prompt hash, schema version, outcome, error type when applicable, nullable observed token usage and dollar cost, and each recorded validator verdict with stage and subject. |
-| `terminal` | Run ID, `complete` or `failed` status, and a reason for failure. |
+| `terminal` | Run ID, `complete` or `failed` status, a reason for failure, and attempted calls from an unfinished case when the run failed. |
 
 The run ID is a SHA-256 digest of the canonical header. A changed commit, model, prompt,
 schema, fixture, bank, case plan or repeat count changes that ID. The store rejects a
@@ -38,7 +38,8 @@ estimated for the audit. Entailment records only validators actually reached by 
 and rationale checks. Report verification records V4, V5 and V9, including failed verdicts.
 Validator verdicts can contain offending text from a posting or model rationale, so treat a
 trace and its eventual audit export as sensitive run data.
-The CLI runner that persists these records in SQLite is a later card.
+The CLI persists completed case traces through `EvalStore`. A failed case stays pending, while
+its attempted calls are retained in the failed terminal.
 
 Each append commits as one SQLite transaction, so an interrupted write cannot leave a partial
 case record. The `0004_eval_runs.sql` migration adds these tables to the existing database in
@@ -48,9 +49,43 @@ file. `load_run(path, expected_header=header)` validates an export but never cha
 state. An export is not a resume store.
 
 Scratch exports belong under `evals/scratch/`, which Git ignores. Only published exports with
-hand labels belong under `evals/results/`, named with date, backend and model. E2b adds the
-CLI that fills the database from real providers. E3 supplies the labels, so no E2a file is
-benchmark evidence.
+hand labels belong under `evals/results/`, named with date, backend and model. E3 supplies
+those labels, so an E2b2 scratch file is not benchmark evidence.
+
+## Run the harness
+
+Start Ollama and pull `qwen3.5:0.8b` as described in the [provider guide](providers.md#try-it-locally).
+From the repository root, inspect the one-case plan without contacting the model:
+
+```bash
+uv run python -m evals.harness.run --backend ollama --model qwen3.5:0.8b --cases evals/cases/technical-smoke.json --repeats 1 --dry-run
+```
+
+The output labels initial extraction calls as exact and entailment attempts and cost as upper
+bounds, because requirements and retries depend on the model. To run the case and save both
+live state and an audit snapshot:
+
+```bash
+uv run python -m evals.harness.run --backend ollama --model qwen3.5:0.8b --cases evals/cases/technical-smoke.json --repeats 1 --out data/cypress_creek.sqlite3 --export evals/scratch/technical-smoke.jsonl
+```
+
+`--out` is the SQLite database path; without it, the runner uses the project database under
+`CYPRESS_CREEK_DATA_DIR` (default `data/`). `--export` is optional, only works on a live run,
+and must name a nonexistent `.jsonl` file under `evals/scratch/`. The CLI never overwrites an
+export or writes to `evals/results/`. To rerun or resume the same run, keep the same commit,
+model, case manifest, bank and repeat count. Omit `--export` or choose another unused scratch
+filename. Completed pairs are skipped. A backend that cannot be reached exits nonzero and
+saves a failed terminal; a later invocation retries its pending pair.
+
+The header records Git `HEAD`, not uncommitted source changes. Use a clean checkout for runs
+you need to reproduce or compare.
+
+The budget from [provider settings](providers.md#the-budget-guard) covers the whole run,
+including completed cases and attempts saved in failed terminals. A failed attempt with no
+reported usage remains `null` in the audit. It blocks later calls in that invocation; on
+resume, the runner reserves the configured context size and that stage's output cap for it
+before allowing another call. This may exhaust the run budget. Hosted providers also require
+`--confirm-spend` before a live run can call them.
 
 Check the record contract locally with:
 
