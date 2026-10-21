@@ -202,6 +202,14 @@ def test_board_fetch_holds_listings_and_skipped_jobs() -> None:
     assert fetch.skipped == (skipped,)
 
 
+def test_board_fetch_counts_no_unlisted_jobs_by_default() -> None:
+    assert BoardFetch(listings=(), skipped=()).unlisted == 0
+
+
+def test_board_fetch_holds_the_count_of_unlisted_jobs() -> None:
+    assert BoardFetch(listings=(), skipped=(), unlisted=4).unlisted == 4
+
+
 def test_board_fetch_is_frozen() -> None:
     with pytest.raises(dataclasses.FrozenInstanceError):
         BoardFetch(listings=(), skipped=()).listings = ()  # type: ignore[misc]
