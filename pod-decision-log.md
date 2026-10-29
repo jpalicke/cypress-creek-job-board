@@ -65,3 +65,10 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 - 2026-10-29, Worker C.
 - Live test gets spans from report row text via text.index and compares with uncovered_cue_spans, because report rows carry no spans and the review asked for the path through analyze. Safe because the sample posting has no duplicate requirement texts. Reverse: call extract_requirements then assess in the test.
 - C4 WIP is committed on branch c4-openai-compatible (docs and ADR pending) while #116 had priority. C4 live tests need LM Studio and an OPENAI_API_KEY, which this container lacks; they fail loudly, and unverified LM Studio behaviour will be documented as unverified.
+
+## D13. Credentialed live tests get their own markers and workflow (C4)
+- 2026-10-29, manager.
+- live.yml runs everything marked `live` under tests/integration, so C4's OpenAI and LM Studio live files would break it. Choice: separate markers (live_openai, live_lmstudio) excluded from live.yml; a workflow_dispatch only OpenAI workflow reading the OPENAI_API_KEY repo secret that fails loudly if absent; LM Studio is local only with documented command and findings marked unverified.
+- Alternatives: change live.yml to supply credentials (none available); skip when absent (forbidden by the repo rules).
+- Needs from Joe P: add the OPENAI_API_KEY repository secret, run the LM Studio live test locally, confirm the OpenAI model pick (gpt-6-luna from a model page fetched 2026-10-29) in the ADR.
+- To reverse: merge the markers back into `live` and drop the new workflow.
