@@ -248,3 +248,12 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 - Cost: more false positives (legitimate paraphrases flagged); Worker G measures the rate on a corpus. Does not read meaning, so a recombination of cited words can still mislead; human review stays required.
 - Side effect to know: V8 quantity words now withhold some entailment rationales (for example "half"), which moves E-lane metrics.
 - To reverse: drop the strict mode for drafts.
+
+## D45. H7a split and discovery design (PRs #138 stacked on #132; routes #137, Worker H)
+- 2026-10-29, Worker H.
+- Issue #46 retitled H7a; the routes are H7b (#137), which waits on G1. #138 is stacked on the H6 branch so its diff is 13 files; GitHub retargets it to main once #132 merges.
+- run_discovery: blacklist first, fetch, dedupe, filter, score most recent first under a per-run cap (default 30), cache keyed by the existing run_id in a new table discovery_report; stops cleanly on backend outage or spent budget.
+- Only analyzer calls count against the cap and cache hits are free; incomplete reports are not cache hits; no listing-to-report link table (the run id is computed). ADR 0034.
+
+## D46. Migrations numbered in merge order
+- 2026-10-29, manager. The runner is gapless. #120, H7a (#138) and G2 each add a migration; the later merger renumbers. Reverse: none needed.
