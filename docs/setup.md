@@ -320,3 +320,18 @@ uv run pytest tests/integration/test_ashby_network.py -q
 ```
 
 Real output from 2026-10-21: `7 passed in 5.00s`.
+
+## Run the LM Studio and OpenAI live tests
+These two live tests need something this repo cannot start for you, so they have their own markers and the `live` workflow never runs them. Both fail loudly, never skip, when their prerequisite is missing. What they check and how to read the results is in [providers.md](providers.md#the-openai_compatible-adapter-openai-and-lm-studio).
+
+LM Studio (local only, needs the desktop app): start its local server, load a model, then
+```bash
+CYPRESS_CREEK_LMSTUDIO_MODEL="<loaded model identifier>" CYPRESS_CREEK_LMSTUDIO_CONTEXT=4096 uv run pytest tests/integration -m live_lmstudio -q
+```
+`CYPRESS_CREEK_LMSTUDIO_CONTEXT` must be the context length the model was loaded with. The findings table in providers.md stays marked unverified until you have run this and filled it in.
+
+OpenAI (spends a little money, needs a key): export `OPENAI_API_KEY` (or load a gitignored `.env`) and run
+```bash
+uv run pytest tests/integration -m live_openai -q
+```
+In GitHub, the manual `openai-live` workflow (Actions, Run workflow) runs the same test. It reads the repository secret `OPENAI_API_KEY` and fails at once, with a message, if the secret is not set.
