@@ -43,7 +43,7 @@ Before a PR is ready, in the same PR:
 - README.md status and "Try what exists" reflect what now works.
 - The docs index (docs/README.md) lists any new doc or decision record.
 - docs/codebase.md matches the code: layout, the flow diagram and the module list.
-- A new design decision has an ADR in `docs/adr/`. Numbers are sequential. The next free number is 0034, and 0026 to 0033 are reserved by the plan for open work (0026 D7, 0027 C4, 0028 G1, 0029 H1d, 0030 G2, 0031 H6, 0032 E4, 0033 the draft-limits fix). Check `ls docs/adr` and the open pull requests before you pick one; the last PR to merge resolves any clash.
+- A new design decision has an ADR in `docs/adr/`. Numbers are sequential. The latest on main is 0026 and 0027 is the OpenAI adapter's, so the next free number is 0028; 0028 to 0033 are reserved by the plan (0028 G1, 0029 H1d, 0030 G2, 0031 H6, 0032 E4, 0033 the draft-limits fix). Check `ls docs/adr` and the open pull requests before you pick one; the last PR to merge resolves any clash.
 - Configuration files (for example `config/aliases.yaml`) are described in the doc that owns them.
 
 ## Setup

@@ -23,10 +23,15 @@ class PromptError(Exception):
 class Stage(StrEnum):
     EXTRACT = "extract"
     ENTAIL = "entail"
+    DRAFT = "draft"
 
 
-TEMPLATES = {Stage.EXTRACT: "extract_v2.txt", Stage.ENTAIL: "entail_v1.txt"}
-STAGES_SHOWING_FACTS = {Stage.ENTAIL}
+TEMPLATES = {
+    Stage.EXTRACT: "extract_v2.txt",
+    Stage.ENTAIL: "entail_v1.txt",
+    Stage.DRAFT: "draft_v1.txt",
+}
+STAGES_SHOWING_FACTS = {Stage.ENTAIL, Stage.DRAFT}
 
 
 class Prompt(BaseModel):
