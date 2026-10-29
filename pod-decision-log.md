@@ -36,3 +36,11 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 ## D6. Dependency audit fix as its own PR
 - 2026-10-29, manager.
 - The `audit` CI job fails on virtualenv 21.14.3 CVEs (fixed in 21.14.9), a dev dependency unrelated to any card. Worker H fixes it in a separate minimal lockfile PR so cards stay focused. Reverse by reverting that PR.
+
+## D7. Audit fix bumps to latest virtualenv and filelock (PR #121)
+- 2026-10-29, Worker H.
+- Chose virtualenv 21.15.1 (from `uv lock --upgrade-package`) over pinning 21.14.9, and also bumped filelock 4.0.9 to 4.2.4 in the same PR, because the audit stays red without it.
+- To reverse: revert the lock commit.
+
+## D8. C5 reassigned from Worker C to Worker G
+- 2026-10-29, manager. Worker G had idle capacity. Worker C keeps #116 fixes, C4 and D7.
