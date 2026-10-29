@@ -149,6 +149,16 @@ class OllamaProvider:
         return response_object(response)
 
 
+def is_reachable(settings: ProviderSettings) -> bool:
+    """True when the configured Ollama address returns any HTTP answer within a short timeout."""
+    address = (settings.base_url or DEFAULT_BASE_URL).rstrip("/")
+    try:
+        httpx.get(address, timeout=httpx.Timeout(2.0, connect=1.0), follow_redirects=False)
+    except httpx.HTTPError:
+        return False
+    return True
+
+
 def usage_count(body: dict[str, Any], field: str) -> int:
     """A usage count from the response. Without one the truncation check cannot run."""
     value = body.get(field)

@@ -40,6 +40,7 @@ from cypress_creek.ingest.safe_http import FetchResponse, _fetch
 from cypress_creek.pipeline.extract import ExtractionResult, ExtractionStatus
 from cypress_creek.pipeline.report import GapReport
 from cypress_creek.pipeline.run import analyze, assess
+from cypress_creek.pipeline.version import pipeline_version
 from cypress_creek.providers import Budget, BudgetedProvider, BudgetTracker, OllamaProvider
 from cypress_creek.providers.base import Usage
 from cypress_creek.storage.company_key import company_key
@@ -234,6 +235,40 @@ def test_a_run_stops_at_the_cap_and_reports_what_remains(
     assert len(result.ranked) == 50
 
 
+def test_every_analyzer_call_counts_against_the_cap_even_when_extraction_fails(
+    conn: Any, tmp_path: Path, bank: Bank, identity: RunIdentity
+) -> None:
+    calls: list[str] = []
+
+    def always_a_schema_violation(posting: Posting) -> GapReport:
+        calls.append(posting.id)
+        failed = _extraction(["kubernetes"]).model_copy(
+            update={
+                "status": ExtractionStatus.INCOMPLETE,
+                "requirements": [],
+                "failure": "schema_violation",
+                "usage": None,
+            }
+        )
+        return assess(
+            posting,
+            failed,
+            bank,
+            _provider(),
+            backend=BACKEND,
+            model=MODEL,
+            today=TODAY,
+            sleep=_no_sleep,
+        )
+
+    with http_server(_routes(10)) as (port, _):
+        result = _run(conn, _adapter(tmp_path, port), always_a_schema_violation, identity, cap=3)
+    assert len(calls) == 3
+    assert result.summary.stopped_by == "cap"
+    assert result.summary.scored == 0
+    assert result.summary.unscored == 10
+
+
 def test_the_cap_scores_the_most_recent_listings_first(
     conn: Any, tmp_path: Path, bank: Bank, identity: RunIdentity
 ) -> None:
@@ -297,6 +332,26 @@ def test_a_changed_listing_shows_as_unscored_until_it_is_scored_again(
     assert {item.status for item in held.ranked} == {ScoreStatus.UNSCORED}
     assert held.summary.stopped_by == "cap"
     assert len(scorer.calls) == 3
+
+
+def test_a_new_pipeline_version_rescored_everything(
+    conn: Any, tmp_path: Path, bank: Bank, identity: RunIdentity
+) -> None:
+    scorer = Scorer(bank)
+    with http_server(_routes(3)) as (port, _):
+        first = _run(conn, _adapter(tmp_path, port), scorer, identity)
+        newer = RunIdentity(
+            identity.bank_digest, identity.backend, identity.model, pipeline_version="f" * 64
+        )
+        again = _run(conn, _adapter(tmp_path, port), scorer, newer)
+    assert first.summary.scored == 3
+    assert again.summary.cache_hits == 0
+    assert again.summary.scored == 3
+    assert len(scorer.calls) == 6
+
+
+def test_the_default_identity_carries_the_current_pipeline_version(identity: RunIdentity) -> None:
+    assert identity.pipeline_version == pipeline_version()
 
 
 def test_a_changed_bank_or_model_is_rescored(

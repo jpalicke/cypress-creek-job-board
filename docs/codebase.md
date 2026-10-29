@@ -36,6 +36,7 @@ src/cypress_creek/       The library
     draft.py             draft, judge_draft, render_draft, Draft: optional draft help, every sentence checked, nothing is sent
     report.py            GapReport, build_report, verify_report, ReportRefused: stage 4, the report as data
     render.py            render_text: stage 5, the plain text view of a report
+    version.py           pipeline_version, fingerprint: a digest of the stages, prompts, validators, scoring code and config, part of the discovery cache key
     run.py               analyze, assess, run_id: the whole run, with provenance and a run id derived from its inputs
     trace.py             PipelineTrace, CallRecord, ValidatorRecord: observed calls and validator verdicts
     prompts/             Versioned system texts, one file per stage and version (extract_v2.txt, entail_v1.txt, draft_v1.txt)
@@ -67,9 +68,17 @@ src/cypress_creek/       The library
     factory.py           get_provider, ProviderRegistry, UnknownProvider
     ollama.py            OllamaProvider and its pre-flight and post-flight truncation checks
     anthropic.py         AnthropicProvider: Messages API request, strict schema rewrite, response and error mapping
+    openai_compatible.py OpenAICompatibleProvider (OpenAI and LM Studio), build_request, read_completion
+    strict_schema.py     strict_schema: a pydantic schema in the strict subset hosted APIs accept
     budget.py            Budget, BudgetTracker, BudgetedProvider, dry_run_estimate, budget_from_settings
   config/                Backend settings (not the repo level config/ data folder)
-    settings.py          ProviderSettings, load_settings, resolve_api_key, ConfigError
+    settings.py          ProviderSettings, load_settings, is_loopback_url, resolve_api_key, ConfigError
+  api/                   The local FastAPI app (see api.md)
+    app.py               create_app: wires the headers, the Host check, the CSRF middleware, typed errors and routes
+    security.py          allowed_hosts, HostCheckMiddleware, CsrfMiddleware, SecurityHeadersMiddleware, new_token, API_PORT
+    errors.py            ErrorCode, ApiError, ErrorResponse and the handlers for the one error shape
+    server.py            main, check_bind_host: the uvicorn entry point (`cypress-creek-api`)
+    routes/              health.py, providers.py, session.py (one router each)
   storage/               Mutable state: the company name key and the SQLite database
     company_key.py       company_key, load_confusables: the one company name normalizer
     db.py                data_dir, connect, migrate, schema_version, MigrationError
@@ -108,10 +117,12 @@ evals/
   scratch/               Gitignored local JSONL exports
   results/               Published labeled JSONL exports only after E3 labels exist
 tests/
-  unit/                  Pure functions and models, including the Anthropic request, schema rewrite and response parsing, eval case loading and dry-run planning, fetch policy and limiter, adapter contract, and Greenhouse, Lever and Ashby feed mappings
-  component/             Real files and local servers, including the Anthropic adapter over real HTTP (wire request, error mapping, retry, budget guard), the no-network eval CLI dry run, response cache, polite client, and the Greenhouse, Lever and Ashby adapters (Lever on US and EU path prefixes, Ashby also answering a weak ETag with a 304)
-  integration/           Public DNS and feeds (needs_network), a live discovery run with a real model, dedupe, filters and listing states over a real public board, real Ollama eval runs and failure persistence, the live Anthropic call (needs a key, fails without one), and live Greenhouse, paged US and EU Lever, and Ashby boards (the probe, a made-up slug and a real weak ETag revalidation)
-  e2e/                   Separate-process flows for URL guard, posting fetch, HTML text, blacklist filtering, listing state refreshes and discovery score reuse across processes, and eval CLI resume of pending cases
+  unit/                  Pure functions and models, including the Anthropic request, schema rewrite and response parsing, the strict schema helper, eval case loading and dry-run planning, fetch policy and limiter, adapter contract, and Greenhouse, Lever and Ashby feed mappings
+  component/             Real files and local servers, including the Anthropic and openai_compatible adapters over real HTTP (wire request, error mapping, retry, budget guard), the no-network eval CLI dry run, response cache, polite client, and the Greenhouse, Lever and Ashby adapters (Lever on US and EU path prefixes, Ashby also answering a weak ETag with a 304)
+  integration/           Public DNS and feeds (needs_network), a live discovery run with a real model, dedupe, filters and listing states over a real public board, real Ollama eval runs and failure persistence, the live Anthropic call (needs a key, fails without one), the credentialed live_openai and live_lmstudio tests, and live Greenhouse, paged US and EU Lever, and Ashby boards (the probe, a made-up slug and a real weak ETag revalidation)
+  e2e/                   Separate-process flows for the openai_compatible adapter against a loopback chat server, URL guard, posting fetch, HTML text, blacklist filtering, listing state refreshes and discovery score reuse across processes, and eval CLI resume of pending cases
+  chat_server.py         Test-only real loopback chat completions server that records requests and plays a set reply
+  api_support.py         A synchronous client that drives the real FastAPI app in process over httpx's ASGI transport
   http_support.py        Test-only real HTTP and UDP DNS servers with a loopback resolver; the HTTP server records methods and can route by query string for paged paths and answer an ETag with a 304
   fixtures/              Recorded or hand written inputs
     extraction/          A posting and a recorded real model output for the accept step
@@ -217,8 +228,9 @@ See [the fetching architecture](architecture.md), [the SSRF rules and limits](th
 - **A report cites or is refused.** `build_report` ends with `verify_report` (V4, V5, V9), so a fabricated or unverified fact id never reaches a report. Failed stages make the report incomplete rather than quietly partial. See `pipeline.md`.
 - **Retrieval is not a model.** `retrieve` matches tags and aliases, ranks and caps the candidates, and sets the support ceiling. A requirement with no candidate is a gap and costs no model call. See `pipeline.md`.
 - **Hand labels are inputs, checked against the posting and the bank.** `validate_labels` refuses a label whose span is not exact posting text, whose fact is missing, unverified or local only, or whose planted gap row disagrees. `require_committed_labels` refuses a case whose labels are not committed. Importance is the human reading, not the V3 cue rule. See [ADR 0024](adr/0024-hand-labels-are-written-before-runs-and-carry-provenance.md), [evals.md](evals.md#posting-fixtures-and-hand-labels) and [e3-label-decisions.md](e3-label-decisions.md).
+- **Every API route inherits the security rules from the app, not from itself.** The CSRF check and the Host check are middleware (hardening headers outermost, then Host, then CSRF), so a new route, sub-app or method cannot skip them. The route table test fails if any path or operation name suggests submitting, sending or posting outward. See [api.md](api.md) and [ADR 0028](adr/0028-api-security-layer.md).
 - **The sample bank and its gap table cannot drift.** `PLANTED_GAPS.md` is parsed by a test that runs each row through `retrieve`, so a bank edit that changes a gap fails the build. See `evals.md`.
-- **A discovery score is cached by run id, capped per run, and stops cleanly.** The run id already covers text, bank, backend and model, so an unchanged listing is never scored again. At most `cap` listings reach the analyzer, most recent first, and the rest are reported unscored. A backend outage or a spent budget ends scoring and keeps what was stored. See [ADR 0034](adr/0034-discovery-run-cap-cache-and-stops.md).
+- **A discovery score is cached by run id and pipeline version, capped per run, and stops cleanly.** The run id covers text, bank, backend and model, and the pipeline version covers the prompts, validators, scoring code and config, so an unchanged listing under unchanged judges is never scored again. At most `cap` analyzer calls are made (a failed extraction counts), most recent first, and the rest are reported unscored. A backend outage or a spent budget ends scoring and keeps what was stored. See [ADR 0034](adr/0034-discovery-run-cap-cache-and-stops.md).
 - **Dedupe is exact or nothing, and only a clean fetch closes.** Cross source listings merge only on equal company key, title and location fingerprints, never inside one source and never in an ambiguous group. `Listings.apply_fetch` closes listings missing from a successful board fetch, and a skipped job it cannot place stops the closing. See [ADR 0031](adr/0031-conservative-dedupe-filters-and-closing.md).
 - **A denial is permanent until a human removes it.** A denied company is a tombstone matched by `company_key` and by normalized board, and `Watchlist.add` refuses it. Only `Tombstones.remove` lifts one. See [ADR 0017](adr/0017-tombstones-are-removed-only-by-a-human-call.md).
 - **The blacklist filter is pure and runs first.** `is_blacklisted(candidate, entries)` takes everything as arguments, touches no database and no network, and returns the `BlockReason` (company key, slug or domain) or `None`. It is meant to run on a discovered company before any fetch. Entries are normalized when created, and `Blacklist` only stores them. See [data-model.md](data-model.md#discovery-the-blacklist).

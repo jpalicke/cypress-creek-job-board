@@ -68,8 +68,29 @@ def test_location_keeps_a_listing_whose_location_names_an_allowed_place() -> Non
 
 
 def test_remote_true_keeps_only_remote_listings() -> None:
-    listings = [make("1"), make("2", location="Remote - US"), make("3", title="Remote Engineer")]
-    assert kept_ids(listings, remote=True) == ["greenhouse:acme:2", "greenhouse:acme:3"]
+    listings = [
+        make("1"),
+        make("2", location="Remote - US"),
+        make("3", title="Platform Engineer (Remote)"),
+        make("4", title="Platform Engineer - Remote"),
+        make("5", title="Remote - Platform Engineer"),
+    ]
+    assert kept_ids(listings, remote=True) == [
+        "greenhouse:acme:2",
+        "greenhouse:acme:3",
+        "greenhouse:acme:4",
+        "greenhouse:acme:5",
+    ]
+
+
+def test_the_word_remote_inside_a_job_title_is_not_a_work_location() -> None:
+    listings = [
+        make("1", title="Remote Sensing Engineer"),
+        make("2", title="Remote Control Software Engineer"),
+        make("3", location="Remote"),
+    ]
+    assert kept_ids(listings, remote=True) == ["greenhouse:acme:3"]
+    assert kept_ids(listings, remote=False) == ["greenhouse:acme:1", "greenhouse:acme:2"]
 
 
 def test_remote_false_drops_remote_listings() -> None:

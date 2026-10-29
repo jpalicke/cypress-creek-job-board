@@ -3,7 +3,7 @@
 import sqlite3
 from collections import defaultdict
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime
 from enum import StrEnum
 
@@ -18,6 +18,7 @@ from cypress_creek.ingest.hashing import text_hash
 from cypress_creek.ingest.models import Extractor, Posting, PostingSource
 from cypress_creek.pipeline.report import GapReport, ReportStatus
 from cypress_creek.pipeline.run import run_id
+from cypress_creek.pipeline.version import pipeline_version
 from cypress_creek.providers.errors import BudgetExceeded
 from cypress_creek.scoring.support import Support
 
@@ -38,11 +39,15 @@ class ScoreStatus(StrEnum):
 
 @dataclass(frozen=True)
 class RunIdentity:
-    """What a cached score depends on besides the listing text."""
+    """What a cached score depends on besides the listing text.
+
+    The pipeline version is a digest of the prompts, stages, validators, scoring and config, so a
+    score judged by older code is never reused."""
 
     bank_digest: str
     backend: str
     model: str
+    pipeline_version: str = field(default_factory=pipeline_version)
 
 
 @dataclass(frozen=True)
@@ -160,36 +165,35 @@ def run_discovery(
         listings.apply_fetch(entry.ats, entry.slug, fetch)
         fetched += len(fetch.listings)
     candidates = _candidates(conn, boards, filters, today)
-    scored = hits = 0
+    scored = hits = calls = 0
     stopped_by: str | None = None
     for merged in sorted(candidates.kept, key=_newest_first):
         listing = merged.listing
         key = run_id(
             text_hash(listing.content_text), identity.bank_digest, identity.backend, identity.model
         )
-        stored = _load_report(conn, key)
+        stored = _load_report(conn, key, identity.pipeline_version)
         if stored is not None and stored.status is ReportStatus.COMPLETE:
             hits += 1
             continue
         if stopped_by is not None:
             continue
-        if scored >= cap:
+        if calls >= cap:
             stopped_by = "cap"
             continue
-        scored += 1
+        calls += 1
         try:
             report = analyzer(posting_from_listing(listing))
         except BudgetExceeded:
-            scored -= 1
             stopped_by = "budget"
             continue
         failure = _extraction_failure(report)
         if failure is not None:
-            scored -= 1
             if failure in _BACKEND_DOWN:
                 stopped_by = "backend"
             continue
-        _store(conn, key, listing.content_hash, report, now)
+        _store(conn, key, identity.pipeline_version, listing.content_hash, report, now)
+        scored += 1
     ranked = ranked_listings(conn, boards, filters, identity, today)
     unscored = sum(1 for row in ranked if row.status is ScoreStatus.UNSCORED)
     summary = RunSummary(
@@ -223,7 +227,7 @@ def ranked_listings(
         key = run_id(
             text_hash(listing.content_text), identity.bank_digest, identity.backend, identity.model
         )
-        rows.append(_row(merged, key, _load_report(conn, key)))
+        rows.append(_row(merged, key, _load_report(conn, key, identity.pipeline_version)))
     return rank(rows)
 
 
@@ -289,20 +293,34 @@ def _extraction_failure(report: GapReport) -> str | None:
     return None
 
 
-def _load_report(conn: sqlite3.Connection, key: str) -> GapReport | None:
+def _load_report(conn: sqlite3.Connection, key: str, version: str) -> GapReport | None:
     row = conn.execute(
-        "SELECT report_json FROM discovery_report WHERE run_id = ?", (key,)
+        "SELECT report_json FROM discovery_report WHERE run_id = ? AND pipeline_version = ?",
+        (key, version),
     ).fetchone()
     return GapReport.model_validate_json(row[0]) if row else None
 
 
 def _store(
-    conn: sqlite3.Connection, key: str, content_hash: str, report: GapReport, now: datetime
+    conn: sqlite3.Connection,
+    key: str,
+    version: str,
+    content_hash: str,
+    report: GapReport,
+    now: datetime,
 ) -> None:
     conn.execute(
-        "INSERT INTO discovery_report (run_id, content_hash, status, report_json, created_at)"
-        " VALUES (?, ?, ?, ?, ?)"
-        " ON CONFLICT (run_id) DO UPDATE SET status = excluded.status,"
+        "INSERT INTO discovery_report"
+        " (run_id, pipeline_version, content_hash, status, report_json, created_at)"
+        " VALUES (?, ?, ?, ?, ?, ?)"
+        " ON CONFLICT (run_id, pipeline_version) DO UPDATE SET status = excluded.status,"
         " report_json = excluded.report_json, created_at = excluded.created_at",
-        (key, content_hash, report.status.value, report.model_dump_json(), now.isoformat()),
+        (
+            key,
+            version,
+            content_hash,
+            report.status.value,
+            report.model_dump_json(),
+            now.isoformat(),
+        ),
     )

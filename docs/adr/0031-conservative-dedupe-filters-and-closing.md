@@ -15,10 +15,12 @@ Discovery must cut the listings down before any model call, without hiding a rea
 - **A listing with no date passes the age filter.** Age cannot be judged, and hiding it would be the worse error.
 - **Each removal is counted under the first filter that rejects it,** in a fixed order, so the counts sum to the total removed.
 - **A closed listing that returns is `seen`, not `new`.** It has been stored before. Whether the user has acted on it is not tracked here.
+- **Remote is a location, not a word in a title.** The remote filter reads the location, and the title only in a marked form (a bracket, or a dash before or after the word). `Remote Sensing Engineer` is not remote. A title that says remote some other way is not recognized, which keeps more listings visible under `remote=false` and hides them under `remote=true`.
 - **Only a whole, clean fetch closes.** `apply_fetch` is reached only after `fetch_board` returned, so a failed fetch writes nothing. A skipped job with a known id protects its listing. A skipped job with no id stops closing for that fetch. An empty successful fetch does close the board, because `[]` is a valid board.
 
 ## Consequences
 
+- A successful fetch of a board with no postings closes every stored listing of that board. An adapter that returns an empty board for a feed glitch would do the same; the adapters fail the board on a schema violation, so an empty board is only a board with no open jobs.
 - A cross-source duplicate whose titles differ by even one word is shown twice. That is accepted.
 - A board that skips jobs without ids never closes anything until it fetches clean. Stale listings last longer, and none is closed wrongly.
 - The company map must be built from the watchlist by the scan card H8 (#47), which is the first caller of all of this.

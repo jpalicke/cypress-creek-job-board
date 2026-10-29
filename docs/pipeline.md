@@ -452,7 +452,7 @@ Discovery turns the listings an adapter fetched into the ones worth scoring, bef
 | --- | --- |
 | `max_age_days` | `today` minus the posted date is at most N days. A listing with no `posted_at` is kept, since age cannot be judged. |
 | `locations` | the location contains any listed place |
-| `remote` | `true`: the location or title says `remote`. `false`: it does not. |
+| `remote` | `true`: the location says `remote`, or the title says it in a marked form (`Engineer (Remote)`, `Engineer - Remote`, `Remote - Engineer`). `false`: it does not. The word alone inside a title, as in `Remote Sensing Engineer`, is not a work location. |
 | `exclude_seniority` | no term appears in the title |
 | `exclude_keywords` | no term appears in the title or description |
 | `include_keywords` | at least one term appears in the title or description |
@@ -532,10 +532,10 @@ The Greenhouse and Lever copies of `Platform Engineer` merged (two URLs), the As
 1. **Blacklist first.** A watched company that `is_blacklisted` is skipped before any request, and is counted in `blocked_boards`.
 2. **Fetch.** Each remaining board is refreshed through its adapter and stored with `Listings.apply_fetch`. A board that fails is listed in `errors` (the error type only) and the other boards still run.
 3. **Dedupe and filter** the open listings of the watched, non-blacklisted boards (see the section above). Counts per filter are in `filtered_out`.
-4. **Score, most recent first, under the cap.** A listing whose score is already stored is a cache hit and costs nothing. Otherwise the analyzer is called, until `cap` listings (default 30) have been sent. The next listing past the cap ends scoring with `stopped_by="cap"`, and the rest are reported as unscored, never dropped.
+4. **Score, most recent first, under the cap.** A listing whose score is already stored is a cache hit and costs nothing. Otherwise the analyzer is called, until `cap` calls (default 30) have been made. Every call counts, including one that fails to extract, so a model that fails every extraction is still called at most `cap` times. The next listing past the cap ends scoring with `stopped_by="cap"`, and the rest are reported as unscored, never dropped.
 5. **Rank** (`rank`): scored rows by score then recency, then rows with no score (no requirements were extracted), then unscored rows.
 
-The cache key is the run id, which already covers the listing text, the bank, the backend and the model (`pipeline.run.run_id`). Reports are stored in the `discovery_report` table. So an unchanged listing is never scored again, and a changed description, bank or model is. Only a complete report is reused; an incomplete one (for example the model could not answer an entailment call) is shown with `incomplete=True` and tried again on the next run.
+The cache key is the run id, which covers the listing text, the bank, the backend and the model (`pipeline.run.run_id`), plus the pipeline version (`pipeline.version.pipeline_version`): a digest of the stages, prompts, validators, scoring code and the config files. Reports are stored in the `discovery_report` table under both. So an unchanged listing is never scored again, and a changed description, bank, model, prompt, validator, scoring rule or config is. A code change that does not touch those folders keeps the cache. Only a complete report is reused; an incomplete one (for example the model could not answer an entailment call) is shown with `incomplete=True` and tried again on the next run.
 
 Scoring stops early, and the rest stay unscored, when the backend cannot answer (`stopped_by="backend"`: provider unavailable or rate limited) or the budget is spent (`stopped_by="budget"`). Scores already stored are kept. A listing whose extraction fails for another reason is left unscored and the run goes on.
 
