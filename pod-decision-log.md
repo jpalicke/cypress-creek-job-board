@@ -281,3 +281,8 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 - 2026-10-29, senior engineer decided, manager concurs.
 - Is a 41 percent false-positive rate acceptable? Choice: yes, for a review aid that shows NOT VERIFIED lines: failures cause friction, never false claims; the risk to manage is alarm fatigue. Do not grow the connective list; reduce false positives through the prompt and measure the live flag rate in the E5 metrics. Alternative: allow a reviewed list extension. FOR JOE P: this is the product trade-off between friction and safety; reverse by widening the list.
 - Two further leaks (plural inflation through the stem rule; passive role inversion with "by") are being fixed: stems ing/ed only and "by" dropped from the connective list, raising false positives from 9/22 to 10/22. Recombinations of a fact's own words (for example "Led 8 billing systems") are pinned and documented as a limit.
+
+## D52. H1c watchlist and blacklist routes (branch h1c-watchlist-routes, PR opens after #139 merges; Worker H)
+- 2026-10-29, Worker H. ADR 0036.
+- A watchlist add needs `"approval": "human_confirmed"` and refuses any extra field, so a model-proposed name cannot arrive as a human approval; the server stamps the approval time. The blacklist is checked first and wins over the watchlist; tombstoned companies stay out; conflicts are typed 409s. Routes: GET/POST /api/watchlist, GET/POST /api/blacklist, DELETE /api/blacklist/{id}.
+- Unverified in the sandbox: the needs_network integration test (no network); CI dispatch is the evidence.
