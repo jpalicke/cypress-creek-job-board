@@ -175,8 +175,9 @@ recorded in the report (`ReportRow.span`), so the scorer never searches for text
 
 A planted gap the run did not extract at all is not in `gap_recall`'s denominator (not extracting a
 requirement asserts nothing), so it is published as its own metric, `planted_not_extracted`. Read the
-two together: a run that skips every planted gap at extraction has `gap_recall` 1.0 only because
-nothing was left to judge, and `planted_not_extracted` is what shows it. A planted gap reported as strong is a fabrication risk. Each
+two together: a run that extracts only some planted gaps can show `gap_recall` 1.0 because the
+skipped ones were never judged, and `planted_not_extracted` is what shows it (if it skips them all,
+`gap_recall` is `not_run`). A planted gap reported as strong is a fabrication risk. Each
 one is listed in `missed_planted_gaps` with the case, repeat, label, the support it claimed and
 the fact ids it cited. "Entailed" means the second opinion ran (`confirmed` or `downgraded`), so a
 row with `not_run` or `not_needed` is not in E2.
