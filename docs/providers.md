@@ -1,6 +1,6 @@
 # Providers
 
-The provider layer is how the pipeline talks to a model. Every backend (local or hosted) implements one interface, so the pipeline and the eval harness never know which one they use. Code is `src/cypress_creek/providers/`. This page covers the interface, the typed errors, the retry policy, the config that selects a backend and the Ollama adapter. The other adapters arrive in later cards (see the issue board).
+The provider layer is how the pipeline talks to a model. Every backend (local or hosted) implements one interface, so the pipeline and the eval harness never know which one they use. Code is `src/cypress_creek/providers/`. This page covers the interface, the typed errors, the retry policy, the config that selects a backend, the Ollama adapter and the Anthropic adapter. The other adapters arrive in later cards (see the issue board).
 
 ## The interface
 `Provider` is a `typing.Protocol` in `providers/base.py`:
@@ -61,6 +61,55 @@ Local setup: install [Ollama](https://ollama.com), then pull a model. Approved f
 ollama pull qwen3.5:4b
 ```
 
+## The Anthropic adapter
+Code is `src/cypress_creek/providers/anthropic.py`, registered as provider `anthropic`. It calls the Messages API (`POST /v1/messages`) with native structured output and defaults to the model `claude-sonnet-5-5`. Decisions are in [ADR 0025](adr/0025-anthropic-native-structured-output.md).
+
+**Not yet proven against the live API.** As of this card, the real structured call has not yet been accepted by the live API; only the wrong-key path has run against it. Joe P runs `uv run pytest tests/integration/test_anthropic_live.py -q` once with a real key to close this, see [issue #129](https://github.com/jpalicke/cypress-creek-job-board/issues/129) for the command and what to record.
+
+- **Hosted rules.** It needs `allow_remote = true`, an `api_key_env` naming the variable that holds the key (never the key itself), and an https URL for any remote `base_url`. The key is sent only in the `x-api-key` header, redirects are not followed, and every error scrubs it. Facts marked `local_only` are left out of the prompt for any backend whose `local` capability is false, so they never reach the request body.
+- **Request.** The trusted system text is the top level `system` field. The untrusted data block (the posting inside its boundary, then any trusted facts) is the single user message. The schema goes in `output_config.format` after the adapter closes every object and drops the keywords the grammar rejects (the pydantic model still validates the answer). No tools are offered.
+- **Answer.** Only `text` blocks are read. `refusal` is the typed `Refusal`. An answer cut off at `max_tokens` or not matching the schema is a `SchemaViolation` (retried once with only the error text). Usage is read from the response, including cache token fields, and a response without complete counts is an error.
+
+| Situation | Error |
+| --- | --- |
+| Server unreachable or timed out | `ProviderUnavailable` |
+| HTTP 429 or 529 | `RateLimited` (with `retry-after` if sent) |
+| HTTP 429 for the monthly spend cap | `ProviderUnavailable`, not retried |
+| Any other non-200 status, including a redirect | `ProviderUnavailable` with the status, error type and `request-id` |
+| `stop_reason` of `refusal` | `Refusal` |
+| Cut off at `max_tokens`, or not matching the schema | `SchemaViolation` |
+| Any other `stop_reason`, or missing text or usage | `ProviderUnavailable` |
+| Prompt plus output cap over `context_tokens` | `ContextTruncated`, before any request |
+
+Setup: create a key in the Claude Console, then put its name in the config and the key itself in your shell (or a gitignored `.env` that you load into the shell). Never commit a key.
+```toml
+provider = "anthropic"
+model = "claude-sonnet-5-5"
+allow_remote = true
+api_key_env = "ANTHROPIC_API_KEY"   # pragma: allowlist secret
+# context_tokens = 1000000          # default for this adapter, not 8192
+# input_usd_per_mtok = 2.0          # defaults exist for claude-sonnet-5-5 (2 and 10),
+# output_usd_per_mtok = 10.0        # claude-opus-5-5 (4 and 20) and claude-fable-5-1 (10 and 50)
+```
+Another model needs both prices set, or the adapter refuses to start. Only hosted adapters read `input_usd_per_mtok` and `output_usd_per_mtok`; the Ollama adapter ignores them and costs nothing. Thinking is left at the model default and its tokens count against the output cap, so give structured calls a generous `max_output_tokens`.
+
+Run it once against the real API (costs a fraction of a cent):
+```bash
+export ANTHROPIC_API_KEY=...   # your key
+CYPRESS_CREEK_PROVIDER=anthropic CYPRESS_CREEK_MODEL=claude-sonnet-5-5 CYPRESS_CREEK_ALLOW_REMOTE=true CYPRESS_CREEK_API_KEY_ENV=ANTHROPIC_API_KEY uv run python -c "
+from pydantic import BaseModel
+from cypress_creek.config import load_settings
+from cypress_creek.providers import get_provider
+
+class Greeting(BaseModel):
+    text: str
+
+result = get_provider(load_settings()).complete_structured('Reply with a short greeting.', 'Say hi', Greeting, 2000)
+print(result.parsed, result.usage)
+"
+```
+It prints a greeting and the real token usage. Without the variable it fails with `environment variable ANTHROPIC_API_KEY is not set` and makes no request. The live tests are `uv run pytest tests/integration/test_anthropic_live.py -q`. They fail, never skip, when the key is missing (the real call test), and the wrong key test needs only the internet.
+
 ## The budget guard
 Code is `src/cypress_creek/providers/budget.py`. A run has four limits, and a call that could pass any of them is refused before it is sent.
 
@@ -84,7 +133,7 @@ provider = "ollama"
 model = "llama3.1"
 base_url = "http://localhost:11434"
 # allow_remote = true              # required for any host that is not loopback
-# api_key_env = "OPENAI_API_KEY"   # the NAME of an environment variable, never the key  # pragma: allowlist secret
+# api_key_env = "ANTHROPIC_API_KEY"   # the NAME of an environment variable, never the key  # pragma: allowlist secret
 # request_timeout_seconds = 120
 # connect_timeout_seconds = 5
 # context_tokens = 8192            # the window sent as num_ctx, at least 2048 for ollama
@@ -92,6 +141,8 @@ base_url = "http://localhost:11434"
 # max_output_tokens = 100000
 # max_requests = 500
 # max_usd = 2.0
+# input_usd_per_mtok = 2.0       # dollars per million tokens, for a model with no built in price
+# output_usd_per_mtok = 10.0
 ```
 - `provider` and `model` are required. The other fields are optional.
 - Any field can be overridden by `CYPRESS_CREEK_<FIELD>`, for example `CYPRESS_CREEK_MODEL=qwen3`. Blank values are ignored.
@@ -99,7 +150,7 @@ base_url = "http://localhost:11434"
 - Keys: the file holds `api_key_env`, and `resolve_api_key(settings)` reads that variable when an adapter needs it. A missing variable is an error that names the variable, never a value.
 - Every failure is a `ConfigError`. Messages carry field names and rules only, so a key pasted into a URL is not echoed back.
 
-`get_provider(settings)` (in `providers/factory.py`) finds the adapter registered under `settings.provider`. An unknown name raises `UnknownProvider`, a `ConfigError` listing the known names. `ollama` is the only adapter registered so far.
+`get_provider(settings)` (in `providers/factory.py`) finds the adapter registered under `settings.provider`. An unknown name raises `UnknownProvider`, a `ConfigError` listing the known names. `ollama` and `anthropic` are registered so far.
 
 Known limits: the loopback check reads the URL text, so a name that resolves elsewhere or a redirect is not caught (adapters must not follow redirects off the configured host). A backend with a built in remote default URL must demand `allow_remote` itself, because an empty `base_url` passes.
 
@@ -133,9 +184,9 @@ print(result.parsed, result.usage)
 ```
 It prints a greeting and the token usage. Change `'Say hi'` to `'word ' * 6000` and it raises `ContextTruncated` before any request is made. The live tests run the same checks, including a real overflow, and fail (never skip) if Ollama or the model is missing:
 ```bash
-uv run pytest tests/integration -m live -q
+uv run pytest tests/integration -m "live and not needs_network" -q
 ```
-The `live` GitHub Actions workflow (`.github/workflows/live.yml`) does this on a schedule and on demand with a fresh Ollama and `qwen3.5:0.8b`.
+The `live` GitHub Actions workflow (`.github/workflows/live.yml`) does this on a schedule and on demand with a fresh Ollama and `qwen3.5:0.8b`. It selects `live and not needs_network`, so the Anthropic live test, which needs a key and spends money, never runs there. Credentialed or desktop-only live tests that are not `needs_network` must use their own marker (as the OpenAI and LM Studio tests do) so this selector stays correct.
 
 Print the projected cost of a plan (three small calls) with the budget from the same settings. No call is made, so no server needs to be running:
 ```bash
