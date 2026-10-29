@@ -60,3 +60,8 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 - Fixture hash lines carry "# pragma: allowlist secret" instead of .secrets.baseline entries. Reverse: swap for baseline entries.
 - One fixture keeps a verbatim em dash in third party salary text. Reverse: normalize and update the hash. Reviewer asked to decide.
 - Four of six originally chosen postings were 404 at fetch; same-board replacements are recorded in meta.yaml.
+
+## D12. PR #116 live test and C4 parking (Worker C)
+- 2026-10-29, Worker C.
+- Live test gets spans from report row text via text.index and compares with uncovered_cue_spans, because report rows carry no spans and the review asked for the path through analyze. Safe because the sample posting has no duplicate requirement texts. Reverse: call extract_requirements then assess in the test.
+- C4 WIP is committed on branch c4-openai-compatible (docs and ADR pending) while #116 had priority. C4 live tests need LM Studio and an OPENAI_API_KEY, which this container lacks; they fail loudly, and unverified LM Studio behaviour will be documented as unverified.
