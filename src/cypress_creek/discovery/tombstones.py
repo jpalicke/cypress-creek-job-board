@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 
-from cypress_creek.storage.company_key import company_key
+from cypress_creek.storage.company_key import CompanyNameError, company_key
 
 
 class InvalidBoard(ValueError):
@@ -81,6 +81,18 @@ class Tombstones:
         if by_board:
             return Denial(DenialReason.BOARD, by_board[0])
         return None
+
+    def denied_company(self, name: str) -> Denial | None:
+        """Whether a company is denied by name alone, matched on its key. Used before any board
+        is known. A name with no usable key matches nothing."""
+        try:
+            key = company_key(name)
+        except CompanyNameError:
+            return None
+        row = self._conn.execute(
+            "SELECT name FROM suggestion WHERE state = 'denied' AND company_key = ?", (key,)
+        ).fetchone()
+        return Denial(DenialReason.COMPANY, row[0]) if row else None
 
     def is_denied(self, *, name: str, ats: str, slug: str) -> bool:
         return self.denial(name=name, ats=ats, slug=slug) is not None
