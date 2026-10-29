@@ -47,7 +47,7 @@ Before a PR is ready, in the same PR:
 - README.md status and "Try what exists" reflect what now works.
 - The docs index (docs/README.md) lists any new doc or decision record.
 - docs/codebase.md matches the code: layout, the flow diagram and the module list.
-- A new design decision has an ADR in `docs/adr/`. Numbers are sequential. The latest on main is 0027 and 0028 is the API security layer's (G1), so the next free number is 0029; 0029 to 0035 are reserved by the plan (0029 H1d, 0030 G2, 0031 H6, 0032 E4, 0033 the draft-limits fix, 0034 H7, 0035 G3). Check `ls docs/adr` and the open pull requests before you pick one; the last PR to merge resolves any clash.
+- A new design decision has an ADR in `docs/adr/`. Numbers are sequential and gaps are fine. The latest on main is 0029 (the Lever region). Numbers reserved by the plan for open work: 0030 G2, 0031 H6, 0032 E4, 0033 the draft-limits fix, 0034 H7, 0035 E5 (G3 also names 0035), 0041 H8. Check `ls docs/adr` and the open pull requests before you pick one; the last PR to merge resolves any clash.
 - Configuration files (for example `config/aliases.yaml`) are described in the doc that owns them.
 
 ## Setup
