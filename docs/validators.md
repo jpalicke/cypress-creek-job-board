@@ -74,7 +74,13 @@ This is a heuristic and is deliberately conservative: it flags for review, it ne
 `check_fact_dates(fact, today)`. Wraps `date_problems` in `facts/dates.py`, the same rules the bank loader applies: no `start`, `end` or `verified_on` after `today`, and `start` not after `end`. `today` is passed in so the function stays pure. The verdict's `offending` is the field name.
 
 ## V13 Cue sentence coverage
-`check_cue_coverage(posting_text, requirements)` fails if a posting sentence holding an importance cue word (the lists in `cues.py`) is not touched by any requirement span. `uncovered_cue_sentences(text, spans)` returns all of them, so a later stage can report them as "not assessed" instead of failing. A line that is only a section heading ("Nice to have:") is not a requirement and is skipped. Partial overlap counts as covered. The pipeline wires this in at ingestion (a later card).
+`check_cue_coverage(posting_text, requirements)` fails if a posting sentence holding an importance cue word (the lists in `cues.py`, shared with V3) is not touched by any requirement span. The trace records this verdict after successful extraction. `uncovered_cue_spans(text, spans)` returns all original character offsets; `uncovered_cue_sentences` returns their text. The report lists each missed sentence with reason `cue_sentence_uncovered`, and the text view shows the count beside the score. The warning does not change score arithmetic or report status. A line that is only a section heading ("Nice to have:") is skipped. Partial overlap counts as covered.
+
+Try the coverage check without a model:
+```bash
+uv run python -c "from cypress_creek.validators.requirements import uncovered_cue_spans; text='You must know Python. Postgres is required.'; print([(text[a:b], (a, b)) for a, b in uncovered_cue_spans(text, [(0, 21)])])"
+```
+It prints the uncovered Postgres sentence and its original offsets.
 
 ## V14 Company name shape
 `check_company_name(name)`. After NFKC normalization the name must be 2 to 60 characters, at most 6 words, made only of letters, digits, spaces and `& . ' - ,`, in one script (so a Cyrillic lookalike letter inside a Latin name fails). It must not look like a web address (a dot followed by letters, so `acme.io` fails), a slug (one lowercase word with a hyphen), or be only digits.

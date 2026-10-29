@@ -1,8 +1,9 @@
 # Evals
 
-The eval harness measures the pipeline against a fixed, fictional fact bank. The run record
-format and production pipeline trace are available now. The CLI runner, postings and hand
-labels come in later cards.
+The eval harness runs dated, fictional postings against the sample fact bank and a real model.
+Its CLI saves resumable runs in SQLite and can export JSONL for audit. Six real postings with
+hand labels are committed under `evals/fixtures/` (see [Posting fixtures and hand labels](#posting-fixtures-and-hand-labels)),
+but the smoke case runs are still not benchmark evidence.
 
 ## Run record format
 
@@ -19,7 +20,7 @@ terminal when the same run resumes. A `complete` terminal requires every planned
 | --- | --- |
 | `header` | Git commit, provider, exact model, prompt hashes and schema versions by stage, fixture set hash, bank hash, ordered case IDs and repeat count. `format_version` is 1. |
 | `case` | Run ID, case ID, repeat number, posting hash, full gap report, every attempted provider call with stage, prompt hash, schema version, outcome, error type when applicable, nullable observed token usage and dollar cost, and each recorded validator verdict with stage and subject. |
-| `terminal` | Run ID, `complete` or `failed` status, and a reason for failure. |
+| `terminal` | Run ID, `complete` or `failed` status, a reason for failure, and attempted calls from an unfinished case when the run failed. |
 
 The run ID is a SHA-256 digest of the canonical header. A changed commit, model, prompt,
 schema, fixture, bank, case plan or repeat count changes that ID. The store rejects a
@@ -38,7 +39,8 @@ estimated for the audit. Entailment records only validators actually reached by 
 and rationale checks. Report verification records V4, V5 and V9, including failed verdicts.
 Validator verdicts can contain offending text from a posting or model rationale, so treat a
 trace and its eventual audit export as sensitive run data.
-The CLI runner that persists these records in SQLite is a later card.
+The CLI persists completed case traces through `EvalStore`. A failed case stays pending, while
+its attempted calls are retained in the failed terminal.
 
 Each append commits as one SQLite transaction, so an interrupted write cannot leave a partial
 case record. The `0004_eval_runs.sql` migration adds these tables to the existing database in
@@ -48,15 +50,103 @@ file. `load_run(path, expected_header=header)` validates an export but never cha
 state. An export is not a resume store.
 
 Scratch exports belong under `evals/scratch/`, which Git ignores. Only published exports with
-hand labels belong under `evals/results/`, named with date, backend and model. E2b adds the
-CLI that fills the database from real providers. E3 supplies the labels, so no E2a file is
-benchmark evidence.
+hand labels belong under `evals/results/`, named with date, backend and model. The labels now
+exist, but no scorer has read them yet, so an E2b2 scratch file is not benchmark evidence.
+
+For E2's omission rate, read `report.not_assessed` (cue sentences extraction skipped, with offsets)
+and the V13 verdict that the pipeline trace records at stage `extract`.
+
+## Run the harness
+
+Start Ollama and pull `qwen3.5:0.8b` as described in the [provider guide](providers.md#try-it-locally).
+From the repository root, inspect the one-case plan without contacting the model:
+
+```bash
+uv run python -m evals.harness.run --backend ollama --model qwen3.5:0.8b --cases evals/cases/technical-smoke.json --repeats 1 --dry-run
+```
+
+The output labels initial extraction calls as exact and entailment attempts and cost as upper
+bounds, because requirements and retries depend on the model. To run the case and save both
+live state and an audit snapshot:
+
+```bash
+uv run python -m evals.harness.run --backend ollama --model qwen3.5:0.8b --cases evals/cases/technical-smoke.json --repeats 1 --out data/cypress_creek.sqlite3 --export evals/scratch/technical-smoke.jsonl
+```
+
+`--out` is the SQLite database path; without it, the runner uses the project database under
+`CYPRESS_CREEK_DATA_DIR` (default `data/`). `--export` is optional, only works on a live run,
+and must name a nonexistent `.jsonl` file under `evals/scratch/`. The CLI never overwrites an
+export or writes to `evals/results/`. To rerun or resume the same run, keep the same commit,
+model, case manifest, bank and repeat count. Omit `--export` or choose another unused scratch
+filename. Completed pairs are skipped. A backend that cannot be reached exits nonzero and
+saves a failed terminal; a later invocation retries its pending pair.
+
+The header records Git `HEAD`, not uncommitted source changes. Use a clean checkout for runs
+you need to reproduce or compare.
+
+The budget from [provider settings](providers.md#the-budget-guard) covers the whole run,
+including completed cases and attempts saved in failed terminals. A failed attempt with no
+reported usage remains `null` in the audit. It blocks later calls in that invocation; on
+resume, the runner reserves the configured context size and that stage's output cap for it
+before allowing another call. This may exhaust the run budget. Hosted providers also require
+`--confirm-spend` before a live run can call them.
 
 Check the record contract locally with:
 
 ```bash
 uv run pytest tests/unit/test_run_records.py tests/component/test_eval_run_files.py -q --no-cov
 ```
+
+## Posting fixtures and hand labels
+
+`evals/fixtures/<ats>-<job id>/` holds one real, public job posting as three files: `posting.txt`
+(the plain text after this project's own HTML to text step and normalization), `meta.yaml` and
+`labels.yaml`. There are six: four Greenhouse and two Lever postings, taken from the approved
+list of eight. The two Ashby postings are held out for later.
+
+**Source and license.** Each posting belongs to its publisher, and the feeds state no reuse
+license. They are kept only as evaluation inputs and are treated as hostile input. `meta.yaml`
+records the posting URL, the feed URL, the publisher, the retrieval date (2026-10-29) and the
+SHA-256 of `posting.txt`; [NOTICE](../NOTICE) lists the same and gives the takedown contact. No
+recruiter or other personal data is kept (a test refuses any `@` in a posting). The postings were
+fetched with an honest, versioned `cypress-creek` User-Agent and no repeated requests.
+
+**Replacements.** Four of the six approved postings had closed when they were re-fetched. Each
+stand in comes from the same board and records the original ID and the reason under `replaces`
+in its `meta.yaml`. The details are in [e3-label-decisions.md](e3-label-decisions.md#the-404s-and-the-replacements).
+
+**Labels.** Per posting, `labels.yaml` lists the requirements as read from the text: a verbatim
+`span`, `kind`, `term`, optional `years` and `issuer`, `importance`, the `expected_support`
+(`strong`, `partial` or `none`), the `expected_status` (`gap` unless strong), the `fact_ids` that
+justify it, an optional `planted_gap` row and an optional `note`. It also lists the cue
+sentences that the V13 check must cover. The labels carry a `provenance` block: who labeled them,
+`review: pending` until Joe P signs off, the date, and `model_output_used: false`. Joe P
+delegated the labeling to the pod and reviews the result; every judgment call is explained in
+[e3-label-decisions.md](e3-label-decisions.md) and is his to change. Labels are written before any
+model runs and are never adjusted to fit a backend. A change after a run is a new label version,
+and the earlier run files stay in the record.
+
+**The checks.** `evals/harness/labels.py` holds the pydantic schema and `validate_labels`. It
+rejects a span that is not exact posting text, a fact ID that is missing, unverified or local
+only, a planted gap row that disagrees with the label, a status that does not follow the support,
+and a cue sentence in the posting that is not labeled. `require_committed_labels` refuses a case
+whose `labels.yaml` is untracked or differs from the commit, so a run can only use labels that git
+already holds. `evals/harness/fixtures.py` loads a fixture directory, checks the hash and computes
+the fixture set hash for run headers.
+
+```bash
+uv run python -m evals.harness.check_labels
+```
+It prints one `ok` line per fixture and the fixture set hash, and exits 1 with each problem on
+standard error when a fixture is unsound. The tests are:
+```bash
+uv run pytest tests/unit/test_labels_unit.py tests/component/test_labels.py tests/component/test_fixtures.py tests/e2e/test_check_labels_process.py tests/integration/test_label_commit_guard.py -q --no-cov
+```
+The last one needs the labels to be committed, so run it from a clean checkout.
+
+To fetch a posting again, read the feed named in `meta.yaml`, convert the description with
+`html_to_text`, join the title and the text, and pass the result through `normalize`. The shipped
+text is exactly that output.
 
 ## The sample bank
 

@@ -18,7 +18,7 @@ Never commit with a personal email address. Secrets live in the environment or a
 
 ## The card routine, in order
 1. **Read the card.** Pick one from the board ([lanes.md](lanes.md) shows which lanes can run in parallel and how to list ready cards). Scope, out of scope, suggested files, first failing test, test plan, docs owned, depends on. Check the dependencies are closed.
-2. **Size it.** A PR aims for at most 10 changed files, hard cap 20 (a bundled third party data file counts as one). If the card will exceed about 10, propose a split before starting. Retitle the issue (for example `B6a`), file the follow up (`B6b`) and say so in the PR. Each piece ships its own docs.
+2. **Size it.** A PR aims for roughly 20 changed files (a bundled third party data file counts as one). If the card will go well past that, propose a split before starting. Retitle the issue (for example `B6a`), file the follow up (`B6b`) and say so in the PR. Each piece ships its own docs.
 3. **Branch.** `git checkout -b <card-id>-<short-name>` from an up to date `main`. One branch per card. No worktrees.
 4. **Test first, always.** Write the failing test, run it, see it fail for the right reason, and only then write implementation. The same goes for every later design change within the card: change the tests first, watch them fail, then change the code. Never write implementation ahead of the test that demands it, and never "fix the tests afterwards". Every tier that applies exists: unit, component, integration, e2e. No tier is ever marked not applicable.
 5. **Implement the minimum**, then refactor with the tests green. Match the surrounding style. Every code file starts with two `ABOUTME: ` comment lines (100 characters or fewer per line).
@@ -29,8 +29,10 @@ Never commit with a personal email address. Secrets live in the environment or a
    uv run ruff check src tests
    uv run mypy                       # strict
    uv run pytest tests/unit tests/component --cov --cov-fail-under=80 -q
+   uv run pytest tests/e2e tests/integration -m "not needs_network and not live and not live_openai and not live_lmstudio" -q
    uv run pre-commit run --all-files
    ```
+   The e2e line is an offline gate in CI too. Tests marked `needs_network` or `live` run in `network.yml` and `live.yml` (start them from the Actions tab with `workflow_dispatch` on your branch when your card touches them), and the run is the evidence.
    If a hook fails: read the whole output, name the tool and cause, fix the root cause, re-run. Never use `--no-verify` or any bypass flag.
 8. **Commit and push.** Short imperative message, no attribution lines, no em dashes. The hooks run on commit.
 9. **Open the PR.** Title `<card-id>: <title>`, body starts with `Closes #<issue>` (that closes the card when it merges), then what changed, the split if any, the docs updated, and the file count. No attribution lines.
