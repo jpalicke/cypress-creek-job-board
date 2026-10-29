@@ -208,3 +208,12 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 ## D37. Merge order follows the ADR plan
 - 2026-10-29, manager.
 - #120 (H1d) is approved (network run 40944431404 passed 33 tests, including the seeded-EU test) but holds ADR 0029, so I merge it after 0026 (D7 #126), 0027 (C4 #124) and 0028 (G1 #125) to avoid churn on the contributing.md "next free ADR" line. Every PR that adds an ADR updates that line. Migration 0005: #120 merges before G2, so G2 renumbers its migration to 0006.
+
+## D38. G1 hardening decisions (PR #125, Worker E)
+- 2026-10-29, Worker E.
+- Bind check accepts only 127.0.0.1 (the card says so); 127.0.0.2 and ::1 exit 2. Reverse: restore the ipaddress is_loopback check.
+- CSRF safe methods are GET, HEAD, OPTIONS; every other method, including unknown ones, needs the token. Reverse: add the method to SAFE_METHODS.
+- Cache-Control no-store only on /api, so the later static bundle stays cacheable; no CSP yet (G3 decides it with the bundle).
+- Unknown paths answer 403 without the token and 404 with it; validation error details no longer repeat caller keys.
+- Process note: a stale server on port 5309 broke an e2e run; kill the python child, not the uv wrapper.
+- FOR JOE P: second human review of Host/CSRF logic still owed: security.py, app.py, session.py, server.py, errors.py.
