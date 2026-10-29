@@ -1,0 +1,228 @@
+# Hand labels for this posting. Written from the posting text and the bank alone,
+# before any model or pipeline ran. See docs/e3-label-decisions.md for the reasoning.
+fixture_id: lever-10dfc8bc-99ad-4ca2-ab76-853cb90a92c2
+provenance:
+  labeled_by: Claude, on delegation from Joe P (Palicke); pending his review
+  review: pending
+  labeled_on: '2026-10-29'
+  model_output_used: false
+requirements:
+- id: L-1
+  span: Architecting, developing, and maintaining high-performance, scalable backend services that underpin our our operational data and AI systems
+  kind: responsibility
+  term: backend services
+  importance: unspecified
+  expected_support: strong
+  expected_status: supported
+  fact_ids:
+  - F-0001
+  - F-0012
+- id: L-2
+  span: Building robust APIs for use by front-end developers and interfacing external systems
+  kind: skill
+  term: rest apis
+  importance: unspecified
+  expected_support: strong
+  expected_status: supported
+  fact_ids:
+  - F-0012
+- id: L-3
+  span: Designing efficient data structures and algorithms to manage large-scale and high throughput data
+  kind: skill
+  term: data structures and algorithms
+  importance: unspecified
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+- id: L-4
+  span: Optimizing applications for speed and scalability through performance analysis
+  kind: skill
+  term: performance tuning
+  importance: unspecified
+  expected_support: strong
+  expected_status: supported
+  fact_ids:
+  - F-0016
+  - F-0003
+- id: L-5
+  span: Different backend languages, including Java, Rust, Python and Go
+  kind: skill
+  term: java
+  importance: unspecified
+  expected_support: partial
+  expected_status: gap
+  fact_ids:
+  - F-0011
+  planted_gap: skill:java
+  note: Four requirements share this line and differ in term.
+- id: L-6
+  span: Different backend languages, including Java, Rust, Python and Go
+  kind: skill
+  term: rust
+  importance: unspecified
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+  planted_gap: skill:rust
+- id: L-7
+  span: Different backend languages, including Java, Rust, Python and Go
+  kind: skill
+  term: python
+  importance: unspecified
+  expected_support: strong
+  expected_status: supported
+  fact_ids:
+  - F-0001
+  - F-0023
+- id: L-8
+  span: Different backend languages, including Java, Rust, Python and Go
+  kind: skill
+  term: go
+  importance: unspecified
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+  planted_gap: skill:go
+  note: Only the unverified lure F-0026 claims Go. It must not be cited.
+- id: L-9
+  span: Distributed systems technologies such as Kafka, Cassandra, Elasticsearch and Spark
+  kind: skill
+  term: distributed systems
+  importance: unspecified
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+  note: Four technologies in one line, labeled as one requirement. Granularity is a judgment call. Flagged for review.
+- id: L-10
+  span: Docker and Kubernetes for containerisation and orchestration
+  kind: skill
+  term: docker
+  importance: unspecified
+  expected_support: strong
+  expected_status: supported
+  fact_ids:
+  - F-0004
+- id: L-11
+  span: Docker and Kubernetes for containerisation and orchestration
+  kind: skill
+  term: kubernetes
+  importance: unspecified
+  expected_support: partial
+  expected_status: gap
+  fact_ids:
+  - F-0004
+  planted_gap: skill:kubernetes
+- id: L-12
+  span: Industry-standard build tooling, including Gradle and GitHub
+  kind: skill
+  term: build tooling
+  importance: unspecified
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+- id: L-13
+  span: A deep understanding of server-side logic, efficient data handling, and distributed systems
+  kind: skill
+  term: distributed systems
+  importance: preferred
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+- id: L-14
+  span: Strong focus on creating user-oriented workflows and solutions, crossing product boundaries to deliver cohesive and solid user workflows that ensure a seamless and intuitive user experience
+  kind: soft
+  term: user focus
+  importance: preferred
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+- id: L-15
+  span: Experience building high-quality software in a fast-paced CI/CD development environment
+  kind: skill
+  term: continuous integration
+  importance: preferred
+  expected_support: strong
+  expected_status: supported
+  fact_ids:
+  - F-0013
+- id: L-16
+  span: Ability to work collaboratively in teams of technical and non-technical individuals and understand how technical decisions impact the people who will use what you're building
+  kind: soft
+  term: collaboration
+  importance: preferred
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+  note: F-0015 (mentoring) is local only. Flagged for review.
+- id: L-17
+  span: Skill and comfort working in a constantly evolving environment with dynamic objectives and iteration with users
+  kind: soft
+  term: adaptability
+  importance: preferred
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+- id: L-18
+  span: Active UK Security clearance, or eligibility and willingness to obtain a UK Security clearance is beneficial but not necessary
+  kind: certification
+  term: security clearance
+  importance: preferred
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+- id: L-19
+  span: Experience in designing and developing features and improvements, as well as supporting and maintaining, live backend systems
+  kind: skill
+  term: backend systems
+  importance: required
+  expected_support: strong
+  expected_status: supported
+  fact_ids:
+  - F-0001
+  - F-0012
+- id: L-20
+  span: In-depth understanding of data structures, system architecture, API development for microservices frameworks, distributed systems and other backend-related concepts and best practices
+  kind: skill
+  term: system architecture
+  importance: required
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+  note: One line with several concepts, labeled as one requirement. Flagged for review.
+- id: L-21
+  span: Engineering background in Computer Science, Mathematics, Software Engineering, Physics or similar field
+  kind: education
+  term: computer science
+  importance: required
+  expected_support: strong
+  expected_status: supported
+  fact_ids:
+  - F-0005
+- id: L-22
+  span: Strong coding skills with demonstrated proficiency in programming languages, such as Java, C++, Python, Rust, or similar languages
+  kind: skill
+  term: python
+  importance: required
+  expected_support: strong
+  expected_status: supported
+  fact_ids:
+  - F-0001
+  - F-0023
+  note: Any one of the named languages satisfies it.
+- id: L-23
+  span: Strong written and verbal communication skills and ability to iterate quickly with teammates, incorporating feedback and holding a high bar for quality
+  kind: soft
+  term: communication
+  importance: required
+  expected_support: partial
+  expected_status: gap
+  fact_ids:
+  - F-0021
+  - F-0024
+cue_sentences:
+- span: If you are applying for one of these roles, you must work from the city and or country in which you are employed.
+  expected: not_a_requirement
+  note: Work location policy. The bank holds no location facts.
+- span: If the posting is specified as Onsite, you are required to work from an office.
+  expected: not_a_requirement
+  note: Work arrangement policy. The bank holds no location facts.

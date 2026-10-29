@@ -31,6 +31,8 @@ The Lever adapter has its own `needs_network` integration test: it reads a real 
 
 The Ashby adapter has its own `needs_network` integration test: it fetches a real public board, checks every listing, probes it, probes and fetches a made-up slug, and revalidates the stored weak ETag against the real server, which must answer 304: `uv run pytest tests/integration/test_ashby_network.py -q`. It takes a few seconds. It needs the internet and fails, never skips, when the network is unreachable. Run it when you touch `discovery/adapters/ashby.py`, `discovery/adapters/feed_common.py` or the polite client's conditional requests.
 
+The posting fixtures and their hand labels have their own check: `uv run python -m evals.harness.check_labels`. Its tests are listed in [evals.md](evals.md#posting-fixtures-and-hand-labels). Run it when you touch anything under `evals/fixtures/` or `evals/harness/labels.py`. A label edit must be committed before any eval run.
+
 The integration and e2e tiers are not in the gated run, so run them by hand when you touch what they cover. For the blacklist: `uv run pytest tests/e2e/test_blacklist_process.py tests/integration/test_blacklist_dns.py -q`. The e2e file starts real child Python processes against a real temp SQLite file. The integration file is marked `needs_network` and resolves a real host, so an unreachable network makes it fail, never skip.
 
 Cue coverage in the report has an e2e test (a child Python process renders the text report for a posting with an omitted cue sentence) and a `live` integration test (a real Ollama extraction of the sample posting, checked against V13, the trace and the rendered count): `uv run pytest tests/e2e/test_cue_coverage_process.py tests/integration/test_cue_coverage_live.py -q`. The live test fails, never skips, when Ollama or the model is missing.
@@ -41,7 +43,7 @@ Before a PR is ready, in the same PR:
 - README.md status and "Try what exists" reflect what now works.
 - The docs index (docs/README.md) lists any new doc or decision record.
 - docs/codebase.md matches the code: layout, the flow diagram and the module list.
-- A new design decision has an ADR in `docs/adr/`. Numbers are sequential and the latest is 0022, so the next free number is 0023. Check `ls docs/adr` before you pick one.
+- A new design decision has an ADR in `docs/adr/`. Numbers are sequential and the latest is 0024, so the next free number is 0025. Check `ls docs/adr` before you pick one.
 - Configuration files (for example `config/aliases.yaml`) are described in the doc that owns them.
 
 ## Setup
