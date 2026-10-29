@@ -32,7 +32,11 @@ def test_a_real_public_page_is_fetched_and_turned_into_a_posting(tmp_path: Path)
 
     assert response.status_code == 201, response.text
     body = response.json()
-    assert "documentation examples" in body["text"]
+    # The live page changes (its heading once moved from the body to the title), so only
+    # properties that survive a rewrite are checked, never a particular sentence.
+    assert body["text"].strip()
+    assert "<" not in body["text"]
+    assert len(body["text_hash"]) == 64
     assert body["source"] == "link"
     assert body["origin_url"] == "https://example.com/"
 
