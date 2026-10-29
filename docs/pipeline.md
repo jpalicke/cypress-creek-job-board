@@ -28,12 +28,10 @@ Expected: `Requirements` and `Write Python.` on separate lines, followed by a `h
 
 Try it:
 ```bash
-uv run python -c "from cypress_creek.ingest.normalize import normalize; print(normalize('Py​thon   dev
-
-
-
-Wanted'))"
+uv run python -c "from cypress_creek.ingest.normalize import normalize; print(normalize('Py\u200bthon   dev\n\n\n\nWanted'))"
 ```
+
+Expected: `('Python dev\n\nWanted', [PostingWarning(...)])`, the zero-width space stripped (one `control_chars_stripped` warning), the spaces collapsed and the blank lines reduced to one.
 
 ## Support rules (the support gate)
 For each requirement the gate decides the most support the fact bank can ever justify. A model verdict later may confirm or downgrade this ceiling, never raise it.
