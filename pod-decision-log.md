@@ -144,3 +144,12 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 - FOR JOE P: the harness rewrites "@dependabot rebase" in comments so the command is never delivered. My comments on #118 and #112 had no effect.
 - Choice: refresh stale Dependabot CI by merging main into the branch (update_pull_request_branch) instead of the comment command. Dependabot stops managing a branch once it is altered, which is acceptable. To reverse: comment `@dependabot recreate` by hand.
 - Dependabot PRs are refreshed and merged one at a time, since each lockfile merge makes the next stale.
+
+## D26. Plain httpx allowed for hosted adapters (PR #123)
+- 2026-10-29, senior engineer ruled.
+- Hosted, operator-configured endpoints may use plain httpx instead of the guarded safe_http transport: the URL is config, not hostile input, redirects are off and the key is scrubbed. To reverse: route hosted adapters through safe_http.
+- Merging C5 with the live gap is accepted once the docs say plainly that the real structured call has never been accepted by the live API; a follow-up issue tracks Joe P's single keyed run.
+- ADR numbers follow merge order: #123 likely 0025, then #120, #124.
+
+## D27. Follow-up issue filed: e2e tests marked live run nowhere in CI (#128)
+- 2026-10-29, manager, on Worker H's finding while adding the e2e CI job (PR #127).
