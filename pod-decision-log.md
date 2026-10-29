@@ -235,3 +235,7 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 - 2026-10-29, Worker G.
 - Quantity words, invented results, rank inflation and negation are caught by deterministic word lists in V8 and V10, no model in the loop. Negation, result and rank words are strict for drafts only (V10 strict mode); V8 quantity words apply everywhere. Alternative: strict everywhere, which would withhold legitimate "does not show" rationales. Reverse: pass claim_words=True from entail. ADR 0033.
 - FOR JOE P: word lists are inherently incomplete; they raise the bar, they do not prove a draft true. Every draft still needs a human read.
+
+## D43. Process slip caught by the harness
+- 2026-10-29, Worker C reported.
+- Worker C typed a commit with --no-verify out of habit; the auto-mode classifier denied it and nothing was committed that way. The commit was redone with hooks. No bypass reached any branch.
