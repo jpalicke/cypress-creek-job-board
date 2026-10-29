@@ -4,7 +4,7 @@ Tailors a job application to a posting without ever stating a claim the author h
 
 It reads a posting, extracts requirements, maps each requirement to facts in a curated bank, reports gaps honestly, and only then helps draft. Every claim cites verified fact IDs, enforced by deterministic validators rather than prompting. There is no auto apply, and a human reviews every draft.
 
-Status: early implementation. The fact bank, the posting normalizer, the tag alias table, the deterministic support gate, the score formula, the company name normalizer, the SQLite migration runner, the grounding validators, the provider interface, the provider config, the Ollama adapter, the budget guard, the prompt builder (extraction and entailment prompts), the extraction stage, candidate retrieval, the entailment stage, the gap report, the pipeline run, URL target validation, guarded HTTP transport, link fetcher, HTML text extractor, fictional sample fact bank for evals, typed eval run records with SQLite resume and JSONL export, the eval CLI runner, and the discovery tables with the watchlist, the blacklist table with its deterministic filter, the polite fetch layer (fetch policy, per-host rate limiter, ETag disk cache and polite client) and the ATS adapter interface with the Greenhouse, Lever and Ashby adapters (board listings and board probe) exist. The link fetcher returns bounded raw bytes with provenance and typed errors. HTML text extraction is a separate library step that drops hidden content and reports warnings; PDF text extraction and an app workflow are still to come. There is no app to start yet. Work is tracked as a kanban in this repo's issues (one issue per card, labeled by lane). Cards marked `core` are the smallest set that makes the repo credible and demoable on its own.
+Status: early implementation. The fact bank, the posting normalizer, the tag alias table, the deterministic support gate, the score formula, the company name normalizer, the SQLite migration runner, the grounding validators, the provider interface, the provider config, the Ollama adapter, the budget guard, the prompt builder (extraction and entailment prompts), the extraction stage, candidate retrieval, the entailment stage, the gap report, the pipeline run, URL target validation, guarded HTTP transport, link fetcher, HTML text extractor, fictional sample fact bank for evals, typed eval run records with SQLite resume and JSONL export, the eval CLI runner, six real posting fixtures with hand labels and their label checker, and the discovery tables with the watchlist, the blacklist table with its deterministic filter, the polite fetch layer (fetch policy, per-host rate limiter, ETag disk cache and polite client) and the ATS adapter interface with the Greenhouse, Lever and Ashby adapters (board listings and board probe) exist. The link fetcher returns bounded raw bytes with provenance and typed errors. HTML text extraction is a separate library step that drops hidden content and reports warnings; PDF text extraction and an app workflow are still to come. There is no app to start yet. Work is tracked as a kanban in this repo's issues (one issue per card, labeled by lane). Cards marked `core` are the smallest set that makes the repo credible and demoable on its own.
 
 The pipeline also exposes an in-memory trace of attempted provider calls and actual validator
 verdicts. The eval CLI saves those traces with each completed case in SQLite and keeps failed
@@ -32,6 +32,8 @@ Each command is copy and paste, and lives with its documentation:
 | Piece | Where the command is |
 | --- | --- |
 | Validate the fictional sample fact bank and run its planted gap checks | [docs/evals.md](docs/evals.md#try-it-locally) |
+| Validate the six real posting fixtures and their hand labels, and print the fixture set hash | [docs/evals.md](docs/evals.md#posting-fixtures-and-hand-labels) |
+| Read why each hand label is what it is | [docs/e3-label-decisions.md](docs/e3-label-decisions.md) |
 | Check SQLite eval resume and JSONL audit export | [docs/evals.md](docs/evals.md#run-record-format) |
 | Plan and run the technical eval smoke case against Ollama, with an optional audit export | [docs/evals.md](docs/evals.md#run-the-harness) |
 | Validate your fact bank | [docs/data-model.md](docs/data-model.md#try-it-locally) |
@@ -56,6 +58,7 @@ Each command is copy and paste, and lives with its documentation:
 | Fetch a public Ashby board in one request and print its normalized listings | [docs/setup.md](docs/setup.md#fetch-an-ashby-board) |
 | Create the local database and apply migrations | [docs/data-model.md](docs/data-model.md#try-the-database) |
 | Run a grounding validator on model output | [docs/validators.md](docs/validators.md#try-it-locally) |
+| Check which cue sentences extraction missed | [docs/validators.md](docs/validators.md#v13-cue-sentence-coverage) |
 | See the provider errors and retry policy, load backend config, run the Ollama adapter, print a projected cost | [docs/providers.md](docs/providers.md#try-it-locally) |
 | Validate a URL or fetch a bounded public page | [docs/threat-model.md](docs/threat-model.md#try-it-locally) |
 | Fetch one public posting link as bounded raw bytes | [docs/setup.md](docs/setup.md#fetch-a-posting-link) |
@@ -89,15 +92,19 @@ This is a real run of the "whole run against a local model" command in [docs/pip
 
 ```text
 Gap report for P-1: complete
-Score: 25.0 out of 100 (triage only, not a probability). Supported 1 of 2.
+Score: 25.0 out of 100 (triage only, not a probability). Supported 1 of 2. 3 cue sentences not assessed; the score does not cover them.
 [none] R-1 (required): You must have 3 years of Python experience.
 [partial] R-2 (required): Experience with PostgreSQL is required.
     facts: F-0002
     why: rationale withheld: failed grounding check
 Gaps: R-1, R-2
+Cue sentence not assessed at offset 224: You must be comfortable working in a small team.
+Cue sentence not assessed at offset 287: Kubernetes experience is preferred.
+Cue sentence not assessed at offset 323: A degree in computer science is a plus.
 ```
 
 Every supported row cites a verified fact. A model rationale that fails the grounding checks is withheld rather than shown. The report is also available as JSON (`report.model_dump_json()`), with the backend, model, prompt hashes, usage and a run id derived from the inputs.
+The cue warning identifies posting sentences that extraction omitted. Those sentences do not enter the displayed score, so read the warning before using the number for triage.
 
 ## What the score means
 The score (0 to 100) ranks postings so you can triage them. It is a weighted share of requirements your verified facts support. It is not a probability of getting the job, and a posting with no extractable requirements gets no score at all.
