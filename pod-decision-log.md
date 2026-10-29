@@ -153,3 +153,10 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 
 ## D27. Follow-up issue filed: e2e tests marked live run nowhere in CI (#128)
 - 2026-10-29, manager, on Worker H's finding while adding the e2e CI job (PR #127).
+
+## D28. C4 follow-ups (PR #124, Worker C)
+- 2026-10-29, Worker C.
+- HTTP path tested with a new stdlib helper tests/chat_server.py (ThreadingHTTPServer) because tests/http_support.py http_server does not read POST bodies. Reverse: extend http_support and delete the helper.
+- 400 context errors map to ContextTruncated carrying the estimate and the window, no new error class.
+- Remote base_url must be https; a refusal without usage maps to Refusal; no hosted default for context_tokens.
+- Harness note: the PR tool re-adds the attribution footer on create (and possibly on update), so authors check the body after every edit.
