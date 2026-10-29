@@ -3,18 +3,12 @@
 import sqlite3
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import StrEnum
 
 from cypress_creek.discovery.adapters.lever import ATS as LEVER_ATS
 from cypress_creek.discovery.adapters.lever import LeverRegion
+from cypress_creek.discovery.evidence import IdentityEvidence as IdentityEvidence
 from cypress_creek.discovery.tombstones import InvalidBoard, Tombstones, normalize_board
 from cypress_creek.storage.company_key import company_key
-
-
-class IdentityEvidence(StrEnum):
-    STRONG = "strong"
-    WEAK = "weak"
-    NONE = "none"
 
 
 class Tombstoned(Exception):

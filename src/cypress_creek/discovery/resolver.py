@@ -6,8 +6,8 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
 from cypress_creek.discovery.adapters.base import AdapterError, BoardAdapter, ExistenceResult
+from cypress_creek.discovery.evidence import IdentityEvidence
 from cypress_creek.discovery.polite_client import PoliteFetchError
-from cypress_creek.discovery.watchlist import IdentityEvidence
 from cypress_creek.ingest.safe_http import SafeHttpError
 from cypress_creek.storage.company_key import LEGAL_SUFFIXES, CompanyNameError, company_key
 
