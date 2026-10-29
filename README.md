@@ -57,6 +57,7 @@ Each command is copy and paste, and lives with its documentation:
 | Compute a score from requirement supports | [docs/pipeline.md](docs/pipeline.md#score) |
 | Normalize a company name to its comparison key | [docs/data-model.md](docs/data-model.md#try-company_key) |
 | Add a company to the watchlist and see a denied one refused | [docs/data-model.md](docs/data-model.md#try-the-discovery-tables) |
+| Add a company to the watchlist through the API with a human approval marker, and see a blacklisted one refused | [docs/setup.md](docs/setup.md#start-the-api-server) |
 | Block a company, board slug or domain and see a lookalike filtered | [docs/data-model.md](docs/data-model.md#try-the-blacklist) |
 | Fetch a large public Greenhouse board and print its normalized listings | [docs/setup.md](docs/setup.md#fetch-a-greenhouse-board) |
 | Fetch a large public Lever board, page by page, and print its normalized listings | [docs/setup.md](docs/setup.md#fetch-a-lever-board) |

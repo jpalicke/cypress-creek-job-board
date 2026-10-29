@@ -55,6 +55,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [0028](adr/0028-api-security-layer.md) | The API security layer: an exact Host allow-list, an app-wide CSRF middleware after the Host check, hardening headers, a session route that sets no cookie, no docs or schema routes, and httpx ASGI transport tests |
 | [0029](adr/0029-lever-region-is-stored-on-the-watchlist-entry.md) | The Lever region is stored on the watchlist entry (`region` column, `Watchlist.set_region`) and seeded back into the adapter with `remember_region`, so a fresh process asks only the right host |
 | [0030](adr/0030-posting-and-analyze-routes.md) | The posting and analyze routes: a down backend is an incomplete report, a budget per request, PDF checked and held back until F4, verdicts kept without offending text, storage created on first use |
+| [0036](adr/0036-watchlist-and-blacklist-routes.md) | The watchlist is written only through a human approval marker with no proposer field, the server stamps the time, the blacklist is checked first and wins, and conflicts are typed 409s with fixed text |
 
 ## Configuration
 - `config/aliases.yaml`: tag alias table, described in [data-model.md](data-model.md#tag-alias-table).
