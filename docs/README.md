@@ -60,6 +60,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [0032](adr/0032-scorer-matching-and-metric-definitions.md) | The scorer matches rows to labels by span overlap over union, reads recorded spans and raise flags, scores each repeat alone, and defines gap recall over extracted planted gaps |
 | [0033](adr/0033-draft-closed-vocabulary.md) | Drafts use a closed vocabulary (every word from a cited fact, plain ASCII, no dropped negation); V8 reads quantity words, which can withhold some rationales |
 | [0035](adr/0035-injection-corpus-pairs-and-score-shift.md) | The injection corpus pairs each attacked posting with a clean twin that differs only by the payload, and score shift is attacked minus clean, averaged per class in a repeat |
+| [0036](adr/0036-watchlist-and-blacklist-routes.md) | The watchlist is written only through a human approval marker with no proposer field, the server stamps the time, the blacklist is checked first and wins, and conflicts are typed 409s with fixed text |
 
 ## Configuration
 - `config/aliases.yaml`: tag alias table, described in [data-model.md](data-model.md#tag-alias-table).
