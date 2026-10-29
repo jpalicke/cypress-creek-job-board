@@ -32,7 +32,7 @@ def test_a_real_public_page_is_fetched_and_turned_into_a_posting(tmp_path: Path)
 
     assert response.status_code == 201, response.text
     body = response.json()
-    assert "Example Domain" in body["text"]
+    assert "documentation examples" in body["text"]
     assert body["source"] == "link"
     assert body["origin_url"] == "https://example.com/"
 
