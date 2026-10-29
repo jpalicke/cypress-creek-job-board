@@ -230,3 +230,8 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 ## D41. G1 will merge before Joe P's second human review
 - 2026-10-29, manager.
 - The G1 card asks for a second human review of the Host and CSRF logic. The senior engineer approved (engineering review), Worker G ran adversarial probes against a real server, and the code is a loopback-only local server on a branch nobody deploys. Waiting for Joe P would stall G2 to G5. Choice: merge #125 after #124, and flag the review as owed. Files and functions to review are listed in the PR comment from the senior engineer (security.py, app.py, session.py, server.py, errors.py). Reverse: revert the merge, or order changes after review.
+
+## D42. Claim-word checks for drafts (PR #136, closes #131, Worker G)
+- 2026-10-29, Worker G.
+- Quantity words, invented results, rank inflation and negation are caught by deterministic word lists in V8 and V10, no model in the loop. Negation, result and rank words are strict for drafts only (V10 strict mode); V8 quantity words apply everywhere. Alternative: strict everywhere, which would withhold legitimate "does not show" rationales. Reverse: pass claim_words=True from entail. ADR 0033.
+- FOR JOE P: word lists are inherently incomplete; they raise the bar, they do not prove a draft true. Every draft still needs a human read.
