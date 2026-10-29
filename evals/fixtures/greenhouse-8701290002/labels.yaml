@@ -1,0 +1,128 @@
+# Hand labels for this posting. Written from the posting text and the bank alone,
+# before any model or pipeline ran. See docs/e3-label-decisions.md for the reasoning.
+fixture_id: greenhouse-8701290002
+provenance:
+  labeled_by: Claude, on delegation from Joe P (Palicke); pending his review
+  review: pending
+  labeled_on: '2026-10-29'
+  model_output_used: false
+requirements:
+- id: L-1
+  span: Background managing complex, customer facing support cases end to end, from initial inquiry and triage through reproduction, escalation, and resolution.
+  kind: responsibility
+  term: customer support
+  importance: required
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+- id: L-2
+  span: Advanced troubleshooting skills with the ability to investigate ambiguous, multi-layered technical issues and identify root causes across applications, infrastructure, and integrations.
+  kind: skill
+  term: troubleshooting
+  importance: required
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+  note: Adjacent facts F-0016 and F-0017 show diagnosing slow queries and failed loads, but no fact states troubleshooting experience, so no support is expected. Flagged for review.
+- id: L-3
+  span: Strong Linux systems administration knowledge (LFCE or RHCE equivalent), including performance analysis and low-level debugging tools.
+  kind: skill
+  term: linux
+  importance: required
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+  note: The certification equivalence is part of the skill, not a separate certification requirement.
+- id: L-4
+  span: Practical experience with GitLab
+  kind: skill
+  term: gitlab
+  importance: required
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+- id: L-5
+  span: continuous integration / continuous delivery (CI/CD)
+  kind: skill
+  term: continuous integration
+  importance: required
+  expected_support: strong
+  expected_status: supported
+  fact_ids:
+  - F-0013
+  note: CI/CD is an alias of continuous integration in config/aliases.yaml. F-0013 shows CI only, not delivery. Flagged for review.
+- id: L-6
+  span: Ability to write and maintain clear, reusable support content such as knowledge articles, runbooks, and troubleshooting guides.
+  kind: skill
+  term: documentation
+  importance: required
+  expected_support: strong
+  expected_status: supported
+  fact_ids:
+  - F-0024
+  - F-0017
+- id: L-7
+  span: Proficiency with scripting languages (such as Ruby or Bash)
+  kind: skill
+  term: bash
+  importance: required
+  expected_support: strong
+  expected_status: supported
+  fact_ids:
+  - F-0018
+  note: 'Ruby or Bash: either satisfies it, so the Bash fact is enough.'
+- id: L-8
+  span: familiarity with model-view-controller (MVC) frameworks, preferably Ruby on Rails
+  kind: skill
+  term: mvc frameworks
+  importance: required
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+  note: The bank has FastAPI (F-0012), which is not an MVC framework.
+- id: L-9
+  span: Effective communication skills for explaining complex technical topics to audiences with varying technical backgrounds and for building rapport with customer stakeholders.
+  kind: soft
+  term: communication
+  importance: required
+  expected_support: partial
+  expected_status: gap
+  fact_ids:
+  - F-0021
+  note: A meetup talk shows explaining a technical topic. Nothing shows customer rapport. Flagged for review.
+- id: L-10
+  span: DevOps practices and technologies such as Kubernetes
+  kind: skill
+  term: kubernetes
+  importance: required
+  expected_support: partial
+  expected_status: gap
+  fact_ids:
+  - F-0004
+  planted_gap: skill:kubernetes
+- id: L-11
+  span: serverless platforms
+  kind: skill
+  term: serverless
+  importance: required
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+- id: L-12
+  span: using tools like Zendesk, logs, and Linux utilities such as strace
+  kind: skill
+  term: zendesk
+  importance: unspecified
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+- id: L-13
+  span: Create and improve support content, including documentation and knowledge articles
+  kind: responsibility
+  term: documentation
+  importance: unspecified
+  expected_support: strong
+  expected_status: supported
+  fact_ids:
+  - F-0024
+cue_sentences: []

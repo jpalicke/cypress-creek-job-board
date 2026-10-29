@@ -1,0 +1,14 @@
+fixture_id: greenhouse-8704363002
+ats: greenhouse
+publisher: GitLab Inc.
+job_id: '8704363002'
+title: 'Backend Engineer (Python),AI Engineering: Agent Foundations'
+url: https://job-boards.greenhouse.io/gitlab/jobs/8704363002
+api_url: https://boards-api.greenhouse.io/v1/boards/gitlab/jobs?content=true
+retrieved: '2026-10-29'
+normalized_sha256: 1e87404f2777cfab46e29792ff250b6b27e623caaa1b9033b98df68294748029  # pragma: allowlist secret
+replaces:
+  job_id: '8698314002'
+  reason: Job 8698314002 returned HTTP 404 from the Greenhouse job endpoint and is absent from the board
+    listing on 2026-10-29, so it is closed or removed. This open role from the same board stands in for
+    it. Chosen because its Python, API and testing requirements overlap the sample bank.

@@ -95,6 +95,10 @@ evals/
   bank/                  The fictional sample fact bank, its unverified lure file and PLANTED_GAPS.md (see evals.md)
   cases/                 Dated fictional postings; technical-smoke.json is the CLI smoke case
   harness/run.py         Dry-run planner and resumable real-provider CLI
+  harness/labels.py      Hand label schema, validate_labels, planted_gap_support, require_committed_labels
+  harness/fixtures.py    Fixture loading, the meta schema and fixture_set_hash
+  harness/check_labels.py  Command line check of every posting fixture
+  fixtures/<ats>-<job id>/  One real posting: posting.txt, meta.yaml, labels.yaml (see evals.md and NOTICE)
   scratch/               Gitignored local JSONL exports
   results/               Published labeled JSONL exports only after E3 labels exist
 tests/
@@ -175,7 +179,8 @@ See [the fetching architecture](architecture.md), [the SSRF rules and limits](th
 ## Ideas to know
 - **One source of truth.** The bank file is the only record of facts. Verification is derived from `verified_on` and is never stored as a separate flag. The pipeline only ever sees `Bank.verified_facts()`.
 - **Pure and deterministic.** Scoring functions take everything as arguments, including `today`. Nothing reads the clock or the network.
-- **Data, not code.** Things a person should tune (the alias table, the score weights) or bundled third party data (the Unicode confusables) are YAML in `config/`, loaded and validated, never hard coded.
+- **Coverage is visible.** V3 and V13 read the same cue word list. The report keeps uncovered cue sentences and their source offsets in `not_assessed`; the text view puts the count by the score without changing that score.
+- **Data, not code.** Things a person should tune (the alias table, the score weights) or bundled third party data (the Unicode confusables) are files in `config/` (YAML for the alias table and weights, plain text for the confusables), loaded and validated, never hard coded. Provider settings are TOML, see [providers.md](providers.md#configuration).
 - **Typed errors.** Failures are specific exception classes (`PostingTooLong`, `FactValidationError`), so callers and tests can tell them apart. Text is rejected, never silently cut or repaired.
 - **Public URL targets.** `validate_url` raises `UrlGuardError` with a stable `reason_code` and a generic message. It never echoes the URL or resolver error. Every DNS answer must pass the address checks before any one is selected; one private answer rejects the entire result.
 - **Pinned HTTP connections.** `fetch_url` connects only to the validated numeric IP, disables environment proxies and redirects, then handles redirects itself. Every hop sends a versioned, honest User-Agent. It returns bytes only after content-type and size checks. `SafeHttpError` has stable reason codes and generic messages.
@@ -194,6 +199,7 @@ See [the fetching architecture](architecture.md), [the SSRF rules and limits](th
 - **The pipeline trace records what ran.** Pass a `PipelineTrace` to `analyze` or `assess` for per-attempt provider records and the actual validator verdicts. Extraction, entailment and report assembly append to the same trace. Missing usage is nullable, never guessed in the audit. The eval CLI persists completed case traces and failed terminal attempts through `EvalStore`; see [evals.md](evals.md#run-the-harness).
 - **A report cites or is refused.** `build_report` ends with `verify_report` (V4, V5, V9), so a fabricated or unverified fact id never reaches a report. Failed stages make the report incomplete rather than quietly partial. See `pipeline.md`.
 - **Retrieval is not a model.** `retrieve` matches tags and aliases, ranks and caps the candidates, and sets the support ceiling. A requirement with no candidate is a gap and costs no model call. See `pipeline.md`.
+- **Hand labels are inputs, checked against the posting and the bank.** `validate_labels` refuses a label whose span is not exact posting text, whose fact is missing, unverified or local only, or whose planted gap row disagrees. `require_committed_labels` refuses a case whose labels are not committed. Importance is the human reading, not the V3 cue rule. See [ADR 0024](adr/0024-hand-labels-are-written-before-runs-and-carry-provenance.md), [evals.md](evals.md#posting-fixtures-and-hand-labels) and [e3-label-decisions.md](e3-label-decisions.md).
 - **The sample bank and its gap table cannot drift.** `PLANTED_GAPS.md` is parsed by a test that runs each row through `retrieve`, so a bank edit that changes a gap fails the build. See `evals.md`.
 - **A denial is permanent until a human removes it.** A denied company is a tombstone matched by `company_key` and by normalized board, and `Watchlist.add` refuses it. Only `Tombstones.remove` lifts one. See [ADR 0017](adr/0017-tombstones-are-removed-only-by-a-human-call.md).
 - **The blacklist filter is pure and runs first.** `is_blacklisted(candidate, entries)` takes everything as arguments, touches no database and no network, and returns the `BlockReason` (company key, slug or domain) or `None`. It is meant to run on a discovered company before any fetch. Entries are normalized when created, and `Blacklist` only stores them. See [data-model.md](data-model.md#discovery-the-blacklist).
@@ -217,7 +223,7 @@ See [the fetching architecture](architecture.md), [the SSRF rules and limits](th
 - **A probe can check only the shape.** `AshbyAdapter.probe` accepts a 200 whose body is an object with a `jobs` list (empty is fine) and raises `FeedSchemaError` for any other 200. It reads the whole board from the same URL as `fetch_board`, so the cache serves the fetch that follows, and it never reads individual jobs. `organization_name` is `None`, because Ashby reports no company name.
 - **A weak ETag is sent back as received.** The Ashby `ETag` is weak (`W/"job-board:..."`). The cache stores and sends it unchanged and the real server answers 304. `from_cache` is true for a 304 revalidation (status 304) and for a hit inside the refresh window (status 200).
 - **Frozen models.** Pydantic models are frozen and reject unknown fields, so a typo or smuggled field is an error.
-- **Two stores, on purpose.** The fact bank and config are hand edited YAML (reviewable, diffable, versioned). Mutable app state, including eval runs, is SQLite behind numbered migrations. JSONL eval files are audit exports.
+- **Two stores, on purpose.** The fact bank, alias table and weights are hand edited YAML, and provider settings are hand edited TOML (reviewable, diffable, versioned). Mutable app state, including eval runs, is SQLite behind numbered migrations. JSONL eval files are audit exports.
 - **Shared normalization.** `terms.normalize_term` is used for bank tags, requirement terms and the alias table, so they always compare under the same rules. Company names have their own single normalizer, `company_key`, which every blacklist, denied list and watchlist comparison must use. Blacklist slugs and domains likewise have one normalizer each, `normalize_slug` and `normalize_domain` in `discovery/blacklist.py`.
 
 ## Working in the repo
