@@ -37,6 +37,7 @@ Each command is copy and paste, and lives with its documentation:
 | Validate the six real posting fixtures and their hand labels, and print the fixture set hash | [docs/evals.md](docs/evals.md#posting-fixtures-and-hand-labels) |
 | Score a run file against the hand labels (E1 to E4 metrics) and read the mismatch view | [docs/evals.md](docs/evals.md#scoring-a-run) |
 | Read why each hand label is what it is | [docs/e3-label-decisions.md](docs/e3-label-decisions.md) |
+| Build the backend comparison table from scored run files and check it is current | [docs/evals.md](docs/evals.md#the-comparison-table) |
 | Check SQLite eval resume and JSONL audit export | [docs/evals.md](docs/evals.md#run-record-format) |
 | Plan and run the technical eval smoke case against Ollama, with an optional audit export | [docs/evals.md](docs/evals.md#run-the-harness) |
 | Start the local API and call its health, providers and session routes | [docs/setup.md](docs/setup.md#start-the-api-server) |
@@ -70,6 +71,21 @@ Each command is copy and paste, and lives with its documentation:
 | Fetch one public posting link as bounded raw bytes | [docs/setup.md](docs/setup.md#fetch-a-posting-link) |
 | Extract readable text from HTML bytes | [docs/pipeline.md](docs/pipeline.md#html-posting-text) |
 | Fetch a public job board feed politely: download, cache hit, then a 304 revalidation | [docs/setup.md](docs/setup.md#fetch-a-job-board-politely) |
+
+## Evaluation results
+No backend has been evaluated and published yet, so every row below says `not run` (never 0). The table is generated from the committed run files by `uv run python -m evals.harness.table` and checked by CI, so it cannot drift from the data. How to read it, and its limits (one author's labels, a small fictional bank), are in [docs/evals.md](docs/evals.md#the-comparison-table). The full page is [docs/evals-results.md](docs/evals-results.md).
+
+<!-- evals-results:start -->
+| Target | Model | Status | Repeats scored | E1 recall | E3 violations per 100 | E6 score shift | E8 schema failure rate | Median latency | Cost per run, USD | Commit | Prompt hash | Fixture hash | Conditions |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Ollama qwen3.5:4b | not run | not run | not run | not run | not run | not run | not run | not run | not run | - | - | - | - |
+| Ollama qwen3.5:9b | not run | not run | not run | not run | not run | not run | not run | not run | not run | - | - | - | - |
+| LM Studio (the loaded model) | not run | not run | not run | not run | not run | not run | not run | not run | not run | - | - | - | - |
+| OpenAI (the C4 pick, pending confirmation) | not run | not run | not run | not run | not run | not run | not run | not run | not run | - | - | - | - |
+| Anthropic claude-sonnet-5-5 | not run | not run | not run | not run | not run | not run | not run | not run | not run | - | - | - | - |
+
+No backend has been run yet, so every row is not run.
+<!-- evals-results:end -->
 
 ## Discovery findings and sources
 Discovery reads the public job board feeds of three applicant tracking systems. These are findings from reading each provider's documentation and robots.txt on 2026-10-01, not guarantees. None of this is legal advice. The conclusion drawn here is that the three feeds are public by design and that a small personal tool polling an approved list is low risk. Their documentation is silent on terms and limits in some cases, so polite behavior is the mitigation.

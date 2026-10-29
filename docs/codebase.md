@@ -110,6 +110,8 @@ evals/
   harness/check_labels.py  Command line check of every posting fixture
   harness/metrics.py     The E1 to E4 metric definitions: score_case, pool, repeat_values, aggregate
   harness/score.py       The scorer CLI: run files and committed labels in, a metrics JSON and a mismatch view out
+  harness/table.py       The comparison table builder: collect_rows, render_table, update_readme, and the --check CLI
+  backends.yaml          The backends the table must list (data, edit freely)
   fixtures/<ats>-<job id>/  One real posting: posting.txt, meta.yaml, labels.yaml (see evals.md and NOTICE)
   scratch/               Gitignored local JSONL exports
   results/               Published labeled JSONL exports only after E3 labels exist

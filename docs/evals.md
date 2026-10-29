@@ -202,6 +202,40 @@ uv run pytest tests/unit/test_metrics.py tests/component/test_score_cli.py tests
 The live test needs Ollama: `uv run pytest tests/integration/test_score_live.py -q --no-cov`. It is
 selected by the `live` marker, so the scheduled `live` workflow runs it.
 
+## The comparison table
+
+`evals/harness/table.py` builds the backend comparison table. The table is generated, never hand edited: it is written to [evals-results.md](evals-results.md) and to the marked block in the README, and CI regenerates both and fails if the committed text differs.
+
+```bash
+uv run python -m evals.harness.table           # write docs/evals-results.md and the README block
+uv run python -m evals.harness.table --check   # fail if either file is out of date (CI runs this)
+```
+
+**Inputs.** `evals/results/` holds, for each published run, the JSONL run export and the metrics JSON the scorer wrote for it (`score.py --out evals/results`). The two are paired by run id: a metrics file without its run file, a run file without metrics, or a JSON file the scorer did not write is an error, so a row can never be built from half of its data. [`evals/backends.yaml`](../evals/backends.yaml) lists the backends the table must show, in order: Ollama `qwen3.5:4b` and `qwen3.5:9b`, LM Studio (any model, which the run records), OpenAI (the C4 pick, `gpt-6-luna`, pending Joe P's confirmation) and Anthropic `claude-sonnet-5-5`. The tiny CI model `qwen3.5:0.8b` is plumbing and is not part of the comparison. A run matches the entry with its exact model, else the entry with `model: null` for its backend; a run that matches no entry is still shown, labeled "not in the backend list". Edit the list to add a backend.
+
+**Columns.** Each metric is `mean / worst` of the repeats that had every planned case.
+
+| Column | Where it comes from |
+| --- | --- |
+| E1 recall | `requirement_recall` in the metrics JSON (worst is the lowest) |
+| E3 violations per 100 | `grounding_violations_per_100` (worst is the highest) |
+| E6 score shift | `score_shift` in the metrics JSON, which no scorer writes until the injection corpus (E5) exists, so it says `not run` |
+| E8 schema failure rate | share of recorded provider calls that ended in a `SchemaViolation`, per repeat, from the run export (worst is the highest) |
+| Median latency | `not recorded`: run records carry no timing yet, so there is nothing to compute. This is a gap in the record, not a zero. |
+| Cost per run, USD | sum of `cost_usd` over every call of a repeat, from the run export. A repeat with any call of unknown cost is left out, never counted as 0. |
+| Commit, Prompt hash, Fixture hash | the run header: the git commit, a hash of the per stage prompt hashes, and the fixture set hash |
+| Conditions | rows get a letter by distinct prompt hash and fixture hash. Rows in different groups are marked "not comparable with A" and the note under the table says so. |
+
+A backend with no run says `not run` in every cell, never 0. The page and the README block say that the labels are one author's on a small fictional bank. No run is committed yet, so every row is `not run`.
+
+**Checks.** `uv run pytest tests/unit/test_table.py tests/component/test_table_cli.py tests/e2e/test_table_process.py tests/integration/test_table_committed.py -q --no-cov`. To try it with a synthetic run (not benchmark evidence), the component tests build runs with `tests/table_support.py`.
+
+### Planning the first published run (designed, not run)
+The first published run (card E8) is not started, and the design is only recorded here so Joe P can trigger it after his label review. It needs no key and no spend for the local backends:
+- **Before the run:** the labels must be reviewed and committed (the method rule is labels frozen before the runs), and the fixtures must be runnable by the runner (card #140). The scorer refuses labels that are not committed.
+- **A dispatched workflow** (a new `eval-run.yml`, manual only, like `live.yml`) would: install Ollama and cache `~/.ollama/models` as `live.yml` does; pull `qwen3.5:4b` (and `qwen3.5:9b` if the runner has the disk and time for it; a GitHub runner has no GPU, so budget an hour or more per model and set `timeout-minutes` to match); run the fixture runner with 3 repeats at temperature 0 for each model; score each export with `score.py`; and upload the exports and metrics JSON as an artifact.
+- **After the run:** a human copies the artifact files into `evals/results/`, runs `python -m evals.harness.table`, reviews the diff and commits. Hosted rows stay `not run` unless Joe P provides keys and approves the dry run estimate.
+
 ## Posting fixtures and hand labels
 
 `evals/fixtures/<ats>-<job id>/` holds one real, public job posting as three files: `posting.txt`

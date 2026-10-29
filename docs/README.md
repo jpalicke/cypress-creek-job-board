@@ -9,6 +9,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [pipeline.md](pipeline.md) | HTML posting text extraction, posting normalization, the prompt builder (extraction, entailment and draft prompts), draft help, accepting extraction output, stage 1 extraction, stage 2 retrieval, stage 3 entailment, stages 4 and 5 score and report, running the pipeline with an optional trace and a derived run id, the support gate, the score |
 | [api.md](api.md) | The local API: loopback bind, Host check, CSRF token flow, typed errors, route table and error codes |
 | [evals.md](evals.md) | Eval CLI dry runs and real Ollama smoke runs, whole-run budgets, typed records and traces, SQLite resume, scratch JSONL audit exports, fictional sample fact bank and planted gaps, real posting fixtures with hand labels and the label check, and the E1 to E4 scorer with its metric definitions and mismatch view |
+| [evals-results.md](evals-results.md) | The generated backend comparison table (do not edit by hand) |
 | [e3-label-decisions.md](e3-label-decisions.md) | Why each hand label is what it is, the judgment calls for Joe P to review, and the closed postings and their replacements |
 | [validators.md](validators.md) | The grounding validators V1 to V14: what each rejects and its known limits |
 | [providers.md](providers.md) | The provider interface, typed errors, retry policy, backend config, the loopback rule, the Ollama and Anthropic adapters and the budget guard |
@@ -55,6 +56,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [0028](adr/0028-api-security-layer.md) | The API security layer: an exact Host allow-list, an app-wide CSRF middleware after the Host check, hardening headers, a session route that sets no cookie, no docs or schema routes, and httpx ASGI transport tests |
 | [0029](adr/0029-lever-region-is-stored-on-the-watchlist-entry.md) | The Lever region is stored on the watchlist entry (`region` column, `Watchlist.set_region`) and seeded back into the adapter with `remember_region`, so a fresh process asks only the right host |
 | [0032](adr/0032-scorer-matching-and-metric-definitions.md) | The scorer matches rows to labels by span overlap over union, reads recorded spans and raise flags, scores each repeat alone, and defines gap recall over extracted planted gaps |
+| [0039](adr/0039-comparison-table-is-generated-from-paired-run-and-metrics-files.md) | The comparison table is generated from paired run and metrics files, a target list owns the rows, conditions are a column, missing is never zero, and CI checks the table is current |
 
 ## Configuration
 - `config/aliases.yaml`: tag alias table, described in [data-model.md](data-model.md#tag-alias-table).
