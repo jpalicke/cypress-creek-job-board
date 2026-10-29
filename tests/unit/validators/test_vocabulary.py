@@ -63,6 +63,11 @@ SIBLINGS = [
     f"{BASE}, but dont mention it.",
     f"{BASE}, away from Python.",
     "Never led a team of 8 engineers moving a billing system to Python.",
+    # plural inflation and passive role inversion
+    "Led teams of 8 engineers moving billing systems to Python.",
+    "Led a team of 8 engineers moving billing systems to Python.",
+    "Was led by a team of 8 engineers moving a billing system to Python.",
+    "Python was moved by a team of 8 engineers led.",
     # hyphenation, plurals, possessives, punctuation tricks
     f"{BASE}, world-class.",
     f"{BASE}; owner's mindset.",
@@ -95,7 +100,7 @@ CLEAN = [
     BASE + ".",
     "Led a team of eight engineers moving a billing system to Python.",
     "Moving a billing system to Python, led a team of 8 engineers.",
-    "The team of 8 engineers moving the billing system to Python was led by Tech Lead.",
+    "Tech Lead, and the team of 8 engineers moving the billing system to Python.",
     "Led the 8 engineers' move of a billing system to Python.",
     "Led a team of 8 engineers who moved a billing system to Python at Initech.",
     "led a team of 8 engineers moving a billing system to python",
@@ -140,20 +145,21 @@ def test_a_dropped_negation_is_still_flagged() -> None:
 @pytest.mark.parametrize(
     "word,expected",
     [
-        ("services", "servic"),
+        ("services", "services"),
         ("service", "servic"),
         ("migrating", "migrat"),
         ("migrated", "migrat"),
         ("migrate", "migrat"),
         ("running", "run"),
         ("run", "run"),
-        ("companies", "company"),
+        ("companies", "companies"),
         ("company", "company"),
         ("led", "led"),
         ("lead", "lead"),
         ("python", "python"),
         ("is", "is"),
-        ("databases", "databas"),
+        ("teams", "teams"),
+        ("team", "team"),
     ],
 )
 def test_stem_is_a_small_explicit_inflection_rule(word: str, expected: str) -> None:
@@ -164,6 +170,24 @@ def test_a_stem_never_joins_words_that_mean_different_things() -> None:
     assert stem("manager") != stem("manage")
     assert stem("lead") != stem("led")
     assert stem("developer") != stem("developed")
+
+
+def test_a_plural_is_a_different_word_unless_a_fact_has_that_plural() -> None:
+    assert unknown_words("teams", ["Led a team"]) == ["teams"]
+    assert unknown_words("teams", ["Led two teams"]) == []
+    assert unknown_words("team", ["Led two teams"]) == ["team"]
+
+
+def test_by_is_not_a_free_word_so_a_passive_cannot_swap_who_led_whom() -> None:
+    assert "by" not in FUNCTION_WORDS
+    assert unknown_words("led by a team", ["Led a team"]) == ["by"]
+    assert unknown_words("run by another team", ["run by another team"]) == []
+
+
+def test_a_recombination_of_a_facts_own_words_is_a_documented_limit() -> None:
+    # Every word is in the fact, so the closed vocabulary cannot see that the meaning changed.
+    assert _verdict("Led 8 billing system.").passed
+    assert _verdict("A team led 8 engineers.").passed
 
 
 def test_the_function_word_list_is_the_reviewed_one() -> None:
@@ -181,7 +205,6 @@ def test_the_function_word_list_is_the_reviewed_one() -> None:
                 "for",
                 "with",
                 "and",
-                "by",
                 "as",
                 "from",
                 "using",

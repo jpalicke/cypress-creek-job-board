@@ -8,10 +8,11 @@ from cypress_creek.validators.consistency import extract_numbers
 
 # The only words a draft may use without a cited fact saying them. Each one is a connective that
 # carries no claim of its own. Words that can carry a claim (no, not, never, only, first, more,
-# most, all, every, many, over, or, but) are deliberately not here. Adding a word needs a reviewer.
+# most, all, every, many, over, or, but) are deliberately not here, and neither is "by", because
+# "was led by a team" turns who led whom around. Adding a word needs a reviewer.
 FUNCTION_WORDS = frozenset(
     {
-        "a", "an", "the", "of", "to", "in", "on", "at", "for", "with", "and", "by", "as",
+        "a", "an", "the", "of", "to", "in", "on", "at", "for", "with", "and", "as",
         "from", "using", "while", "its", "their", "into", "that", "which", "who", "was",
         "were", "is", "are", "been", "it", "this", "these", "those", "through", "via",
     }
@@ -29,7 +30,7 @@ MONTH_WORDS = frozenset(
 # Hyphens split a compound, so "double-checked" needs both words. Digits are V8's concern.
 _WORD = re.compile(r"[^\W\d_]+(?:['’][^\W\d_]+)?")
 _CITATION = re.compile(r"\b[fr]-\d+\b", re.IGNORECASE)
-_SUFFIXES = ("ies", "ing", "ed", "es", "s")
+_SUFFIXES = ("ing", "ed")
 _MIN_STEM = 3
 
 
@@ -42,12 +43,13 @@ def normalize(text: str) -> str:
 
 
 def stem(word: str) -> str:
-    """A small inflection rule: drop one of ies, ing, ed, es, s, then a final e and a doubled
-    final consonant. "migrating", "migrated" and "migrate" agree, "manager" and "manage" do not."""
+    """A small inflection rule: drop ing or ed, then a final e and a doubled final consonant.
+    "migrating", "migrated" and "migrate" agree; "manager" and "manage" do not. A plural is a
+    different word ("team" and "teams"), so it needs a fact that has that plural."""
     base = word
     for suffix in _SUFFIXES:
         if word.endswith(suffix) and len(word) - len(suffix) >= _MIN_STEM:
-            base = word[: -len(suffix)] + ("y" if suffix == "ies" else "")
+            base = word[: -len(suffix)]
             break
     if base.endswith("e") and len(base) > _MIN_STEM:
         base = base[:-1]

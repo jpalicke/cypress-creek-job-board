@@ -38,7 +38,7 @@ HONEST = [
         "F-0003",
         "Cut the nightly batch from 6 hours to 90 minutes by migrating a reporting database to "
         "PostgreSQL.",
-        True,
+        False,
     ),
     ("F-0003", "Reduced the nightly batch from 6 hours to 90 minutes.", False),
     ("F-0004", "Packaged services in Docker and deployed them to a Kubernetes cluster.", True),
@@ -72,6 +72,6 @@ def test_each_honest_sentence_is_judged_as_recorded() -> None:
 
 def test_the_false_positive_rate_on_the_honest_corpus_is_pinned() -> None:
     flagged = [sentence for fact_id, sentence, _ in HONEST if not _clean(fact_id, sentence)]
-    # 9 of 22 honest rewordings are flagged (41 percent): every one swaps in a word the fact does
+    # 10 of 22 honest rewordings are flagged (45 percent): every one swaps in a word the fact does
     # not use. The price of a closed vocabulary is a human look at those, never a wrong "clean".
-    assert (len(flagged), len(HONEST)) == (9, 22)
+    assert (len(flagged), len(HONEST)) == (10, 22)

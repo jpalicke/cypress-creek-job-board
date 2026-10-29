@@ -427,6 +427,8 @@ SIBLINGS = [
     "Hardly led a team of 8 engineers moving a billing system to Python.",
     f"{BASE_SENTENCE}, but dont mention it.",
     f"{BASE_SENTENCE}, away from Python.",
+    "Led teams of 8 engineers moving billing systems to Python.",
+    "Was led by a team of 8 engineers moving a billing system to Python.",
 ]
 
 
