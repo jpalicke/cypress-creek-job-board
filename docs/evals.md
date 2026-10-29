@@ -102,7 +102,8 @@ uv run pytest tests/unit/test_run_records.py tests/component/test_eval_run_files
 
 `evals/harness/score.py` reads a JSONL run export and the committed hand labels and writes one
 metrics JSON per run. The numbers depend only on those files and the bank, so they are
-reproducible: the same inputs give byte for byte the same JSON. Scoring is not pass or fail.
+reproducible: the same inputs give byte for byte the same JSON. Scoring is not pass or fail. The matching rule and the other choices are in
+[ADR 0032](adr/0032-scorer-matching-and-metric-definitions.md).
 
 ```bash
 uv run python -m evals.harness.score --run evals/scratch/run.jsonl --out evals/scratch/scores --diff
