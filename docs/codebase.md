@@ -85,6 +85,9 @@ src/cypress_creek/       The library
   discovery/             Discovery state in SQLite, the polite fetch layer over the guarded transport, and the ATS board adapters
     watchlist.py         WatchlistEntry, Watchlist, Tombstoned, AlreadyWatched, IdentityEvidence
     tombstones.py        Tombstones, Denial, DenialReason, normalize_board: denied companies kept as denied suggestion rows
+    listings.py          Listings, StateChanges: the listing table, with new, seen and closed transitions from a successful board fetch
+    dedupe.py            dedupe, MergedListing, fingerprint_text: conservative merge by listing id, then exact cross source fingerprint
+    filters.py           ListingFilters, apply_filters, FilterReport, FilterName: deterministic keyword, location, remote, seniority and age filters
     blacklist.py         The pure filter: is_blacklisted, Candidate, BlacklistEntry, BlockReason, normalize_slug, normalize_domain, InvalidBlacklistValue
     blacklist_repository.py  Blacklist (add, remove, rows, entries) and AlreadyBlacklisted: stores and loads entries, no matching
     fetch_policy.py      FetchPolicy, FetchConfigError, parse_retry_after: refresh window, host delay, retries and backoff, read from env
@@ -118,8 +121,8 @@ evals/
 tests/
   unit/                  Pure functions and models, including the Anthropic request, schema rewrite and response parsing, the strict schema helper, eval case loading and dry-run planning, fetch policy and limiter, adapter contract, Greenhouse, Lever and Ashby feed mappings, and the Lever region on a watchlist entry and adapter seed
   component/             Real files and local servers, including the Anthropic and openai_compatible adapters over real HTTP (wire request, error mapping, retry, budget guard), the no-network eval CLI dry run, response cache, polite client, and the Greenhouse, Lever and Ashby adapters (Lever on US and EU path prefixes, Ashby also answering a weak ETag with a 304)
-  integration/           Public DNS and feeds (needs_network), real Ollama eval runs and failure persistence, the live Anthropic call (needs a key, fails without one), the credentialed live_openai and live_lmstudio tests, and live Greenhouse, paged US and EU Lever (including a stored EU region that reaches the EU host with no US request), and Ashby boards (the probe, a made-up slug and a real weak ETag revalidation)
-  e2e/                   Separate-process flows for the openai_compatible adapter against a loopback chat server, URL guard, posting fetch, HTML text, blacklist filtering, a stored Lever region used by a fresh process, and eval CLI resume of pending cases
+  integration/           Public DNS and feeds (needs_network), dedupe, filters and listing states over a real public board, real Ollama eval runs and failure persistence, the live Anthropic call (needs a key, fails without one), the credentialed live_openai and live_lmstudio tests, and live Greenhouse, paged US and EU Lever (including a stored EU region that reaches the EU host with no US request), and Ashby boards (the probe, a made-up slug and a real weak ETag revalidation)
+  e2e/                   Separate-process flows for the openai_compatible adapter against a loopback chat server, URL guard, posting fetch, HTML text, blacklist filtering, listing state refreshes across processes, a stored Lever region used by a fresh process, and eval CLI resume of pending cases
   chat_server.py         Test-only real loopback chat completions server that records requests and plays a set reply
   api_support.py         A synchronous client that drives the real FastAPI app in process over httpx's ASGI transport
     eval_support.py        Test-only builders for hand made labels, reports and run files used by the scorer tests
@@ -184,6 +187,10 @@ flowchart LR
     discovery --> adapter["discovery.adapters.GreenhouseAdapter, LeverAdapter, AshbyAdapter: fetch_board, probe"]
     adapter --> polite
     adapter --> listings["Listing rows: id, title, location, content_text, content_hash"]
+    listings --> store["discovery.listings.Listings.apply_fetch(): new, seen, closed"]
+    store --> db
+    listings --> dedupe["discovery.dedupe.dedupe(): exact merge"]
+    dedupe --> filt["discovery.filters.apply_filters(): counts per filter"]
 ```
 The diagram shows library components, not a running app workflow. The link fetcher returns raw bytes, and a caller can pass HTML bytes separately to the HTML text extractor before normalization. PDF text extraction and a user-facing app workflow remain later cards. Draft help exists as a library step (`pipeline.draft`) that returns checked data and sends nothing (see the issue board and the spec).
 
@@ -225,6 +232,7 @@ See [the fetching architecture](architecture.md), [the SSRF rules and limits](th
 - **Hand labels are inputs, checked against the posting and the bank.** `validate_labels` refuses a label whose span is not exact posting text, whose fact is missing, unverified or local only, or whose planted gap row disagrees. `require_committed_labels` refuses a case whose labels are not committed. Importance is the human reading, not the V3 cue rule. See [ADR 0024](adr/0024-hand-labels-are-written-before-runs-and-carry-provenance.md), [evals.md](evals.md#posting-fixtures-and-hand-labels) and [e3-label-decisions.md](e3-label-decisions.md).
 - **Every API route inherits the security rules from the app, not from itself.** The CSRF check and the Host check are middleware (hardening headers outermost, then Host, then CSRF), so a new route, sub-app or method cannot skip them. The route table test fails if any path or operation name suggests submitting, sending or posting outward. See [api.md](api.md) and [ADR 0028](adr/0028-api-security-layer.md).
 - **The sample bank and its gap table cannot drift.** `PLANTED_GAPS.md` is parsed by a test that runs each row through `retrieve`, so a bank edit that changes a gap fails the build. See `evals.md`.
+- **Dedupe is exact or nothing, and only a clean fetch closes.** Cross source listings merge only on equal company key, title and location fingerprints, never inside one source and never in an ambiguous group. `Listings.apply_fetch` closes listings missing from a successful board fetch, and a skipped job it cannot place stops the closing. See [ADR 0031](adr/0031-conservative-dedupe-filters-and-closing.md).
 - **A denial is permanent until a human removes it.** A denied company is a tombstone matched by `company_key` and by normalized board, and `Watchlist.add` refuses it. Only `Tombstones.remove` lifts one. See [ADR 0017](adr/0017-tombstones-are-removed-only-by-a-human-call.md).
 - **The blacklist filter is pure and runs first.** `is_blacklisted(candidate, entries)` takes everything as arguments, touches no database and no network, and returns the `BlockReason` (company key, slug or domain) or `None`. It is meant to run on a discovered company before any fetch. Entries are normalized when created, and `Blacklist` only stores them. See [data-model.md](data-model.md#discovery-the-blacklist).
 - **Delay is measured from the end of the previous request.** `HostRateLimiter.wait` sleeps until `delay` seconds after the last request to that host finished, and `PoliteClient` calls `finished` in a `finally` after every attempt, so a slow response never eats into the gap. See [ADR 0019](adr/0019-polite-fetch-timing-and-clocks.md).
