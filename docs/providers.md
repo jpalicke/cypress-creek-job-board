@@ -184,9 +184,9 @@ print(result.parsed, result.usage)
 ```
 It prints a greeting and the token usage. Change `'Say hi'` to `'word ' * 6000` and it raises `ContextTruncated` before any request is made. The live tests run the same checks, including a real overflow, and fail (never skip) if Ollama or the model is missing:
 ```bash
-uv run pytest tests/integration -m "live and not needs_network" -q
+uv run pytest tests/e2e tests/integration -m "live and not needs_network and not live_openai and not live_lmstudio" -q
 ```
-The `live` GitHub Actions workflow (`.github/workflows/live.yml`) does this on a schedule and on demand with a fresh Ollama and `qwen3.5:0.8b`. It selects `live and not needs_network`, so the Anthropic live test, which needs a key and spends money, never runs there. Credentialed or desktop-only live tests that are not `needs_network` must use their own marker (as the OpenAI and LM Studio tests do) so this selector stays correct.
+The `live` GitHub Actions workflow (`.github/workflows/live.yml`) does this on a schedule and on demand with a fresh Ollama and `qwen3.5:0.8b`. It selects `live and not needs_network and not live_openai and not live_lmstudio` in `tests/e2e` and `tests/integration`, so the Anthropic live test, which needs a key and spends money, never runs there. Credentialed or desktop-only live tests that are not `needs_network` must use their own marker (as the OpenAI and LM Studio tests do) and be added to this selector's exclusions.
 
 Print the projected cost of a plan (three small calls) with the budget from the same settings. No call is made, so no server needs to be running:
 ```bash
