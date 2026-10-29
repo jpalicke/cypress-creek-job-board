@@ -66,6 +66,7 @@ src/cypress_creek/       The library
     retry.py             call_with_retry, RetryPolicy
     factory.py           get_provider, ProviderRegistry, UnknownProvider
     ollama.py            OllamaProvider and its pre-flight and post-flight truncation checks
+    anthropic.py         AnthropicProvider: Messages API request, strict schema rewrite, response and error mapping
     budget.py            Budget, BudgetTracker, BudgetedProvider, dry_run_estimate, budget_from_settings
   config/                Backend settings (not the repo level config/ data folder)
     settings.py          ProviderSettings, load_settings, resolve_api_key, ConfigError
@@ -103,9 +104,9 @@ evals/
   scratch/               Gitignored local JSONL exports
   results/               Published labeled JSONL exports only after E3 labels exist
 tests/
-  unit/                  Pure functions and models, including eval case loading and dry-run planning, fetch policy and limiter, adapter contract, and Greenhouse, Lever and Ashby feed mappings
-  component/             Real files and local servers, including the no-network eval CLI dry run, response cache, polite client, and the Greenhouse, Lever and Ashby adapters (Lever on US and EU path prefixes, Ashby also answering a weak ETag with a 304)
-  integration/           Public DNS and feeds (needs_network), real Ollama eval runs and failure persistence, and live Greenhouse, paged US and EU Lever, and Ashby boards (the probe, a made-up slug and a real weak ETag revalidation)
+  unit/                  Pure functions and models, including the Anthropic request, schema rewrite and response parsing, eval case loading and dry-run planning, fetch policy and limiter, adapter contract, and Greenhouse, Lever and Ashby feed mappings
+  component/             Real files and local servers, including the Anthropic adapter over real HTTP (wire request, error mapping, retry, budget guard), the no-network eval CLI dry run, response cache, polite client, and the Greenhouse, Lever and Ashby adapters (Lever on US and EU path prefixes, Ashby also answering a weak ETag with a 304)
+  integration/           Public DNS and feeds (needs_network), real Ollama eval runs and failure persistence, the live Anthropic call (needs a key, fails without one), and live Greenhouse, paged US and EU Lever, and Ashby boards (the probe, a made-up slug and a real weak ETag revalidation)
   e2e/                   Separate-process flows for URL guard, posting fetch, HTML text, blacklist filtering, and eval CLI resume of pending cases
   http_support.py        Test-only real HTTP and UDP DNS servers with a loopback resolver; the HTTP server records methods and can route by query string for paged paths and answer an ETag with a 304
   fixtures/              Recorded or hand written inputs
@@ -191,6 +192,7 @@ See [the fetching architecture](architecture.md), [the SSRF rules and limits](th
 - **HTML content boundary.** `html_to_text` drops non-content tags, supported hidden styles and attributes, plus conservative nav, footer and cookie boilerplate. It retains headings and list items as lines, reports hidden elements, and rejects input above 10 MiB or nesting above 128 elements. It does not run JavaScript or fetch resources; external CSS visibility is unknown. See [the pipeline guide](pipeline.md#html-posting-text).
 - **Safe by default config.** Backends default to loopback only, going remote needs `allow_remote`, and keys come from the environment alone. Config errors never echo a submitted value.
 - **Measured truncation signatures are refused.** The Ollama adapter estimates before the call and checks the reported count after it. It raises `ContextTruncated` when the estimate exceeds the configured context or the count matches a measured truncation signature. Other server behavior may need additional detection.
+- **Hosted adapters send the minimum and hide the key.** The Anthropic adapter needs `allow_remote`, sends the system text and the untrusted block as separate fields (prompt building already drops `local_only` facts for a non local backend), offers no tools, never follows a redirect, and scrubs the key from every error. See [ADR 0025](adr/0025-anthropic-native-structured-output.md).
 - **Spend is capped before it happens.** `BudgetedProvider` checks the worst case (estimate plus output cap) against the run limits before a call and records the server's real usage after it. Real usage above an estimate blocks the next call, so the guard fails closed.
 - **Attempted failures count.** A provider error identifies whether a request was attempted and carries complete reported usage when known. The budget counts attempted failed requests, including reported tokens and cost. Unknown usage blocks later calls in that invocation; on eval resume, a context-sized input ceiling and the stage output cap are reserved for that attempt before another call. A preflight refusal spends no request. See [providers.md](providers.md#the-budget-guard) and [evals.md](evals.md#run-the-harness).
 - **Posting text never leaves its block.** `build_prompt` puts the posting between boundary lines carrying a random 128 bit token, keeps it out of the system message and shows extraction no facts. It is the first layer only, the validators are the control.
@@ -262,6 +264,7 @@ Conventions you will trip over if you do not know them:
 - **A new legal suffix for company names:** add it to `LEGAL_SUFFIXES` in `storage/company_key.py`, with a row in `tests/unit/test_company_key.py` first. **Newer Unicode confusables:** see the update steps in `docs/data-model.md`.
 - **A new table or column:** add the next numbered file to `src/cypress_creek/storage/migrations/` (for example `0005_postings.sql`, with `-- ABOUTME: ` header lines), never edit an applied one, and add a test in `tests/component/test_migrations.py` or beside the new code. See `docs/data-model.md#storage-sqlite-and-migrations`.
 - **A new blacklist match kind:** add a `BlockReason` member and its normalizer in `discovery/blacklist.py`, write the failing unit rows in `tests/unit/test_blacklist_filter.py` first, then add the kind to the `CHECK` list with the next numbered migration (never edit `0003_blacklist.sql`) and update [data-model.md](data-model.md#discovery-the-blacklist).
+- **A new model backend:** implement `Provider` in `providers/<name>.py`, register it with `REGISTRY.register`, import it in `providers/__init__.py`, and add the file to the HTTP client allow list in `tests/unit/test_safe_http.py` if it uses httpx. Write the request and response tests first (copy `tests/unit/test_anthropic_adapter.py` and `tests/component/test_anthropic_request_shape.py`), then a `live` integration test that fails without its backend. A hosted backend must demand `allow_remote`, take its key from `api_key_env`, scrub it from errors and map refusals to `Refusal`.
 - **A new tag alias:** add it to `config/aliases.yaml`. The tests in `tests/unit/test_aliases.py` show the rules (an alias belongs to one canonical tag).
 - **A new fact field:** change `facts/models.py`, add a failing test in `tests/unit/test_fact_models.py` first, write an ADR if it is a design decision, and update `docs/data-model.md`.
 - **A new pipeline stage:** a new module under the right package, typed errors beside it, tests in all relevant tiers, and a section in `docs/pipeline.md`.

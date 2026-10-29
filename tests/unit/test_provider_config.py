@@ -213,3 +213,16 @@ def test_budget_limits_can_come_from_the_environment() -> None:
         "CYPRESS_CREEK_MAX_OUTPUT_TOKENS": "777",
     }
     assert load_settings(environ=environ).max_output_tokens == 777
+
+
+def test_token_prices_are_optional_non_negative_and_can_come_from_the_environment() -> None:
+    assert _settings().input_usd_per_mtok is None
+    assert _settings().output_usd_per_mtok is None
+    assert _settings(input_usd_per_mtok=0, output_usd_per_mtok=2.5).output_usd_per_mtok == 2.5
+    with pytest.raises(ConfigError, match="input_usd_per_mtok"):
+        _settings(input_usd_per_mtok=-1)
+    environ = {
+        **{"CYPRESS_CREEK_PROVIDER": "anthropic", "CYPRESS_CREEK_MODEL": "m"},
+        "CYPRESS_CREEK_INPUT_USD_PER_MTOK": "1.25",
+    }
+    assert load_settings(environ=environ).input_usd_per_mtok == 1.25
