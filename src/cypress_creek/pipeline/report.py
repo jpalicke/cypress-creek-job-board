@@ -3,8 +3,9 @@
 from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from cypress_creek.facts.models import Bank
 from cypress_creek.ingest.models import Importance, Posting, PostingWarning, Requirement
@@ -17,6 +18,7 @@ from cypress_creek.scoring.score import ScoreResult, Weights, score
 from cypress_creek.scoring.support import Gate, Support
 from cypress_creek.validators.citations import check_fact_exists, check_fact_verified
 from cypress_creek.validators.claims import check_citation_required
+from cypress_creek.validators.requirements import uncovered_cue_spans
 
 TRIAGE_DISCLAIMER = "triage only, not a probability"
 
@@ -66,6 +68,16 @@ class ReportRow(BaseModel):
     raise_attempted: bool = False
 
 
+class NotAssessedSentence(BaseModel):
+    """A posting cue sentence that extraction did not cover with a requirement."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    reason: Literal["cue_sentence_uncovered"] = "cue_sentence_uncovered"
+    text: str
+    span: tuple[int, int]
+
+
 class GapReport(BaseModel):
     """The product's output. A data structure first: text and UI are views of it."""
 
@@ -77,6 +89,7 @@ class GapReport(BaseModel):
     rows: list[ReportRow]
     gaps: list[str]
     not_assessed_count: int
+    not_assessed: list[NotAssessedSentence] = Field(default_factory=list)
     dropped: list[Dropped]
     warnings: list[PostingWarning]
     score: ScoreResult | None
@@ -162,11 +175,18 @@ def build_report(
     call for a requirement keeps the score, built from its rule ceiling, and flags the row."""
     reasons: list[str] = []
     rows: list[ReportRow] = []
+    not_assessed: list[NotAssessedSentence] = []
     result: ScoreResult | None = None
     if extraction.status is ExtractionStatus.INCOMPLETE:
         reasons.append(f"extraction failed: {extraction.failure}")
     else:
         _check_alignment(extraction, candidates, entailed)
+        not_assessed = [
+            NotAssessedSentence(text=posting.text[start:end], span=(start, end))
+            for start, end in uncovered_cue_spans(
+                posting.text, [requirement.span for requirement in extraction.requirements]
+            )
+        ]
         rows = [
             _row(requirement, candidate, outcome)
             for requirement, candidate, outcome in zip(
@@ -187,6 +207,7 @@ def build_report(
         rows=rows,
         gaps=[row.requirement_id for row in rows if row.support is not Support.STRONG],
         not_assessed_count=extraction.not_assessed_count,
+        not_assessed=not_assessed,
         dropped=extraction.dropped,
         warnings=posting.warnings,
         score=result,

@@ -7,6 +7,7 @@ from cypress_creek.pipeline.render import render_text
 from cypress_creek.pipeline.report import (
     TRIAGE_DISCLAIMER,
     GapReport,
+    NotAssessedSentence,
     Provenance,
     ReportRow,
     ReportStatus,
@@ -91,6 +92,18 @@ def test_a_report_with_no_score_says_so_and_never_shows_a_number() -> None:
     assert "out of 100" not in text
 
 
+def test_a_report_with_only_omitted_cues_shows_the_count_by_the_missing_score() -> None:
+    report = _report(
+        [],
+        not_assessed=[NotAssessedSentence(text="Python is required.", span=(0, 19))],
+    )
+    lines = render_text(report).splitlines()
+    assert lines[1] == (
+        "Score: none, there were no requirements to score. "
+        "1 cue sentence not assessed; the score does not cover them."
+    )
+
+
 def test_an_incomplete_report_leads_with_a_banner_and_the_reasons() -> None:
     report = _report(
         [],
@@ -133,3 +146,20 @@ def test_not_assessed_dropped_and_warnings_are_listed() -> None:
     assert "Not assessed: 3 requirements over the cap." in text
     assert "Dropped proposals: 1" in text
     assert "Warning: control_chars_stripped (7)" in text
+
+
+def test_uncovered_cue_count_is_beside_score_with_flattened_sentence_and_offset() -> None:
+    report = _report(
+        [_row(1, Support.STRONG)],
+        not_assessed=[
+            NotAssessedSentence(text="Postgres is required.\n[fake] Forged row", span=(24, 62))
+        ],
+    )
+
+    lines = render_text(report).splitlines()
+    assert "1 cue sentence not assessed" in lines[1]
+    assert "Score: 100.0" in lines[1]
+    assert (
+        "Cue sentence not assessed at offset 24: Postgres is required. [fake] Forged row" in lines
+    )
+    assert not any(line.startswith("[fake]") for line in lines)
