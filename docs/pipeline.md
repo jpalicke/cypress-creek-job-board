@@ -395,6 +395,95 @@ It prints the gap report, the run id and counts of observed calls and validator 
 Every cited fact is verified, a rationale that fails the grounding checks is replaced by
 `rationale withheld`, and the score is triage only.
 
+## Discovery: dedupe, filters and listing states
+
+Discovery turns the listings an adapter fetched into the ones worth scoring, before any model call. Three deterministic steps, none of which uses a model. The choices are in [ADR 0025](adr/0025-conservative-dedupe-filters-and-closing.md).
+
+**Dedupe** (`discovery/dedupe.py`, `dedupe(listings, company_keys)`). A false merge hides a real posting, so the rule is exact or nothing.
+1. One listing per listing id (`ats:slug:job_id`). If the same id arrives twice, the copy with the latest `fetched_at` wins, with every other field as the tie breaker, so the answer never depends on input order.
+2. Across sources, two listings merge only when their company key, title and location fingerprints are all equal. The company is `company_key` of the watchlist display name, passed in as a map from the normalized `(ats, slug)` to the key, because a listing does not carry a company name. A listing whose board is not in the map is never merged across sources.
+3. A fingerprint is NFKC, casefold, punctuation turned into a space, whitespace collapsed. `#` is kept, and `+` is not punctuation, so `C#` and `C++` do not collapse into `C`. Location gets the same treatment and nothing more: a region is never expanded to a city.
+4. A fingerprint group merges only if each source (`ats`) appears once in it. Two openings with the same title and place on one board are two jobs, and a group with such a pair merges nothing, because it is unclear which copy matches which.
+5. A merge is a `MergedListing`: the listing with the smallest id, the earliest `posted_at` of the group, every URL (sorted) and every source id (sorted). The result is sorted by id.
+
+**Filters** (`discovery/filters.py`, `apply_filters(listings, ListingFilters(...), today)`). All matching is on whole words after the same fingerprint folding, so `java` does not match `javascript`.
+
+| Field | Keeps a listing when |
+| --- | --- |
+| `max_age_days` | `today` minus the posted date is at most N days. A listing with no `posted_at` is kept, since age cannot be judged. |
+| `locations` | the location contains any listed place |
+| `remote` | `true`: the location or title says `remote`. `false`: it does not. |
+| `exclude_seniority` | no term appears in the title |
+| `exclude_keywords` | no term appears in the title or description |
+| `include_keywords` | at least one term appears in the title or description |
+
+The filters run in that order and `FilterReport.removed` counts each removed listing under the first filter that rejected it, so the counts add up to `total_removed` and a filter set that removes everything says which filter did it. `today` is passed in, never read from a clock.
+
+**Listing states** (`discovery/listings.py`, `Listings`). `apply_fetch(ats, slug, fetch)` takes one successful fetch of a whole board and, in one transaction, stores unknown listings as `new`, marks known ones `seen` (a closed listing that returns is `seen` again), and marks stored listings of that board that are missing from the fetch `closed`. A fetch that raised never reaches `apply_fetch`, so a failed fetch closes nothing (`Listings.refresh(adapter, ats, slug)` fetches and applies in one call). A job the adapter skipped as malformed does not close its listing: a skipped job with a known id protects that listing, and a skipped job with no id stops closing for that fetch, because it could have been any of them.
+
+### Try dedupe, filters and states
+No network and no model. This writes only to a throwaway database. From the repository root, in a bash shell:
+
+```bash
+export CYPRESS_CREEK_DATA_DIR="$(mktemp -d)"
+uv run python - <<'PY'
+from datetime import UTC, date, datetime
+
+from cypress_creek.discovery.adapters.base import BoardFetch, Listing
+from cypress_creek.discovery.dedupe import dedupe
+from cypress_creek.discovery.filters import ListingFilters, apply_filters
+from cypress_creek.discovery.listings import Listings
+from cypress_creek.storage.db import connect, database_path, migrate
+
+
+def listing(ats, job_id, title, location="Austin, TX", posted=datetime(2026, 3, 1, tzinfo=UTC)):
+    return Listing(
+        id=f"{ats}:exampleco:{job_id}", ats=ats, slug="exampleco", title=title,
+        location=location, url=f"https://jobs.example.test/{ats}/{job_id}", posted_at=posted,
+        fetched_at=datetime(2026, 3, 31, tzinfo=UTC), content_text="Build services in Python.",
+        content_hash="h",
+    )
+
+
+found = [
+    listing("greenhouse", "1", "Platform Engineer"),
+    listing("lever", "a", "PLATFORM  engineer."),
+    listing("ashby", "z", "Staff Platform Engineer"),
+]
+keys = {("greenhouse", "exampleco"): "exampleco", ("lever", "exampleco"): "exampleco",
+        ("ashby", "exampleco"): "exampleco"}
+merged = dedupe(found, keys)
+print("after dedupe:", [(m.listing.title, len(m.urls)) for m in merged])
+
+report = apply_filters(
+    [m.listing for m in merged], ListingFilters(exclude_seniority=("staff",)), date(2026, 3, 31)
+)
+print("kept:", [item.title for item in report.kept])
+print("removed:", {name.value: count for name, count in report.removed.items() if count})
+
+conn = connect(database_path())
+migrate(conn)
+repo = Listings(conn)
+print(repo.apply_fetch("greenhouse", "exampleco", BoardFetch((found[0],), ())))
+print(repo.apply_fetch("greenhouse", "exampleco", BoardFetch((), ())))
+print([(item.id, item.state.value) for item in repo.board("greenhouse", "exampleco")])
+PY
+unset CYPRESS_CREEK_DATA_DIR
+```
+
+Expected output:
+
+```text
+after dedupe: [('Staff Platform Engineer', 1), ('Platform Engineer', 2)]
+kept: ['Platform Engineer']
+removed: {'seniority': 1}
+StateChanges(added=1, seen=0, closed=0)
+StateChanges(added=0, seen=0, closed=1)
+[('greenhouse:exampleco:1', 'closed')]
+```
+
+The Greenhouse and Lever copies of `Platform Engineer` merged (two URLs), the Ashby `Staff Platform Engineer` stayed separate, the seniority filter removed it, and an empty successful fetch closed the stored listing.
+
 ## Try it locally
 ```bash
 uv run python -c "

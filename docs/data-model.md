@@ -126,7 +126,7 @@ Known limits: there are no checksums, so an edited applied migration is not dete
 
 ## Discovery: watchlist and tombstones
 Code is in `src/cypress_creek/discovery/`. Tables come from `0002_discovery.sql`:
-- `listing`: a posting found on a company board. `id` is `ats:slug:job_id`, `state` is new, seen or closed. Nothing writes listings yet.
+- `listing`: a posting found on a company board. `id` is `ats:slug:job_id`, `state` is new, seen or closed. `Listings` (`discovery/listings.py`) writes it: `apply_fetch` stores a successful board fetch and moves states, and a failed fetch changes nothing. See [pipeline.md](pipeline.md#discovery-dedupe-filters-and-listing-states).
 - `watchlist_entry`: an approved company. `company_key` is the key, derived from `display_name` by `company_key()` and never supplied. `(ats, slug)` is unique, stored trimmed and lower case, and neither part may be empty. `identity_evidence` is strong, weak or none. It is written only by a human approval, so `Watchlist.add` takes the approval time from the caller and never reads a clock.
 - `suggestion`: a proposed company. `state` is pending, approved or denied. A denied row is the permanent tombstone, one per company and board. `ats` and `slug` are both set or both empty. Nothing writes pending or approved rows until the suggestion card.
 
