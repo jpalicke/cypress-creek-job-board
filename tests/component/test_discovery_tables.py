@@ -31,12 +31,12 @@ def _entry(
     region: LeverRegion | None = None,
 ) -> WatchlistEntry:
     return WatchlistEntry(
-        region=region,
         display_name=name,
         ats=ats,
         slug=slug,
         identity_evidence=IdentityEvidence.STRONG,
         approved_at=NOW,
+        region=region,
     )
 
 
@@ -295,6 +295,18 @@ def test_an_entry_without_a_region_reads_back_as_none(conn: sqlite3.Connection) 
 def test_a_region_on_a_board_that_is_not_lever_is_refused() -> None:
     with pytest.raises(InvalidBoard, match="region"):
         _entry(ats="greenhouse", slug="acme", region=LeverRegion.US)
+
+
+@pytest.mark.parametrize("ats", ["greenhouse", "ashby"])
+def test_the_database_refuses_a_region_on_a_board_that_is_not_lever(
+    conn: sqlite3.Connection, ats: str
+) -> None:
+    with pytest.raises(sqlite3.IntegrityError):
+        conn.execute(
+            "INSERT INTO watchlist_entry (company_key, display_name, ats, slug,"
+            " identity_evidence, approved_at, region) VALUES ('a', 'A', ?, 'a', 'weak', 'x', 'us')",
+            (ats,),
+        )
 
 
 def test_the_database_refuses_an_unknown_region(conn: sqlite3.Connection) -> None:

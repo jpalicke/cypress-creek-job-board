@@ -18,6 +18,9 @@ Status: accepted (card #109). Supersedes the "memory only" part of [ADR 0022](00
 - A caller reads `region_of` after a successful fetch, stores it with `set_region`, and on the next run seeds each Lever entry with `remember_region` before fetching. The scan card H8 (#47) is the first caller. Nothing calls them yet.
 - A stored region that has gone stale costs one 404 and a report of a missing board, never a wrong listing.
 
+- `discovery/watchlist.py` imports `LeverRegion` and the `lever` name from the Lever adapter module. That is one vendor adapter in a state module. If a second ATS with regions appears, move the region type and the name into a small shared module.
+- Tests cover every tier: unit (entry rule, seed normalization), component (SQLite, CHECK, loopback servers), e2e (a region written by one process and used by a fresh one, which asks exactly one host) and integration (a seeded region reaches the real EU host with no US request, run by the network tests).
+
 ## Alternatives considered
 
 - **Put the region on `ExistenceResult`.** Rejected for the reason in ADR 0022: it widens the contract of every adapter for one vendor.
