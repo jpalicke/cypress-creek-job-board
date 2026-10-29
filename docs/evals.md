@@ -1,8 +1,9 @@
 # Evals
 
 The eval harness runs dated, fictional postings against the sample fact bank and a real model.
-Its CLI saves resumable runs in SQLite and can export JSONL for audit. Hand labels come in E3;
-these runs are not benchmark evidence yet.
+Its CLI saves resumable runs in SQLite and can export JSONL for audit. Six real postings with
+hand labels are committed under `evals/fixtures/` (see [Posting fixtures and hand labels](#posting-fixtures-and-hand-labels)),
+but the smoke case runs are still not benchmark evidence.
 
 ## Run record format
 
@@ -49,8 +50,11 @@ file. `load_run(path, expected_header=header)` validates an export but never cha
 state. An export is not a resume store.
 
 Scratch exports belong under `evals/scratch/`, which Git ignores. Only published exports with
-hand labels belong under `evals/results/`, named with date, backend and model. E3 supplies
-those labels, so an E2b2 scratch file is not benchmark evidence.
+hand labels belong under `evals/results/`, named with date, backend and model. The labels now
+exist, but no scorer has read them yet, so an E2b2 scratch file is not benchmark evidence.
+
+For E2's omission rate, read `report.not_assessed` (cue sentences extraction skipped, with offsets)
+and the V13 verdict that the pipeline trace records at stage `extract`.
 
 ## Run the harness
 
@@ -92,6 +96,57 @@ Check the record contract locally with:
 ```bash
 uv run pytest tests/unit/test_run_records.py tests/component/test_eval_run_files.py -q --no-cov
 ```
+
+## Posting fixtures and hand labels
+
+`evals/fixtures/<ats>-<job id>/` holds one real, public job posting as three files: `posting.txt`
+(the plain text after this project's own HTML to text step and normalization), `meta.yaml` and
+`labels.yaml`. There are six: four Greenhouse and two Lever postings, taken from the approved
+list of eight. The two Ashby postings are held out for later.
+
+**Source and license.** Each posting belongs to its publisher, and the feeds state no reuse
+license. They are kept only as evaluation inputs and are treated as hostile input. `meta.yaml`
+records the posting URL, the feed URL, the publisher, the retrieval date (2026-10-29) and the
+SHA-256 of `posting.txt`; [NOTICE](../NOTICE) lists the same and gives the takedown contact. No
+recruiter or other personal data is kept (a test refuses any `@` in a posting). The postings were
+fetched with an honest, versioned `cypress-creek` User-Agent and no repeated requests.
+
+**Replacements.** Four of the six approved postings had closed when they were re-fetched. Each
+stand in comes from the same board and records the original ID and the reason under `replaces`
+in its `meta.yaml`. The details are in [e3-label-decisions.md](e3-label-decisions.md#the-404s-and-the-replacements).
+
+**Labels.** Per posting, `labels.yaml` lists the requirements as read from the text: a verbatim
+`span`, `kind`, `term`, optional `years` and `issuer`, `importance`, the `expected_support`
+(`strong`, `partial` or `none`), the `expected_status` (`gap` unless strong), the `fact_ids` that
+justify it, an optional `planted_gap` row and an optional `note`. It also lists the cue
+sentences that the V13 check must cover. The labels carry a `provenance` block: who labeled them,
+`review: pending` until Joe P signs off, the date, and `model_output_used: false`. Joe P
+delegated the labeling to the pod and reviews the result; every judgment call is explained in
+[e3-label-decisions.md](e3-label-decisions.md) and is his to change. Labels are written before any
+model runs and are never adjusted to fit a backend. A change after a run is a new label version,
+and the earlier run files stay in the record.
+
+**The checks.** `evals/harness/labels.py` holds the pydantic schema and `validate_labels`. It
+rejects a span that is not exact posting text, a fact ID that is missing, unverified or local
+only, a planted gap row that disagrees with the label, a status that does not follow the support,
+and a cue sentence in the posting that is not labeled. `require_committed_labels` refuses a case
+whose `labels.yaml` is untracked or differs from the commit, so a run can only use labels that git
+already holds. `evals/harness/fixtures.py` loads a fixture directory, checks the hash and computes
+the fixture set hash for run headers.
+
+```bash
+uv run python -m evals.harness.check_labels
+```
+It prints one `ok` line per fixture and the fixture set hash, and exits 1 with each problem on
+standard error when a fixture is unsound. The tests are:
+```bash
+uv run pytest tests/unit/test_labels_unit.py tests/component/test_labels.py tests/component/test_fixtures.py tests/e2e/test_check_labels_process.py tests/integration/test_label_commit_guard.py -q --no-cov
+```
+The last one needs the labels to be committed, so run it from a clean checkout.
+
+To fetch a posting again, read the feed named in `meta.yaml`, convert the description with
+`html_to_text`, join the title and the text, and pass the result through `normalize`. The shipped
+text is exactly that output.
 
 ## The sample bank
 

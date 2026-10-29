@@ -238,7 +238,7 @@ stored: True
 region: eu
 ```
 
-Seeding is `adapter.remember_region(entry.slug, entry.region)` for each Lever entry with a region. See [ADR 0024](adr/0024-lever-region-is-stored-on-the-watchlist-entry.md).
+Seeding is `adapter.remember_region(entry.slug, entry.region)` for each Lever entry with a region. See [ADR 0025](adr/0025-lever-region-is-stored-on-the-watchlist-entry.md).
 
 The real-network check reads the board at a page size of 10 (about 32 requests, so it is slow), the probe, a made-up slug, and a board that lives only on the EU host. It needs the internet and fails, never skips, when the network is unreachable. The EU board had no open postings when it was recorded, so that test asserts the probe, the region and a clean fetch, not a posting count:
 
