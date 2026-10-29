@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from cypress_creek.discovery.adapters.lever import LeverRegion
 from cypress_creek.discovery.tombstones import InvalidBoard, Tombstones
 from cypress_creek.discovery.watchlist import (
     AlreadyWatched,
@@ -23,8 +24,14 @@ NOW = datetime(2024, 6, 1, tzinfo=UTC)
 HOMOGLYPH_ACME = "Аcme Corp"
 
 
-def _entry(name: str = "Acme Corp", ats: str = "greenhouse", slug: str = "acme") -> WatchlistEntry:
+def _entry(
+    name: str = "Acme Corp",
+    ats: str = "greenhouse",
+    slug: str = "acme",
+    region: LeverRegion | None = None,
+) -> WatchlistEntry:
     return WatchlistEntry(
+        region=region,
         display_name=name,
         ats=ats,
         slug=slug,
@@ -270,3 +277,43 @@ def test_the_refusal_names_the_company_that_was_denied(conn: sqlite3.Connection)
     _deny(conn)
     with pytest.raises(Tombstoned, match="Acme Corp"):
         Watchlist(conn).add(_entry("Renamed Holdings", slug="acme"))
+
+
+def test_a_lever_region_is_stored_and_survives_reopening(database: Path) -> None:
+    with closing(connect(database)) as conn:
+        Watchlist(conn).add(_entry(ats="lever", slug="acme", region=LeverRegion.EU))
+    with closing(connect(database)) as reopened:
+        (entry,) = Watchlist(reopened).entries()
+    assert entry.region is LeverRegion.EU
+
+
+def test_an_entry_without_a_region_reads_back_as_none(conn: sqlite3.Connection) -> None:
+    Watchlist(conn).add(_entry(ats="lever", slug="acme"))
+    assert Watchlist(conn).entries()[0].region is None
+
+
+def test_a_region_on_a_board_that_is_not_lever_is_refused() -> None:
+    with pytest.raises(InvalidBoard, match="region"):
+        _entry(ats="greenhouse", slug="acme", region=LeverRegion.US)
+
+
+def test_the_database_refuses_an_unknown_region(conn: sqlite3.Connection) -> None:
+    with pytest.raises(sqlite3.IntegrityError):
+        conn.execute(
+            "INSERT INTO watchlist_entry (company_key, display_name, ats, slug,"
+            " identity_evidence, approved_at, region)"
+            " VALUES ('a', 'A', 'lever', 'a', 'weak', 'x', 'mars')"
+        )
+
+
+def test_set_region_records_where_a_lever_board_was_found(database: Path) -> None:
+    with closing(connect(database)) as conn:
+        watchlist = Watchlist(conn)
+        watchlist.add(_entry(ats="lever", slug="acme"))
+        assert watchlist.set_region("lever", "ACME ", LeverRegion.EU) is True
+    with closing(connect(database)) as reopened:
+        assert Watchlist(reopened).entries()[0].region is LeverRegion.EU
+
+
+def test_set_region_of_an_unwatched_board_changes_nothing(conn: sqlite3.Connection) -> None:
+    assert Watchlist(conn).set_region("lever", "ghost", LeverRegion.US) is False
