@@ -9,13 +9,19 @@ def _one_line(text: str) -> str:
 
 def _score_line(report: GapReport) -> str:
     if report.score is None:
-        return "Score: none, the report is incomplete."
-    if report.score.score is None:
-        return "Score: none, there were no requirements to score."
-    return (
-        f"Score: {report.score.score:.1f} out of 100 ({report.score_disclaimer}). "
-        f"Supported {report.score.supported} of {report.score.total}."
-    )
+        line = "Score: none, the report is incomplete."
+    elif report.score.score is None:
+        line = "Score: none, there were no requirements to score."
+    else:
+        line = (
+            f"Score: {report.score.score:.1f} out of 100 ({report.score_disclaimer}). "
+            f"Supported {report.score.supported} of {report.score.total}."
+        )
+    if report.not_assessed:
+        count = len(report.not_assessed)
+        noun = "sentence" if count == 1 else "sentences"
+        line += f" {count} cue {noun} not assessed; the score does not cover them."
+    return line
 
 
 def _row_lines(row: ReportRow) -> list[str]:
@@ -43,6 +49,10 @@ def render_text(report: GapReport) -> str:
         lines.append(f"Gaps: {', '.join(report.gaps)}")
     if report.not_assessed_count:
         lines.append(f"Not assessed: {report.not_assessed_count} requirements over the cap.")
+    for sentence in report.not_assessed:
+        lines.append(
+            f"Cue sentence not assessed at offset {sentence.span[0]}: {_one_line(sentence.text)}"
+        )
     if report.dropped:
         lines.append(f"Dropped proposals: {len(report.dropped)}")
     lines += [f"Warning: {warning.kind.value} ({warning.count})" for warning in report.warnings]
