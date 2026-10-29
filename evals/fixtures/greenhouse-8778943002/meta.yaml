@@ -1,0 +1,15 @@
+fixture_id: greenhouse-8778943002
+ats: greenhouse
+publisher: GitLab Inc.
+job_id: '8778943002'
+title: Senior Backend Engineer, Database Excellence (Ruby)
+url: https://job-boards.greenhouse.io/gitlab/jobs/8778943002
+api_url: https://boards-api.greenhouse.io/v1/boards/gitlab/jobs?content=true
+retrieved: '2026-10-29'
+normalized_sha256: a4edbae7014368c3f0b8454170bf82704e6dff8be657542bc18f56e0e689dbaa  # pragma: allowlist secret
+replaces:
+  job_id: '8512220002'
+  reason: Job 8512220002 returned HTTP 404 from the Greenhouse job endpoint and is absent from the board
+    listing on 2026-10-29, so it is closed or removed. This open role from the same board stands in for
+    it. Chosen because its PostgreSQL requirement is strongly supported by the sample bank while its Ruby
+    requirement is a gap.
