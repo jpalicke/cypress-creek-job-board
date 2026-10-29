@@ -82,6 +82,8 @@ Two more CI pieces cover the tiers the gated run leaves out:
 - **e2e job** (same workflow, every push and pull request): `pytest tests/e2e tests/integration -m "not needs_network and not live"`. These are the offline end to end and integration tests: real child processes, real SQLite files and real loopback servers.
 - **`network.yml`** (weekly and on demand, not a pull request gate): `pytest tests/integration tests/e2e -m needs_network`. These talk to public job boards and public HTTPS, so an outage or a changed board must not block a merge. Start it by hand from the Actions tab (`workflow_dispatch`) on the branch whose network tests you changed, and quote the run in the pull request. The `live` tests (a real Ollama) run in `live.yml` the same way.
 
+Every workflow declares `permissions: contents: read` at the top, the minimum a checkout needs. A job that needs more must say why in a comment next to the grant.
+
 Warnings are errors, and a skipped test fails the whole run, so a missing service can never hide as a skip. Tool versions are pinned by `uv.lock`. Run everything by hand with `uv run pre-commit run --all-files`. Never use `--no-verify`.
 
 ## Dependency audit and licenses
