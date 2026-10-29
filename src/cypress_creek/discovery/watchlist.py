@@ -5,7 +5,9 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 
-from cypress_creek.discovery.tombstones import Tombstones, normalize_board
+from cypress_creek.discovery.adapters.lever import ATS as LEVER_ATS
+from cypress_creek.discovery.adapters.lever import LeverRegion
+from cypress_creek.discovery.tombstones import InvalidBoard, Tombstones, normalize_board
 from cypress_creek.storage.company_key import company_key
 
 
@@ -32,12 +34,15 @@ class WatchlistEntry:
     slug: str
     identity_evidence: IdentityEvidence
     approved_at: datetime
+    region: LeverRegion | None = None
     company_key: str = field(init=False)
 
     def __post_init__(self) -> None:
         ats, slug = normalize_board(self.ats, self.slug)
         object.__setattr__(self, "ats", ats)
         object.__setattr__(self, "slug", slug)
+        if self.region is not None and ats != LEVER_ATS:
+            raise InvalidBoard("only a lever board has a region")
         object.__setattr__(self, "company_key", company_key(self.display_name))
 
 
@@ -52,8 +57,8 @@ class Watchlist:
             self._refuse_if_blocked(entry)
             self._conn.execute(
                 "INSERT INTO watchlist_entry"
-                " (company_key, display_name, ats, slug, identity_evidence, approved_at)"
-                " VALUES (?, ?, ?, ?, ?, ?)",
+                " (company_key, display_name, ats, slug, identity_evidence, approved_at, region)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?)",
                 (
                     entry.company_key,
                     entry.display_name,
@@ -61,6 +66,7 @@ class Watchlist:
                     entry.slug,
                     entry.identity_evidence.value,
                     entry.approved_at.isoformat(),
+                    entry.region.value if entry.region else None,
                 ),
             )
         except BaseException:
@@ -90,9 +96,20 @@ class Watchlist:
         removed = self._conn.execute("DELETE FROM watchlist_entry WHERE company_key = ?", (key,))
         return removed.rowcount > 0
 
+    def set_region(self, ats: str, slug: str, region: LeverRegion) -> bool:
+        """Record the host a Lever board was found on. Returns whether the board is watched."""
+        ats, slug = normalize_board(ats, slug)
+        if ats != LEVER_ATS:
+            raise InvalidBoard("only a lever board has a region")
+        updated = self._conn.execute(
+            "UPDATE watchlist_entry SET region = ? WHERE ats = ? AND slug = ?",
+            (region.value, ats, slug),
+        )
+        return updated.rowcount > 0
+
     def entries(self) -> list[WatchlistEntry]:
         rows = self._conn.execute(
-            "SELECT display_name, ats, slug, identity_evidence, approved_at"
+            "SELECT display_name, ats, slug, identity_evidence, approved_at, region"
             " FROM watchlist_entry ORDER BY company_key"
         ).fetchall()
         return [
@@ -102,6 +119,7 @@ class Watchlist:
                 slug=slug,
                 identity_evidence=IdentityEvidence(evidence),
                 approved_at=datetime.fromisoformat(approved_at),
+                region=LeverRegion(region) if region else None,
             )
-            for name, ats, slug, evidence, approved_at in rows
+            for name, ats, slug, evidence, approved_at, region in rows
         ]
