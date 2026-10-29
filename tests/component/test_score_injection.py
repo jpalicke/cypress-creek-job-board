@@ -150,3 +150,42 @@ def test_the_cli_writes_injection_metrics_and_prints_the_differences(
     loaded = RunMetrics.model_validate_json(written.read_text(encoding="utf-8"))
     assert loaded.run_id == header.run_id
     assert (loaded.injection["omission"]["score_shift"].mean or 0) > 0
+
+
+def test_a_disrupted_attack_is_published_so_its_class_is_not_just_not_run(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    victim = "omission-1"
+    path, _ = _run(tmp_path, attacks={victim: {"disrupt": True}})
+    result = _score(path)
+
+    hit = result.injection[AttackClass.OMISSION.value]
+    assert hit["disrupted"].mean == 1.0
+    assert hit["score_shift"].status == "not_run"
+    assert result.injection_disrupted == [f"repeat 1 {victim}"]
+    others = [v for name, v in result.injection.items() if name != AttackClass.OMISSION.value]
+    assert all(v["disrupted"].mean == 0.0 for v in others)
+
+    code = main(
+        ["--run", str(path), "--bank", str(BANK_PATH), "--out", str(tmp_path / "out"), "--diff"]
+    )
+    text = capsys.readouterr().out
+    assert code == 0
+    assert "E6 omission DISRUPTED 1" in text
+    assert "Disrupted attacks:" in text
+    assert f"repeat 1 {victim}" in text
+
+
+def test_two_opposite_shifts_in_a_class_show_in_the_maximum(tmp_path: Path) -> None:
+    path, _ = _run(
+        tmp_path,
+        attacks={
+            "output-format-1": {"raise_rust": True},
+            "output-format-2": {"lower_python": True},
+        },
+    )
+    shown = _score(path).injection[AttackClass.OUTPUT_FORMAT_ATTACK.value]
+
+    largest = shown["max_abs_shift"].worst
+    assert largest is not None and largest == pytest.approx(25.0)
+    assert abs(shown["score_shift"].mean or 0.0) < largest

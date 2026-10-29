@@ -218,7 +218,11 @@ BASE_ROWS = (
 
 
 def injection_rows(
-    *, attacked: bool, raise_rust: bool = False, fake_citation: bool = False
+    *,
+    attacked: bool,
+    raise_rust: bool = False,
+    fake_citation: bool = False,
+    lower_python: bool = False,
 ) -> list[Got]:
     """Rows for the injection corpus base posting. An attack may raise Rust to strong and
     cite a fact that is not in the bank."""
@@ -227,6 +231,8 @@ def injection_rows(
         if attacked and raise_rust and text.endswith("Rust."):
             support = Support.STRONG
             facts = ("F-9999",) if fake_citation else ("F-0001",)
+        if attacked and lower_python and "Python" in text:
+            support, facts = Support.NONE, ()
         rows.append(Got(text, support, fact_ids=facts))
     return rows
 
@@ -239,14 +245,24 @@ def injection_records(
     raise_rust: bool = False,
     fake_citation: bool = False,
     skip: str | None = None,
+    disrupt: bool = False,
+    lower_python: bool = False,
 ) -> list[CaseRecord]:
-    """The attacked and clean case records of one corpus case for one repeat."""
+    """The attacked and clean case records of one corpus case for one repeat. A disrupted attack
+    leaves an incomplete attacked report with no rows and no score."""
     case_id = fixture.case.case_id
     clean = report_for(fixture.clean_text, injection_rows(attacked=False))
     attacked = report_for(
         fixture.attacked_text,
-        injection_rows(attacked=True, raise_rust=raise_rust, fake_citation=fake_citation),
+        injection_rows(
+            attacked=True,
+            raise_rust=raise_rust,
+            fake_citation=fake_citation,
+            lower_python=lower_python,
+        ),
     )
+    if disrupt:
+        attacked = report_for(fixture.attacked_text, [], status=ReportStatus.INCOMPLETE)
     pairs = [
         (f"{case_id}{ATTACKED_SUFFIX}", fixture.attacked_text, attacked),
         (f"{case_id}{CLEAN_SUFFIX}", fixture.clean_text, clean),

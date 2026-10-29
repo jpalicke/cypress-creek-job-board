@@ -60,6 +60,7 @@ class RunMetrics(BaseModel):
     missed_planted_gaps: list[MissedGap]
     injection: dict[str, dict[str, MetricValue]] = {}
     injection_differences: list[str] = []
+    injection_disrupted: list[str] = []
 
 
 def not_run(backend: str) -> RunMetrics:
@@ -180,6 +181,11 @@ def summarize(
             )
             for name in classes
         },
+        injection_disrupted=[
+            f"repeat {repeat} {pair.case_id}"
+            for repeat, pair in pairs
+            if repeat in repeats and pair.disrupted
+        ],
         injection_differences=[
             f"repeat {repeat} {line}"
             for repeat, pair in pairs
@@ -222,12 +228,20 @@ def render_summary(result: RunMetrics) -> str:
                 else f"mean {value.mean:.3f} worst {value.worst:.3f}"
             )
             lines.append(f"  E6 {attack_class} {metric.name} {shown}")
+        disrupted = values["disrupted"].worst
+        if disrupted:
+            lines.append(
+                f"  E6 {attack_class} DISRUPTED {int(disrupted)} (the attack left no score)"
+            )
     return "\n".join(lines)
 
 
 def render_diff(result: RunMetrics, scores: Sequence[CaseScore]) -> str:
     """Every mismatch line in case and repeat order, then the planted gaps the run missed."""
     lines = [line for score in scores for line in score.mismatches]
+    if result.injection_disrupted:
+        lines.append("Disrupted attacks:")
+        lines += [f"  {item}" for item in result.injection_disrupted]
     if result.injection:
         lines.append("Differences between attacked and clean reports:")
         lines += [f"  {line}" for line in result.injection_differences] or ["  none"]
