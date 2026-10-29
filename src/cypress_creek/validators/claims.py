@@ -6,6 +6,14 @@ from typing import Protocol
 
 from cypress_creek.facts.models import Fact
 from cypress_creek.terms import normalize_term
+from cypress_creek.validators.claim_words import (
+    NEGATION,
+    fact_text,
+    impact_words,
+    known_in,
+    negation_words,
+    seniority_words,
+)
 from cypress_creek.validators.verdict import Verdict, fail, ok
 
 _TOKEN = re.compile(r"[^\s,;:()\[\]{}\"“”]+")
@@ -112,9 +120,31 @@ def novel_terms(text: str, cited: Sequence[Fact], requirement_text: str) -> list
     return found
 
 
-def check_novel_terms(text: str, cited: Sequence[Fact], requirement_text: str) -> Verdict:
-    """V10: flag terms in the text that no cited fact or requirement mentions."""
+def check_novel_terms(
+    text: str, cited: Sequence[Fact], requirement_text: str, *, claim_words: bool = False
+) -> Verdict:
+    """V10: flag terms in the text that no cited fact or requirement mentions.
+
+    With `claim_words`, also flag a result (reduced, doubling, saved), a rank (senior, sole) or a
+    negation (never, without) that no cited fact makes, and a negation a cited fact makes that the
+    text drops. Drafts use it, because a draft is a claim about the candidate. It is off for
+    rationales, which may say "the facts do not show".
+    """
     found = novel_terms(text, cited, requirement_text)
     if found:
         return fail("V10", "text uses a term that no cited fact mentions", found[0])
+    if claim_words:
+        return _check_claim_words(text, cited, requirement_text)
+    return ok("V10")
+
+
+def _check_claim_words(text: str, cited: Sequence[Fact], requirement_text: str) -> Verdict:
+    sources = [requirement_text, *(fact_text(fact) for fact in cited)]
+    for finder in (impact_words, seniority_words):
+        for word in sorted(finder(text) - known_in(sources, finder)):
+            return fail("V10", "text makes a claim that no cited fact makes", word)
+    if negation_words(text) - known_in(sources, negation_words):
+        return fail("V10", "text negates something that no cited fact negates", NEGATION)
+    if not negation_words(text) and known_in(map(fact_text, cited), negation_words):
+        return fail("V10", "text drops a negation that a cited fact makes", f"{NEGATION} dropped")
     return ok("V10")

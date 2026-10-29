@@ -59,6 +59,8 @@ Known limits: a name that is in no bank fact is V10's concern. Any four digit nu
 ## V8 Numeric consistency
 `check_numbers(text, cited, requirement_text)`. Every number in the text must appear in a cited fact (claim, employer, role, issuer, tag names, or the year of its dates) or in the text of the requirement being answered. `extract_numbers` reads digits (commas, decimals, a leading minus, percents) and number words ("twelve", "twenty-three", "two hundred fifty"). So "40%" and "40" agree, "3.50" and "3.5" agree, and "-5" does not match "5". Fact and requirement IDs (`F-0001`, `R-12`) and names with digits (`k8s`, `python3`) are not numbers. ISO dates are left to V7. A lone "one" is not counted because it is usually a pronoun.
 
+Quantity words are checked too: `decade`, `dozen`, `couple`, `half`, `double`, `triple`, `quadruple`, `hundreds`, `thousands`, `millions`, `billions` and `numerous` (and their inflections, such as "doubling") must be used by a cited fact or the requirement text, so "for a decade" fails against a fact that gives no duration. Hyphenated words such as `double-checked` are whole words and are ignored. The list is finite (see [Claim words](#claim-words)).
+
 ## V9 Citation required
 `check_citation_required(claims)`. Each claim has `text` and `fact_ids` (any object with those attributes works). The first non-blank claim with no fact IDs fails and is named in the verdict.
 
@@ -66,6 +68,22 @@ Known limits: a name that is in no bank fact is V10's concern. Any four digit nu
 `novel_terms(text, cited, requirement_text)` lists suspicious terms, `check_novel_terms` fails if there are any. A term is suspicious if it looks like a name, tool or acronym and neither a cited fact (claim, employer, role, issuer, tags) nor the requirement text contains it. Looks like a name means: contains a digit, `+`, `#` or an inner dot (`node.js`), is ALLCAPS, is CamelCase, or is capitalized in the middle of a sentence. Months, weekdays, fact IDs and plain numbers are skipped, and a possessive matches its base word.
 
 This is a heuristic and is deliberately conservative: it flags for review, it never proves a lie. It cannot see a novel word at the start of a sentence or a lowercase one ("terraform"). V7, V8 and V10 together gate the rationale text, which is shown to a human only if all three pass.
+
+`check_novel_terms(text, cited, requirement_text, claim_words=True)` is the strict form that drafts use. It also flags a result, a rank or a negation that no cited fact makes (see [Claim words](#claim-words)). It is off for rationales, which may legitimately say "the facts do not show".
+
+### Claim words
+`validators/claim_words.py` holds small deterministic word lists, matched on whole lower case words, so a paraphrase stays inside its group ("cut" and "reduced" are one, "doubling" matches "doubled"). For a draft sentence, a group the sentence uses must also be used by a cited fact (claim, employer, role, issuer, tag names and levels) or by the requirement text when one is passed:
+
+| Group | Words |
+| --- | --- |
+| Quantity (V8) | decade, dozen, couple, half, double, triple, quadruple, hundreds, thousands, millions, billions, numerous |
+| Results (V10) | reduce (reduced, decreased, cut, lowered, shortened, trimmed, slashed), increase (increased, grew, grow, boosted, expanded), improve (improved, enhanced, optimized, streamlined), double and triple, save, revenue (profit, sales), cost (budget), speed (faster, accelerated), award (won, winning, prize) |
+| Rank and scope (V10) | senior, staff, principal, chief, director, executive, architect, expert, sole, solely, single-handedly, world-class, award-winning, large-scale, mission-critical, company-wide, org-wide, global, vp |
+| Negation (V10) | never, not, no, none, nor, neither, without, cannot, unable, except, lack and fail words, and any `n't` |
+
+Negation also works the other way: if a cited fact negates something ("Never missed a date") and the sentence does not, V10 fails it as a dropped negation.
+
+Known limits: the lists are finite, so a result or rank word that is not on them ("spearheaded", "pioneered", "successfully") still passes, and meaning is not read. A paraphrase that moves between groups (a fact says "reduced", the sentence says "improved") is flagged, which is intended; the cost is a human review of an honest sentence. Negation words in a different form ("no" in the fact, "without" in the sentence) are one group, but a fact that negates and a sentence that merely avoids the negated word can still pass. These are the only checks of meaning, so a draft always stays under human review.
 
 ## V11 Requirement cap and dedupe
 `dedupe_requirements(requirements)` keeps the first requirement for each normalized term (same rules as the alias table, so "PostgreSQL" and " postgresql. " are one) and at most 40 (`MAX_REQUIREMENTS`). It is idempotent, never reorders and never adds. `check_requirement_cap(requirements)` is the verdict form: it fails on more than 40, or on two requirements sharing a normalized term. A posting stuffed with repeated requirements therefore cannot inflate a score.

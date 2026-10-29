@@ -360,37 +360,47 @@ def test_a_sentence_longer_than_a_fact_claim_is_a_schema_violation() -> None:
         DraftSentenceOutput(text="word " * 100, fact_ids=["F-0001"])
 
 
-# Documented limits of the shared V8 and V10 heuristics (issue #131). These sentences are NOT
-# supported by the fact, yet no validator rejects them. The tests pin that behaviour so the docs
-# stay honest, and so a validator fix shows up as a deliberate change here. They never mean the
-# sentence is verified: a draft always needs human review.
-KNOWN_LIMITS = [
-    ("quantity word", "Led a team of 8 engineers moving a billing system to Python for a decade."),
+# Claims the facts do not make. They were documented limits of V8 and V10 (issue #131) until the
+# claim word checks: each is now flagged, and the fix stays deterministic.
+UNSUPPORTED_CLAIMS = [
+    (
+        "quantity word",
+        "Led a team of 8 engineers moving a billing system to Python for a decade.",
+        "V8",
+    ),
     (
         "invented outcome",
         "Led a team of 8 engineers moving a billing system to Python, doubling revenue.",
+        "V10",
     ),
     (
         "seniority inflation",
         "Led a team of 8 senior staff engineers moving a billing system to Python.",
+        "V10",
     ),
-    ("negation", "Never led a team of 8 engineers moving a billing system to Python."),
+    ("negation", "Never led a team of 8 engineers moving a billing system to Python.", "V10"),
 ]
 
 
-@pytest.mark.parametrize("name,sentence", KNOWN_LIMITS)
-def test_known_validator_limits_still_pass_the_checks_but_stay_under_human_review(
-    bank: Bank, name: str, sentence: str
+@pytest.mark.parametrize("name,sentence,validator", UNSUPPORTED_CLAIMS)
+def test_unsupported_claim_words_are_flagged_and_never_clean(
+    bank: Bank, name: str, sentence: str, validator: str
 ) -> None:
     result = _judge(bank, (sentence, ["F-0001"]))
-    assert result.sentences[0].passed, f"{name} is now caught: update the docs and issue #131"
+    assert validator in _failed(result), name
+    assert result.clean_sentences == []
+    assert "! NOT VERIFIED" in render_draft(result)
+
+
+LEGITIMATE = [
+    "Led 8 engineers in moving a billing system to Python.",
+    "Led an 8 person engineering team migrating the billing system to Python.",
+    "Led a team of 8 engineers who moved a billing system to Python at Initech.",
+]
+
+
+@pytest.mark.parametrize("sentence", LEGITIMATE)
+def test_ordinary_paraphrases_of_the_fact_stay_clean(bank: Bank, sentence: str) -> None:
+    result = _judge(bank, (sentence, ["F-0001"]))
+    assert result.clean_sentences == [sentence]
     assert result.needs_human_review is True
-    assert "human review" in render_draft(result).lower()
-
-
-def test_the_documented_limits_name_every_known_class() -> None:
-    from pathlib import Path
-
-    text = (Path(__file__).resolve().parents[2] / "docs" / "pipeline.md").read_text("utf-8")
-    for word in ("decade", "doubling revenue", "senior staff", "Never led", "#131"):
-        assert word in text

@@ -9,7 +9,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [pipeline.md](pipeline.md) | HTML posting text extraction, posting normalization, the prompt builder (extraction, entailment and draft prompts), draft help, accepting extraction output, stage 1 extraction, stage 2 retrieval, stage 3 entailment, stages 4 and 5 score and report, running the pipeline with an optional trace and a derived run id, the support gate, the score |
 | [evals.md](evals.md) | Eval CLI dry runs and real Ollama smoke runs, whole-run budgets, typed records and traces, SQLite resume, scratch JSONL audit exports, fictional sample fact bank and planted gaps, real posting fixtures with hand labels and the label check |
 | [e3-label-decisions.md](e3-label-decisions.md) | Why each hand label is what it is, the judgment calls for Joe P to review, and the closed postings and their replacements |
-| [validators.md](validators.md) | The grounding validators V1 to V14: what each rejects and its known limits |
+| [validators.md](validators.md) | The grounding validators V1 to V14: what each rejects and its known limits, and the claim word lists |
 | [providers.md](providers.md) | The provider interface, typed errors, retry policy, backend config, the loopback rule, the Ollama and Anthropic adapters and the budget guard |
 | [setup.md](setup.md) | Fetch one public posting link, inspect raw bytes and provenance, and understand network behavior and typed failures. Also fetch a job board politely, fetch a Greenhouse, a Lever or an Ashby board, the fetch cache location, the three fetch environment variables and how to clear the cache |
 | [architecture.md](architecture.md) | How guarded public HTTP fetching pins the connection, bounds the response and isolates DNS behind a deadline, and how the polite fetch layer (rate limiter, refresh window, ETag cache, backoff) sits on top of it, and the board adapter interface (listings, probe, typed errors, the Greenhouse, Lever and Ashby mappings, Lever paging and region discovery, Ashby unlisted jobs and its shape-only probe, the shared feed helpers and the failure modes) |
@@ -50,6 +50,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [0024](adr/0024-hand-labels-are-written-before-runs-and-carry-provenance.md) | Hand labels are written before any run from the posting and bank alone, carry provenance and a pending review, follow the human reading of importance, and are validated against the posting, the bank and the planted gaps |
 | [0025](adr/0025-anthropic-native-structured-output.md) | Anthropic adapter: native structured output instead of forced tool use, schema rewrite, error mapping, hosted rules and price defaults |
 | [0026](adr/0026-draft-help-checks-each-sentence.md) | Draft help: every sentence checked alone, failures shown as not verified, a gap gets no model call, nothing can be sent |
+| [0033](adr/0033-claim-words-in-v8-and-v10.md) | Draft claims about quantity, results, rank and negation are checked with finite deterministic word lists in V8 and V10, strict only for drafts |
 
 ## Configuration
 - `config/aliases.yaml`: tag alias table, described in [data-model.md](data-model.md#tag-alias-table).
