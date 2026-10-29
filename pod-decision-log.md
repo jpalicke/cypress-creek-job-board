@@ -52,3 +52,11 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 
 ## D10. actions/cache v4 to v6 merged (PR #100)
 - 2026-10-29, manager merged after senior approval. The reviewer dispatched the live workflow on the branch (Ollama cache restored, 12 live tests passed) because PRs never run `live.yml`.
+
+## D11. E3 labelling decisions (PR #122, Worker E)
+- 2026-10-29, Worker E on Joe P's delegation. Full list in docs/e3-label-decisions.md in the PR (10 judgement calls for Joe P).
+- Importance labelled as a human reads the posting, not by the V3 cue rule (otherwise most labels would be unspecified). Reverse: set required/preferred under non-cued headings to unspecified.
+- Fixture folders named evals/fixtures/<ats>-<job id>, so E5/E6 injection and pdf folders are not mistaken for postings. Reverse: rename and relax FIXTURE_NAME.
+- Fixture hash lines carry "# pragma: allowlist secret" instead of .secrets.baseline entries. Reverse: swap for baseline entries.
+- One fixture keeps a verbatim em dash in third party salary text. Reverse: normalize and update the hash. Reviewer asked to decide.
+- Four of six originally chosen postings were 404 at fetch; same-board replacements are recorded in meta.yaml.
