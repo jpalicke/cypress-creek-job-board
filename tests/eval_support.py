@@ -2,9 +2,10 @@
 # ABOUTME: Everything is built from plain values so a test can state the expected metric by hand.
 from collections.abc import Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
-from cypress_creek.eval_records import CaseRecord, RunHeader
+from cypress_creek.eval_records import CaseRecord, RunHeader, RunTerminal
 from cypress_creek.ingest.hashing import text_hash
 from cypress_creek.ingest.models import Importance
 from cypress_creek.pipeline.entail import Entailment
@@ -167,3 +168,41 @@ def case_record(
         calls=[],
         validators=[],
     )
+
+
+def mirror_report(
+    labels: Labels,
+    posting: str,
+    *,
+    claim_strong: frozenset[str] = frozenset(),
+    skip: frozenset[str] = frozenset(),
+) -> GapReport:
+    """A report that agrees with the labels, except that the named labels are claimed strong
+    (citing a fact) or left out."""
+    rows = []
+    for label in labels.requirements:
+        if label.id in skip:
+            continue
+        if label.id in claim_strong:
+            rows.append(
+                Got(label.span, Support.STRONG, importance=label.importance, fact_ids=("F-0001",))
+            )
+        else:
+            rows.append(
+                Got(
+                    label.span,
+                    label.expected_support,
+                    importance=label.importance,
+                    fact_ids=tuple(label.fact_ids),
+                )
+            )
+    return report_for(posting, rows)
+
+
+def write_run(
+    path: Path, header: RunHeader, cases: Sequence[CaseRecord], *, complete: bool
+) -> None:
+    lines = [header.model_dump_json(), *(case.model_dump_json() for case in cases)]
+    if complete:
+        lines.append(RunTerminal(run_id=header.run_id, status="complete").model_dump_json())
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
