@@ -262,3 +262,7 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 - 2026-10-29, senior engineer recommended, manager accepted.
 - gap_recall's denominator is the planted gaps that were extracted (stage attribution, ADR 0032). To keep the headline honesty number honest, `planted_not_extracted` is published as an E4 metric (lower is better) so a run that skips planted gaps at extraction cannot show gap_recall 1.0 with no visible counter. Alternative: denominator of all planted gaps. To reverse: one line in repeat_values. FOR JOE P: this is the headline honesty metric; you may want the final call.
 - A bug found in review: the unmatched branch counted the strong planted rows (python 3, postgresql, sql) as planted gaps; being fixed test first.
+
+## D48. F4 and the PDF half of E6 need a PDF library decision from Joe P
+- 2026-10-29, Worker E asked, manager logged.
+- F4 (#34, PDF extraction in a child process) needs a PDF parser (pypdf). `uv add pypdf` was denied by the permission classifier ("Code from External") and the pod did not work around it. Needs from Joe P: approve a library (with an ADR, licence check and pip-audit as the F4 card requires) or name another route. Until then G2 answers a typed 501 `pdf_extraction_unavailable` for PDFs, and E6/F4 are not started.
