@@ -108,3 +108,10 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 - 2026-10-29, Worker H.
 - The integration test records requested URLs with a thin spy (_RecordingFetch) wrapping the real fetch_url, passing through to the real transport. Alternative: none without changing the client. Reverse: delete the class. Senior engineer asked to rule on whether this fits the no-stubbed-HTTP rule.
 - Sandbox cannot run needs_network tests (3 existing Lever network tests fail identically); CI is the evidence.
+
+## D21. H6 dedupe and filter rules (Worker H, branch h6-dedupe-filters, PR not yet open)
+- 2026-10-29, Worker H. Recorded in its ADR; each is reversible there.
+- Dedupe merges only across different sources, only on an exact company, title and location match, and never when one source appears twice in the group.
+- A listing with no `posted_at` passes the age filter.
+- A closed listing that returns becomes `seen`.
+- A skipped job with no id stops closing for that fetch.
