@@ -217,3 +217,12 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 - Unknown paths answer 403 without the token and 404 with it; validation error details no longer repeat caller keys.
 - Process note: a stale server on port 5309 broke an e2e run; kill the python child, not the uv wrapper.
 - FOR JOE P: second human review of Host/CSRF logic still owed: security.py, app.py, session.py, server.py, errors.py.
+
+## D39. E4 scorer choices (PR #135, Worker C)
+- 2026-10-29, Worker C.
+- require_committed_labels is called in the scorer, not the runner (the runner only reads JSON manifests; the card that wires fixtures into the runner should call it too).
+- No recorded CI-model run file is committed (needs Ollama); instead run files built from the real labels plus a live test against a real Ollama. Record one when fixtures are wired into the runner.
+- Gap recall denominator is planted gaps that were extracted; unextracted ones show up as recall loss and in the mismatch view, not as missed gaps. FOR JOE P: this shapes what the published metric claims; reverse in metrics.repeat_values (ADR 0032).
+
+## D40. Work assignments after the first wave
+- 2026-10-29, manager. Worker C: E5 (#27) stacked on E4. Worker G: #133 (#128), then #131 (ADR 0033). Worker H: H7 (#46) stacked on H6 (ADR 0034). Worker E: G1 then G2 (ADR 0030), then peer review. Still blocked: E6 chain beyond E5, E8 (needs Ollama/keys), F4 (needs E6), G3 to G5 (need G2, E8).
