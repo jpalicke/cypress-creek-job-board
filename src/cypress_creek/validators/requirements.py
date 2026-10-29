@@ -35,17 +35,21 @@ def check_requirement_cap(requirements: Sequence[Requirement]) -> Verdict:
     return ok("V11")
 
 
-def uncovered_cue_sentences(text: str, spans: Sequence[tuple[int, int]]) -> list[str]:
-    """Posting sentences holding an importance cue word that no requirement span touches.
-    Lines that are only a section heading such as "Nice to have:" are not requirements."""
-    uncovered: list[str] = []
+def uncovered_cue_spans(text: str, spans: Sequence[tuple[int, int]]) -> list[tuple[int, int]]:
+    """Offsets of cue sentences no requirement touches, excluding section headings."""
+    uncovered: list[tuple[int, int]] = []
     for start, end in split_sentences(text):
         sentence = text[start:end]
         if not has_cue(sentence) or is_importance_heading(sentence):
             continue
         if not any(span_start < end and span_end > start for span_start, span_end in spans):
-            uncovered.append(sentence)
+            uncovered.append((start, end))
     return uncovered
+
+
+def uncovered_cue_sentences(text: str, spans: Sequence[tuple[int, int]]) -> list[str]:
+    """Posting cue sentences that no requirement span touches."""
+    return [text[start:end] for start, end in uncovered_cue_spans(text, spans)]
 
 
 def check_cue_coverage(text: str, requirements: Sequence[Requirement]) -> Verdict:

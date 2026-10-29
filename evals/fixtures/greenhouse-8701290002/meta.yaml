@@ -1,0 +1,9 @@
+fixture_id: greenhouse-8701290002
+ats: greenhouse
+publisher: GitLab Inc.
+job_id: '8701290002'
+title: Senior Assigned Support Engineer (EMEA)
+url: https://job-boards.greenhouse.io/gitlab/jobs/8701290002
+api_url: https://boards-api.greenhouse.io/v1/boards/gitlab/jobs?content=true
+retrieved: '2026-10-29'
+normalized_sha256: ddd5b504bc2f7417d967b9c9aafade9dc6c1a06d04baf450f5cce8f4fd8a7841  # pragma: allowlist secret

@@ -1,0 +1,109 @@
+# Hand labels for this posting. Written from the posting text and the bank alone,
+# before any model or pipeline ran. See docs/e3-label-decisions.md for the reasoning.
+fixture_id: greenhouse-8778943002
+provenance:
+  labeled_by: Claude, on delegation from Joe P (Palicke); pending his review
+  review: pending
+  labeled_on: '2026-10-29'
+  model_output_used: false
+requirements:
+- id: L-1
+  span: Professional software engineering experience working with PostgreSQL in large, complex production environments
+  kind: skill
+  term: postgresql
+  importance: required
+  expected_support: strong
+  expected_status: supported
+  fact_ids:
+  - F-0002
+  - F-0003
+  - F-0016
+- id: L-2
+  span: high availability solutions with automatic failover and zero-downtime data migrations
+  kind: skill
+  term: high availability
+  importance: required
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+  note: F-0003 is a database migration, but zero downtime and failover are not claimed.
+- id: L-3
+  span: managing large or fast-growing datasets through approaches such as data retention, archiving, partitioning, or lifecycle management
+  kind: skill
+  term: data lifecycle management
+  importance: required
+  expected_support: partial
+  expected_status: gap
+  fact_ids:
+  - F-0025
+  note: F-0025 dropped unused tables to cut storage, which is retention in effect. Nothing covers archiving or partitioning. Flagged for review.
+- id: L-4
+  span: Proficiency with Ruby on Rails or another Ruby framework, including designing, implementing, and reviewing backend features.
+  kind: skill
+  term: ruby on rails
+  importance: required
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+- id: L-5
+  span: Ability to reason about software design, algorithms, and performance trade-offs at a system level.
+  kind: skill
+  term: software design
+  importance: required
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+  note: Generic. No fact is tagged for it. A human might accept F-0016 and F-0017. Flagged for review.
+- id: L-6
+  span: Strong written communication skills and comfort working asynchronously in an all-remote, distributed team.
+  kind: soft
+  term: written communication
+  importance: required
+  expected_support: partial
+  expected_status: gap
+  fact_ids:
+  - F-0024
+- id: L-7
+  span: Self-directed work style with effective organizational skills and the ability to manage priorities as a "manager of one".
+  kind: soft
+  term: self direction
+  importance: required
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+- id: L-8
+  span: Alignment with GitLab's values, including transparency, collaboration, inclusion, and contribution to open source.
+  kind: soft
+  term: values alignment
+  importance: required
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+  note: F-0008 is the candidate's own public library, which is not contribution to the employer's project.
+- id: L-9
+  span: Openness to learning and applying new tools and approaches, including transferable experience from related data, infrastructure, or developer tooling domains.
+  kind: soft
+  term: learning agility
+  importance: required
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+- id: L-10
+  span: Willingness to participate in our tier 2 dabase on-call rotation in your time zone.
+  kind: responsibility
+  term: on-call
+  importance: required
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+  note: The posting misspells database. The span keeps it.
+- id: L-11
+  span: Document database best practices, patterns to avoid, and data architecture guidance
+  kind: responsibility
+  term: documentation
+  importance: unspecified
+  expected_support: strong
+  expected_status: supported
+  fact_ids:
+  - F-0024
+cue_sentences: []
