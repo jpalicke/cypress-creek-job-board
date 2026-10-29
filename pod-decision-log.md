@@ -239,3 +239,12 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 ## D43. Process slip caught by the harness
 - 2026-10-29, Worker C reported.
 - Worker C typed a commit with --no-verify out of habit; the auto-mode classifier denied it and nothing was committed that way. The commit was redone with hooks. No bypass reached any branch.
+
+## D44. Drafts use a closed vocabulary (PR #136), the call Joe P may want to make himself
+- 2026-10-29, manager decided on the senior engineer's recommendation.
+- Question: how should drafts enforce "paraphrase only"? The first approach (word lists for quantity, impact, rank and negation) left 20 sibling words rendering clean (lookalike letters, zero-width characters, "many years", "halving", "head of", "founder", "hardly", "dont", ...), because lists are open-ended.
+- Choice: closed vocabulary. Every word in a draft sentence must appear in a cited fact apart from a fixed list of function words and simple inflections; text is NFKC-normalized, format characters stripped, and non-ASCII letters not in a cited fact fail. Deterministic, fails safe (a failing sentence is shown as NOT VERIFIED and is never copyable).
+- Alternative: keep word lists and pin the leaks as documented limits in ADR 0033.
+- Cost: more false positives (legitimate paraphrases flagged); Worker G measures the rate on a corpus. Does not read meaning, so a recombination of cited words can still mislead; human review stays required.
+- Side effect to know: V8 quantity words now withhold some entailment rationales (for example "half"), which moves E-lane metrics.
+- To reverse: drop the strict mode for drafts.
