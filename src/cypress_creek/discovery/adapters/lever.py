@@ -242,7 +242,8 @@ class LeverAdapter:
     """Reads public Lever boards. Every request is a GET through the polite client.
 
     Lever serves a board from a US host or an EU host. Which one is found by asking the US host
-    first, and the answer is remembered in memory for later fetches of that board.
+    first, and the answer is remembered in memory for later fetches of that board. A caller may
+    seed it with `remember_region` from a region it stored.
     """
 
     def __init__(
@@ -266,6 +267,10 @@ class LeverAdapter:
     def region_of(self, slug: str) -> LeverRegion | None:
         """The region a board was last found in, or None when it is not known."""
         return self._regions.get(normalize_board(ATS, slug)[1])
+
+    def remember_region(self, slug: str, region: LeverRegion) -> None:
+        """Seed the region of a board from an earlier run, so the first fetch asks one host."""
+        self._regions[normalize_board(ATS, slug)[1]] = region
 
     def probe(self, slug: str) -> ExistenceResult:
         """Whether the board exists on either host. Lever reports no organization name."""

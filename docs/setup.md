@@ -246,7 +246,39 @@ posted:   2026-08-11
 excerpt:  'A World-Ch'
 ```
 
-What it shows: `probe` asks whether the board exists. Lever reports no organization name, so `probe` returns `found=True` with `organization_name=None`, and the slug is the identity. `region` is where the adapter found the board (`us` or `eu`), kept in memory only. `fetch_board` returns a `BoardFetch` as the Greenhouse adapter does, with an id of the form `lever:slug:posting_id`, a timezone aware `posted_at` from the feed's epoch milliseconds, and the description as plain text (the description, each list heading and its content, then the additional text). An EU board is found the same way: the adapter asks the US host first, and only a 404 moves it on to `api.eu.lever.co`. A slug that exists on neither host makes `probe` return `found=False` and makes `fetch_board` raise `BoardNotFound`. A board still full after 50 pages raises `FeedSchemaError` naming `jobs` instead of returning part of the board. Pass `page_size` (1 to 100) to the adapter to use smaller pages. See [the board adapters architecture](architecture.md#board-adapters) and [ADR 0022](adr/0022-lever-pagination-and-region.md).
+What it shows: `probe` asks whether the board exists. Lever reports no organization name, so `probe` returns `found=True` with `organization_name=None`, and the slug is the identity. `region` is where the adapter found the board (`us` or `eu`). The adapter keeps it in memory; the next snippet stores it on the watchlist and seeds it back. `fetch_board` returns a `BoardFetch` as the Greenhouse adapter does, with an id of the form `lever:slug:posting_id`, a timezone aware `posted_at` from the feed's epoch milliseconds, and the description as plain text (the description, each list heading and its content, then the additional text). An EU board is found the same way: the adapter asks the US host first, and only a 404 moves it on to `api.eu.lever.co`. A slug that exists on neither host makes `probe` return `found=False` and makes `fetch_board` raise `BoardNotFound`. A board still full after 50 pages raises `FeedSchemaError` naming `jobs` instead of returning part of the board. Pass `page_size` (1 to 100) to the adapter to use smaller pages. See [the board adapters architecture](architecture.md#board-adapters) and [ADR 0022](adr/0022-lever-pagination-and-region.md).
+
+Store the region on the watchlist and seed it into a fresh adapter, so the next process asks only the right host. This needs no network and writes only to a throwaway database:
+
+```bash
+export CYPRESS_CREEK_DATA_DIR="$(mktemp -d)"
+uv run python - <<'PY'
+from datetime import UTC, datetime
+
+from cypress_creek.discovery.adapters.lever import LeverRegion
+from cypress_creek.discovery.watchlist import IdentityEvidence, Watchlist, WatchlistEntry
+from cypress_creek.storage.db import connect, database_path, migrate
+
+conn = connect(database_path())
+migrate(conn)
+watchlist = Watchlist(conn)
+watchlist.add(
+    WatchlistEntry("Example Co", "lever", "exampleco", IdentityEvidence.WEAK, datetime.now(UTC))
+)
+print(f"stored: {watchlist.set_region('lever', 'exampleco', LeverRegion.EU)}")
+print(f"region: {watchlist.entries()[0].region}")
+PY
+unset CYPRESS_CREEK_DATA_DIR
+```
+
+Expected output:
+
+```text
+stored: True
+region: eu
+```
+
+Seeding is `adapter.remember_region(entry.slug, entry.region)` for each Lever entry with a region. See [ADR 0029](adr/0029-lever-region-is-stored-on-the-watchlist-entry.md).
 
 The real-network check reads the board at a page size of 10 (about 32 requests, so it is slow), the probe, a made-up slug, and a board that lives only on the EU host. It needs the internet and fails, never skips, when the network is unreachable. The EU board had no open postings when it was recorded, so that test asserts the probe, the region and a clean fetch, not a posting count:
 
