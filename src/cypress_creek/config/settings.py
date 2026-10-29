@@ -37,6 +37,15 @@ def _is_loopback(host: str) -> bool:
         return False
 
 
+def is_loopback_url(url: str) -> bool:
+    """True when the URL's host is localhost or a loopback address."""
+    try:
+        host = urlsplit(url).hostname
+    except ValueError:
+        return False
+    return host is not None and _is_loopback(host)
+
+
 class ProviderSettings(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -52,6 +61,8 @@ class ProviderSettings(BaseModel):
     max_output_tokens: int | None = Field(default=None, gt=0)
     max_requests: int | None = Field(default=None, gt=0)
     max_usd: float | None = Field(default=None, gt=0)
+    cost_input_per_mtok: float | None = Field(default=None, ge=0)
+    cost_output_per_mtok: float | None = Field(default=None, ge=0)
 
     @model_validator(mode="after")
     def _check_base_url(self) -> "ProviderSettings":

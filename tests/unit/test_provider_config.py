@@ -8,6 +8,7 @@ from cypress_creek.config import (
     CONFIG_ENV,
     ConfigError,
     ProviderSettings,
+    is_loopback_url,
     load_settings,
     parse_settings,
     resolve_api_key,
@@ -213,3 +214,34 @@ def test_budget_limits_can_come_from_the_environment() -> None:
         "CYPRESS_CREEK_MAX_OUTPUT_TOKENS": "777",
     }
     assert load_settings(environ=environ).max_output_tokens == 777
+
+
+@pytest.mark.parametrize(
+    ("url", "expected"),
+    [
+        ("http://localhost:1234/v1", True),
+        ("http://[::1]:1234", True),
+        ("https://api.example.com/v1", False),
+        ("http://10.0.0.5:1234", False),
+        ("not a url", False),
+    ],
+)
+def test_is_loopback_url_reads_the_host(url: str, expected: bool) -> None:
+    assert is_loopback_url(url) is expected
+
+
+def test_cost_per_mtok_defaults_to_unset_and_reads_from_the_environment() -> None:
+    assert _settings().cost_input_per_mtok is None
+    environ = {
+        "CYPRESS_CREEK_PROVIDER": "openai_compatible",
+        "CYPRESS_CREEK_MODEL": "m",
+        "CYPRESS_CREEK_COST_INPUT_PER_MTOK": "0.25",
+        "CYPRESS_CREEK_COST_OUTPUT_PER_MTOK": "1.5",
+    }
+    settings = load_settings(environ=environ)
+    assert (settings.cost_input_per_mtok, settings.cost_output_per_mtok) == (0.25, 1.5)
+
+
+def test_negative_cost_is_rejected() -> None:
+    with pytest.raises(ConfigError, match="cost_input_per_mtok"):
+        _settings(cost_input_per_mtok=-1)

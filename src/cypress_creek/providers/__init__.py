@@ -1,5 +1,5 @@
 # ABOUTME: The provider layer: one interface every model backend implements, plus typed errors.
-# ABOUTME: get_provider builds one from settings. The Ollama adapter registers itself here.
+# ABOUTME: get_provider builds one from settings. The Ollama and OpenAI adapters register here.
 from cypress_creek.providers.base import (
     Capabilities,
     CostPerMtok,
@@ -24,6 +24,7 @@ from cypress_creek.providers.factory import (
     get_provider,
 )
 from cypress_creek.providers.ollama import OllamaProvider
+from cypress_creek.providers.openai_compatible import OpenAICompatibleProvider
 from cypress_creek.providers.retry import RetryPolicy, call_with_retry
 
 __all__ = [
@@ -36,6 +37,7 @@ __all__ = [
     "ContextTruncated",
     "CostPerMtok",
     "OllamaProvider",
+    "OpenAICompatibleProvider",
     "Provider",
     "ProviderError",
     "ProviderRegistry",
