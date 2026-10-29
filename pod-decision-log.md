@@ -191,3 +191,8 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 
 ## D33. G1 security review status (PR #125)
 - 2026-10-29, senior engineer probed the Host and CSRF logic (duplicate Host, trailing dot, padded port, no Host, IPv6, lookalikes all 403; compare_digest on every write; no CORS). Joe P's own second human review of the Host and CSRF logic is still owed; exact files and functions are listed in the PR comment.
+
+## D34. G1 CSRF gap found by peer review (PR #125)
+- 2026-10-29, Worker G found, reproduced against a real server on 5309; Worker E fixing.
+- The app-wide CSRF dependency did not cover mounted sub-apps (POST /sub/x without a token returned 200), contradicting ADR and docs. Fix: pure ASGI middleware after the Host check, with a mount test and a route-walk test. Optional items taken test first: custom methods, duplicate token headers, request body limit (a 50 MB body was accepted), hardening headers.
+- Joe P's second human review of the Host and CSRF logic is still owed.
