@@ -121,3 +121,11 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 - deterministic.yml runs only tests/unit and tests/component; live.yml runs only `integration -m live`. Nothing runs tests/e2e or needs_network. Choice: Worker H adds an e2e job to deterministic.yml (offline, a fair PR gate) and a separate network.yml (dispatch plus weekly) for needs_network (real third party services, so not a PR gate, to avoid flaky merges).
 - Alternative: run needs_network on every PR. Reverse by moving that job into deterministic.yml.
 - Until merged, green CI is evidence for unit and component only.
+
+## D23. G1 API design choices (PR #125, Worker E)
+- 2026-10-29, Worker E.
+- CSRF token is delivered by GET /api/session, not embedded in the HTML shell or a cookie (works without a bundle, no ambient cookie authority). Reverse: serve it in the shell and drop the route.
+- Docs, redoc and openapi routes are off so the route table is exactly the written routes. G3 may want the schema for types; reverse by dropping the three None arguments in create_app.
+- Reachability probing lives in providers/ollama.py (is_reachable) because the import guard allows httpx only there; other backends report not_checked. Reverse: widen the guard test's allowed set.
+- The server requires provider settings to start (exit 2 otherwise); create_app(None) exists for tests. Reverse: allow starting with no backends.
+- Owed to Joe P: the card's second human review of the Host and CSRF logic.
