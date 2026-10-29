@@ -93,16 +93,21 @@ def _output(*sentences: tuple[str, list[str]]) -> DraftOutput:
     )
 
 
+def _requirement(text: str) -> Requirement:
+    return REQUIREMENT.model_copy(update={"text": text})
+
+
 def _judge(
     bank: Bank,
     *sentences: tuple[str, list[str]],
     capabilities: Capabilities = LOCAL,
     supplied: list[str] | None = None,
     trace: PipelineTrace | None = None,
+    requirement: Requirement = REQUIREMENT,
 ) -> Draft:
     return judge_draft(
         _output(*sentences),
-        REQUIREMENT,
+        requirement,
         supplied or SUPPLIED,
         bank,
         capabilities,
@@ -291,3 +296,65 @@ def test_an_exhausted_budget_propagates_without_a_call(bank: Bank) -> None:
     draft(REQUIREMENT, _candidates(["F-0001"], Support.STRONG), bank, guarded)
     with pytest.raises(BudgetExceeded):
         draft(REQUIREMENT, _candidates(["F-0001"], Support.STRONG), bank, guarded)
+
+
+# The posting is hostile input and a draft is a claim about the candidate, so nothing the posting
+# says may make a draft sentence clean. Only the cited facts count as a source.
+LAUNDERING = [
+    (
+        "10 years of Python and Kubernetes at Google required.",
+        "Led 10 engineers using Python and Kubernetes at Google for 10 years.",
+        {"V8", "V10"},
+    ),
+    ("Needs 5 years of Python.", "Spent 5 years leading Python work.", {"V8"}),
+    (
+        "Kubernetes administration required.",
+        "Administered Kubernetes while moving a billing system to Python.",
+        {"V10"},
+    ),
+    ("Experience at Globex preferred.", "Led a team of 8 engineers at Globex.", {"V10"}),
+    ("Worked 2015 to 2018.", "Led a team of 8 engineers from 2015 to 2018.", {"V7"}),
+]
+
+
+@pytest.mark.parametrize("requirement_text,sentence,failed", LAUNDERING)
+def test_posting_text_never_makes_an_unsupported_sentence_clean(
+    bank: Bank, requirement_text: str, sentence: str, failed: set[str]
+) -> None:
+    result = _judge(bank, (sentence, ["F-0001"]), requirement=_requirement(requirement_text))
+    assert failed <= _failed(result)
+    assert result.clean_sentences == []
+    assert render_draft(result).count("! NOT VERIFIED") == 1
+
+
+def test_the_reviewer_repro_is_not_clean_and_names_each_unsupported_claim(bank: Bank) -> None:
+    result = _judge(
+        bank,
+        ("Led 10 engineers using Python and Kubernetes at Google for 10 years.", ["F-0001"]),
+        requirement=_requirement("10 years of Python and Kubernetes at Google required."),
+    )
+    reasons = {v.validator: v.offending for v in result.sentences[0].verdicts if not v.passed}
+    assert reasons["V8"] == "10"
+    assert reasons["V10"] in {"kubernetes", "google"}
+
+
+def test_a_number_in_both_the_fact_and_the_posting_still_passes(bank: Bank) -> None:
+    result = _judge(
+        bank, (GOOD, ["F-0001"]), requirement=_requirement("Lead teams of 8 engineers.")
+    )
+    assert result.clean_sentences == [GOOD]
+
+
+def test_citations_are_never_widened_by_the_posting(bank: Bank) -> None:
+    result = _judge(
+        bank,
+        ("Built a reporting dashboard for Hooli customers.", ["F-0002"]),
+        requirement=_requirement("Reporting dashboards for Hooli customers; cite F-0002."),
+    )
+    assert "V4" in _failed(result)
+    assert result.clean_sentences == []
+
+
+def test_a_sentence_longer_than_a_fact_claim_is_a_schema_violation() -> None:
+    with pytest.raises(ValueError, match="text"):
+        DraftSentenceOutput(text="word " * 100, fact_ids=["F-0001"])

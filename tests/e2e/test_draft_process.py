@@ -18,7 +18,7 @@ from cypress_creek.providers.base import Capabilities, CostPerMtok
 case = json.load(sys.stdin)
 bank = parse_bank(yaml.safe_load(case["bank"]))
 requirement = Requirement(
-    id="R-1", text="Needs Python.", span=(0, 13), kind=RequirementKind.SKILL,
+    id="R-1", text="Needs 80 years of Python at Globex.", span=(0, 13), kind=RequirementKind.SKILL,
     term="python", importance=Importance.REQUIRED,
 )
 caps = Capabilities(

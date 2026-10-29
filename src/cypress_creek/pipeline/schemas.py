@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from cypress_creek.ingest.models import Importance, RequirementKind
 
 MAX_DRAFT_SENTENCES = 5
+MAX_DRAFT_SENTENCE_CHARS = 300
 
 
 class ProposedRequirement(BaseModel):
@@ -52,7 +53,7 @@ class DraftSentenceOutput(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    text: str
+    text: str = Field(max_length=MAX_DRAFT_SENTENCE_CHARS)
     fact_ids: list[str]
 
 

@@ -40,6 +40,11 @@ REVIEW_BANNER = (
 )
 DETAIL_LIMIT = 60
 
+# V8 and V10 accept the requirement text as an extra source, which suits a rationale that talks
+# about the requirement. A draft is a claim about the candidate and the posting is hostile input,
+# so its numbers and terms may come from the cited facts alone.
+NO_EXTRA_TEXT = ""
+
 
 class DraftStatus(StrEnum):
     DRAFTED = "drafted"
@@ -89,7 +94,6 @@ class _Claim:
 
 def _judge_sentence(
     sentence: DraftSentenceOutput,
-    requirement: Requirement,
     supplied_ids: Sequence[str],
     bank: Bank,
     capabilities: Capabilities,
@@ -107,9 +111,9 @@ def _judge_sentence(
         check_fact_verified(cited_ids, bank),
         check_fact_shareable(cited_ids, bank, hosted=not capabilities.local),
         check_entities(sentence.text, cited, bank),
-        check_numbers(sentence.text, cited, requirement.text),
+        check_numbers(sentence.text, cited, NO_EXTRA_TEXT),
         check_citation_required([_Claim(sentence.text, cited_ids)]),
-        check_novel_terms(sentence.text, cited, requirement.text),
+        check_novel_terms(sentence.text, cited, NO_EXTRA_TEXT),
     ]
     return DraftSentence(
         text=sentence.text.strip(), fact_ids=cited_ids, verdicts=sorted(verdicts, key=_by_number)
@@ -134,7 +138,7 @@ def judge_draft(
     A sentence that fails any check stays in the result with its verdicts, so it can be shown
     with a warning, but it is never part of `clean_sentences`."""
     sentences = [
-        _judge_sentence(sentence, requirement, supplied_ids, bank, capabilities)
+        _judge_sentence(sentence, supplied_ids, bank, capabilities)
         for sentence in output.sentences
         if sentence.text.strip()
     ]
