@@ -120,9 +120,16 @@ Migration rules:
 - Each file runs in one transaction together with its row in `schema_version`. If it fails, nothing from that file is kept and `MigrationError` names the file. Do not put `BEGIN` or `COMMIT` in a migration.
 - A whole folder is checked before anything runs, so a bad name, a gap or a file that is not utf-8 changes nothing.
 - A database newer than the code, or one whose applied name differs from the file of that number, is refused. Never edit or rename a migration that has been applied; add a new one.
-- `0001_schema_version.sql` creates the version table and holds no domain data. Each card that needs tables adds its own file. `0002_discovery.sql` creates the watchlist, listing and suggestion tables, `0003_blacklist.sql` creates the blacklist table, and `0004_eval_runs.sql` stores eval headers and ordered JSON events with a unique case and repeat pair per run.
+- `0001_schema_version.sql` creates the version table and holds no domain data. Each card that needs tables adds its own file. `0002_discovery.sql` creates the watchlist, listing and suggestion tables, `0003_blacklist.sql` creates the blacklist table, `0004_eval_runs.sql` stores eval headers and ordered JSON events with a unique case and repeat pair per run, and `0005_postings_reports.sql` adds the posting and report tables.
 
 Known limits: there are no checksums, so an edited applied migration is not detected (only a renamed one is). There is no downgrade path. The database file is not encrypted.
+
+## Postings and reports
+Code is `storage/repository.py`. Tables come from `0005_postings_reports.sql`:
+- `posting`: one pasted or fetched posting. `id` is `post-` and 16 hex characters, new for every submission. It holds the normalized `text`, its `text_hash`, the `source` (paste, link, pdf or feed), the `origin_url` for a link, the extractor name and version, the control character `warnings_json` and `created_at`. `PostingStore.get` rebuilds the same `Posting` model that was saved, so the hash and text are checked again on the way out.
+- `report`: one analysis. `id` is `rep-` and 16 hex characters. It points at its posting (a foreign key, so a report for a missing posting is refused), keeps the `status`, the whole `GapReport` as `report_json` and the validator verdicts (id, stage, subject, passed, reason, never the offending text) as `verdicts_json`. The same posting analyzed twice gives two reports, because a model's answer can differ.
+
+`prepare_database(path)` creates the file and applies the migrations. The API calls it the first time a route needs the database.
 
 ## Discovery: watchlist and tombstones
 Code is in `src/cypress_creek/discovery/`. Tables come from `0002_discovery.sql`:

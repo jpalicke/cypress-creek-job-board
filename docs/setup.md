@@ -45,7 +45,28 @@ curl -s http://127.0.0.1:5309/api/session
 curl -s -H 'Host: evil.example' http://127.0.0.1:5309/api/health
 ```
 
-Expected: the first prints `{"status":"ok","backends":[{"provider":"ollama","model":"qwen3.5:0.8b","reachable":...}]}` where `reachable` is `reachable` if Ollama is running and `unreachable` if not. The second prints a `csrf_token`. The third prints the typed `host_not_allowed` error. Stop the server with Ctrl+C. Setting `CYPRESS_CREEK_API_HOST=0.0.0.0` makes it exit with code 2 and say that the API only binds to a loopback address. The rules, routes and error codes are in [api.md](api.md).
+Expected: the first prints `{"status":"ok","backends":[{"provider":"ollama","model":"qwen3.5:0.8b","reachable":...}]}` where `reachable` is `reachable` if Ollama is running and `unreachable` if not. The second prints a `csrf_token`. The third prints the typed `host_not_allowed` error. Paste a posting, look at the cost estimate, analyze it and read the stored report. The analysis needs a model backend. With Ollama not running you get the incomplete report that says so, which is also a good way to see the route work. Use a throwaway data directory so nothing lands in `data/`:
+
+```bash
+export CYPRESS_CREEK_DATA_DIR="$(mktemp -d)"
+export CYPRESS_CREEK_BANK=evals/bank/sample_bank.yaml
+export CYPRESS_CREEK_PROVIDER=ollama CYPRESS_CREEK_MODEL=qwen3.5:0.8b
+uv run cypress-creek-api &
+sleep 3
+TOKEN=$(curl -s http://127.0.0.1:5309/api/session | python3 -c 'import json,sys; print(json.load(sys.stdin)["csrf_token"])')
+ID=$(curl -s -X POST http://127.0.0.1:5309/api/postings -H "X-CSRF-Token: $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"source": "paste", "text": "A backend role requires three years of Python experience and PostgreSQL. Kubernetes is preferred."}' \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')
+curl -s http://127.0.0.1:5309/api/postings/$ID/estimate
+echo
+REPORT=$(curl -s -X POST http://127.0.0.1:5309/api/postings/$ID/analyze -H "X-CSRF-Token: $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"backend": "ollama"}' | python3 -c 'import json,sys; print(json.load(sys.stdin)["report_id"])')
+curl -s http://127.0.0.1:5309/api/reports/$REPORT | python3 -m json.tool | head -20
+kill %1
+unset CYPRESS_CREEK_DATA_DIR CYPRESS_CREEK_BANK CYPRESS_CREEK_PROVIDER CYPRESS_CREEK_MODEL
+```
+
+The estimate prints the extraction call's `input_tokens`, `output_tokens` and a `usd` of 0 for a local model. With Ollama running and `qwen3.5:0.8b` pulled, the report has rows and a score. With it not running, the report shows `"status": "incomplete"` and `extraction failed: provider_unavailable`. A write without the `X-CSRF-Token` header is refused with `csrf_token_invalid`. Stop the server with Ctrl+C. Setting `CYPRESS_CREEK_API_HOST=0.0.0.0` makes it exit with code 2 and say that the API only binds to a loopback address. The rules, routes and error codes are in [api.md](api.md).
 
 ## Fetch a job board politely
 

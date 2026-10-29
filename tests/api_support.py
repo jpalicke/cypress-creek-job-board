@@ -37,3 +37,13 @@ class ApiClient:
 
     def options(self, url: str, **kwargs: Any) -> httpx.Response:
         return self.request("OPTIONS", url, **kwargs)
+
+
+def csrf_headers(client: ApiClient, extra: dict[str, str] | None = None) -> dict[str, str]:
+    """Headers for a write: the session token from the real session route, plus any extras."""
+    token = str(client.get("/api/session").json()["csrf_token"])
+    return {"X-CSRF-Token": token, **(extra or {})}
+
+
+def post_json(client: ApiClient, path: str, body: object) -> httpx.Response:
+    return client.post(path, json=body, headers=csrf_headers(client))

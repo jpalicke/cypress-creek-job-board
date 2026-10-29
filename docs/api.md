@@ -25,7 +25,26 @@ Because a CSRF check needs a matched route, a write to a path that does not exis
 | `GET /api/providers` | `{"providers": [{"provider", "model", "local", "strict_schema", "context_tokens", "cost_per_mtok": {"input", "output"}}]}`. Never a key, an environment variable name or a URL. |
 | `GET /api/session` | `{"csrf_token": "..."}`. |
 
-Posting and analyze routes arrive in G2, and the draft help route later.
+| `POST /api/postings` | Adds a posting. Send `Content-Type: application/json` with `{"source": "paste", "text": "..."}` or `{"source": "link", "url": "https://..."}`; the answer (201) has the new `id`, the normalized `text`, its `text_hash`, `warnings` (such as `control_chars_stripped`), `extraction_warnings` (HTML, such as `hidden_elements_removed`), `fetch_warnings` (such as `cross_host_redirect`), `origin_url` and `created_at`. A link goes through the SSRF guard and the polite fetch limits. A raw body with `Content-Type: application/pdf` is checked for size and the `%PDF-` marker and then answered with `pdf_extraction_unavailable`, because PDF text extraction (card F4) is not built yet. |
+| `GET /api/postings/{id}/estimate` | What the extraction call would use at most under the configured budget: `{"covers": "extraction", "requests", "input_tokens", "output_tokens", "usd"}`. Nothing is sent to the backend. One entailment call per requirement follows an analysis and is not in this number. |
+| `POST /api/postings/{id}/analyze` | Body `{"backend": "<configured provider name>", "confirm_hosted": false}`. Runs the pipeline and answers 200 with `{"report_id", "report"}` where `report` is the `GapReport`. The report may be incomplete: with the backend down it is `status: "incomplete"`, has no score and `incomplete_reasons` says `extraction failed: provider_unavailable`. It is never a 500. A hosted backend needs `confirm_hosted: true`. |
+| `GET /api/reports/{id}` | A stored report: `{"report_id", "posting_id", "created_at", "report", "validator_verdicts": [{"stage", "subject", "validator", "passed", "reason"}]}`. The verdicts are those of V4, V5 and V9 over the finished report, without any offending text. |
+| `GET /api/facts` | The fact bank from the bank file (`CYPRESS_CREEK_BANK`, default `facts.private/bank.yaml`): `{"facts": [...], "unverified_ids": [...]}`. A missing file is `bank_not_found`. |
+| `POST /api/facts/validate` | Body `{"yaml": "<bank file text>", "strict": false}`. Always 200: `{"valid", "fact_count", "unverified_ids", "problem"}` where `problem` is `null` or `{"fact_id", "field", "reason"}`. Strict mode also refuses an unverified fact. The YAML is never echoed. |
+
+The draft help route arrives later (G4 and D7).
+
+### How the routes behave
+- **Budget.** Each analysis gets a fresh budget from the provider settings (`max_requests`, `max_usd` and the token limits), checked before every call. A call that would pass it stops with `budget_exceeded` (409) before anything is sent. The budget is per request, not saved across requests.
+- **Hosted backends** are never the silent default. The request names the configured backend, a name that is not the configured one is `unknown_backend`, and a backend that is not local needs `confirm_hosted: true` or the answer is `hosted_backend_not_confirmed`.
+- **Facts the backend may see.** The pipeline drops `local_only` facts from the prompt for any backend that is not local, the same as everywhere else.
+- **No leaks.** No answer contains a key, an environment value, a stack trace or raw remote content. A link that fails says only that it failed and, for a policy block, the stable reason code.
+
+### Body size limits
+A body without a declared `Content-Length` (chunked) is refused with `length_required` (411). A body over 1 MiB is `payload_too_large` (413), and a PDF upload may be up to 10 MiB. The check uses the declared length before the body is read. Pasted text is also capped at 50,000 characters by the normalizer (`posting_too_long`).
+
+### Storage
+Postings and reports live in the SQLite database (`CYPRESS_CREEK_DATA_DIR`, default `data/`), created and migrated the first time a route needs it. A posting row holds the normalized text and its provenance; a report row holds the whole `GapReport` as JSON and the validator verdicts, and must point at a stored posting. See [data-model.md](data-model.md#postings-and-reports). The fact bank stays in YAML.
 
 ## Error codes
 | Code | Status | Meaning |
@@ -35,6 +54,25 @@ Posting and analyze routes arrive in G2, and the draft help route later.
 | `not_found` | 404 | No such route or file. |
 | `method_not_allowed` | 405 | The path exists but not for this method. This includes CORS preflights. |
 | `invalid_request` | 422 | The body or query did not match the route's model. `details` lists each `field` and a `problem`, never the submitted value. |
+| `payload_too_large` | 413 | The body is over the size limit. |
+| `length_required` | 411 | The body did not declare its length. |
+| `unsupported_media_type` | 415 | `POST /api/postings` takes JSON or a PDF. |
+| `empty_posting` | 422 | The text, or the page text, is empty. Paste the posting text. |
+| `posting_too_long` | 413 | The text is over 50,000 characters. |
+| `blocked_by_policy` | 422 | The link or a redirect failed the SSRF policy. `details` holds the reason code, and nothing was contacted for a private address. |
+| `fetch_failed` | 502 | The link could not be fetched. |
+| `needs_browser` | 422 | The page asked for a sign in. |
+| `unsupported_content` | 422 | The link returned a type that is not HTML, plain text or PDF. |
+| `content_too_large` | 413 | The page is over the fetch limits. |
+| `unreadable_content` | 422 | The HTML could not be read as text. |
+| `invalid_pdf` | 422 | A PDF upload without the `%PDF-` marker. |
+| `pdf_extraction_unavailable` | 501 | PDF text extraction is not built yet. |
+| `unknown_backend` | 422 | The named backend is not the configured one, or none is configured. |
+| `hosted_backend_not_confirmed` | 422 | A hosted backend was named without `confirm_hosted`. |
+| `budget_exceeded` | 409 | The call would pass the configured budget. |
+| `report_refused` | 422 | The report was refused because a claim could not be grounded. |
+| `bank_not_found` | 404 | The fact bank file is missing. |
+| `bank_invalid` | 422 | The fact bank file is not valid. `details` names the fact and field. |
 | `http_error` | other | Any other HTTP failure, with a fixed message. |
 | `internal_error` | 500 | An unexpected failure. The cause is not in the answer. |
 
@@ -46,7 +84,9 @@ If `web/dist` exists (the built Svelte bundle from card G3), the app serves it a
 ## Start it and try it
 See [setup.md](setup.md#start-the-api-server) for the commands. The tests are:
 ```bash
-uv run pytest tests/component/test_api_security.py tests/component/test_api_routes.py tests/unit/test_api_route_table.py -q --no-cov
-uv run pytest tests/e2e/test_api_server_process.py -q --no-cov
+uv run pytest tests/component/test_api_security.py tests/component/test_api_routes.py tests/component/test_api_postings.py tests/component/test_api_facts.py tests/component/test_repository.py tests/component/test_link_posting.py tests/unit/test_api_route_table.py tests/unit/test_api_backends.py tests/unit/test_posting_build.py -q --no-cov
+uv run pytest tests/e2e/test_api_server_process.py tests/e2e/test_api_postings_process.py -q --no-cov
 ```
-The component tests drive the real app in process over `httpx.ASGITransport`, with no mocked component. The e2e file starts the real server as a child process on port 5309, so nothing else may be listening there, and fails (never skips) if it cannot.
+The component tests drive the real app in process over `httpx.ASGITransport`, with no mocked component. The two e2e files start the real server as a child process on port 5309, so nothing else may be listening there, and fails (never skips) if it cannot.
+
+Two integration tests need more: `uv run pytest tests/integration/test_api_postings_live.py -q -m needs_network` fetches a real public page through the whole API, and `-m live` pastes a fictional posting and analyzes it with a real Ollama and `qwen3.5:0.8b` (see [providers.md](providers.md#try-it-locally)). They fail, never skip, when the network or Ollama is missing.

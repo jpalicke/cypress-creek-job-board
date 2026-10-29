@@ -47,6 +47,8 @@ src/cypress_creek/       The library
     safe_http.py         fetch_url, FetchLimits, FetchResponse, SafeHttpError; pinned, bounded HTTP
     fetch.py             fetch_posting, FetchResult, provenance and typed posting fetch errors
     html_text.py         html_to_text, ExtractedText, hidden warnings and typed size/depth errors
+    build.py             build_posting, new_posting_id: the one way text becomes a Posting
+    link_posting.py      posting_from_url, posting_from_fetch, PdfNotSupported: a fetched link becomes a Posting
     _fetch_worker.py     Disposable fetch process that bounds blocking DNS by a whole-fetch deadline
   validators/            Grounding validators V1 to V14, pure functions returning Verdicts
     verdict.py           Verdict, ok(), fail()
@@ -73,11 +75,15 @@ src/cypress_creek/       The library
     security.py          allowed_hosts, HostCheckMiddleware, require_csrf, new_token, API_PORT
     errors.py            ErrorCode, ApiError, ErrorResponse and the handlers for the one error shape
     server.py            main, check_bind_host: the uvicorn entry point (`cypress-creek-api`)
-    routes/              health.py, providers.py, session.py (one router each)
+    routes/              health.py, providers.py, session.py, postings.py, reports.py, facts.py (one router each)
+    context.py           Database (created on first use), Backend, and the dependencies the routes share
+    schemas.py           Request and response models for the posting, analyze, report and fact routes
+    backends.py          check_backend_choice: name the configured backend, confirm a hosted one
   storage/               Mutable state: the company name key and the SQLite database
     company_key.py       company_key, load_confusables: the one company name normalizer
+    repository.py        PostingStore, ReportStore, StoredReport, StoredVerdict, prepare_database
     db.py                data_dir, connect, migrate, schema_version, MigrationError
-    migrations/          Numbered .sql files, including 0003_blacklist.sql and 0004_eval_runs.sql
+    migrations/          Numbered .sql files, including 0003_blacklist.sql, 0004_eval_runs.sql and 0005_postings_reports.sql
   discovery/             Discovery state in SQLite, the polite fetch layer over the guarded transport, and the ATS board adapters
     watchlist.py         WatchlistEntry, Watchlist, Tombstoned, AlreadyWatched, IdentityEvidence
     tombstones.py        Tombstones, Denial, DenialReason, normalize_board: denied companies kept as denied suggestion rows
@@ -207,6 +213,7 @@ See [the fetching architecture](architecture.md), [the SSRF rules and limits](th
 - **A report cites or is refused.** `build_report` ends with `verify_report` (V4, V5, V9), so a fabricated or unverified fact id never reaches a report. Failed stages make the report incomplete rather than quietly partial. See `pipeline.md`.
 - **Retrieval is not a model.** `retrieve` matches tags and aliases, ranks and caps the candidates, and sets the support ceiling. A requirement with no candidate is a gap and costs no model call. See `pipeline.md`.
 - **Hand labels are inputs, checked against the posting and the bank.** `validate_labels` refuses a label whose span is not exact posting text, whose fact is missing, unverified or local only, or whose planted gap row disagrees. `require_committed_labels` refuses a case whose labels are not committed. Importance is the human reading, not the V3 cue rule. See [ADR 0024](adr/0024-hand-labels-are-written-before-runs-and-carry-provenance.md), [evals.md](evals.md#posting-fixtures-and-hand-labels) and [e3-label-decisions.md](e3-label-decisions.md).
+- **A down backend gives an incomplete report, not an error.** `POST /api/postings/{id}/analyze` returns the pipeline's fail closed report with status 200, stores it, and keeps its validator verdicts without their offending text. Only a budget stop and a refused report are errors. See [api.md](api.md) and [ADR 0027](adr/0027-posting-and-analyze-routes.md).
 - **Every API route inherits the security rules from the app, not from itself.** The CSRF check is an app-wide dependency and the Host check is the outermost middleware, so a new route cannot skip them. The route table test fails if any path or operation name suggests submitting, sending or posting outward. See [api.md](api.md) and [ADR 0026](adr/0026-api-security-layer.md).
 - **The sample bank and its gap table cannot drift.** `PLANTED_GAPS.md` is parsed by a test that runs each row through `retrieve`, so a bank edit that changes a gap fails the build. See `evals.md`.
 - **A denial is permanent until a human removes it.** A denied company is a tombstone matched by `company_key` and by normalized board, and `Watchlist.add` refuses it. Only `Tombstones.remove` lifts one. See [ADR 0017](adr/0017-tombstones-are-removed-only-by-a-human-call.md).

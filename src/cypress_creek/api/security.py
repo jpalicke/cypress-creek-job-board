@@ -13,6 +13,8 @@ API_PORT = 5309
 TOKEN_HEADER = "X-CSRF-Token"
 WRITE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 TOKEN_BYTES = 32
+MAX_BODY_BYTES = 1024 * 1024
+MAX_PDF_BYTES = 10 * 1024 * 1024
 
 
 def allowed_hosts(port: int) -> frozenset[str]:
@@ -50,6 +52,45 @@ class HostCheckMiddleware:
             return raw.decode("ascii").casefold() in self._allowed
         except UnicodeDecodeError:
             return False
+
+
+class BodyLimitMiddleware:
+    """Refuses a body whose declared length is over the limit, and any body without a length.
+
+    The server reads exactly the declared number of bytes, so the declared length is the limit.
+    A PDF upload may be larger than a JSON body."""
+
+    def __init__(self, app: ASGIApp, default_limit: int, pdf_limit: int) -> None:
+        self._app = app
+        self._default_limit = default_limit
+        self._pdf_limit = pdf_limit
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self._app(scope, receive, send)
+            return
+        headers = {name: value for name, value in scope["headers"]}
+        refusal = self._refusal(headers)
+        if refusal is None:
+            await self._app(scope, receive, send)
+            return
+        response: Response = refusal
+        await response(scope, receive, send)
+
+    def _refusal(self, headers: dict[bytes, bytes]) -> Response | None:
+        if b"transfer-encoding" in headers:
+            return error_response(411, ErrorCode.LENGTH_REQUIRED)
+        try:
+            length = int(headers.get(b"content-length", b"0") or b"0")
+        except ValueError:
+            return error_response(411, ErrorCode.LENGTH_REQUIRED)
+        media = headers.get(b"content-type", b"").split(b";")[0].strip().lower()
+        limit = self._pdf_limit if media == b"application/pdf" else self._default_limit
+        if length < 0:
+            return error_response(411, ErrorCode.LENGTH_REQUIRED)
+        if length > limit:
+            return error_response(413, ErrorCode.PAYLOAD_TOO_LARGE)
+        return None
 
 
 def require_csrf(request: Request) -> None:

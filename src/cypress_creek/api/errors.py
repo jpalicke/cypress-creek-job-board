@@ -4,7 +4,7 @@ from enum import StrEnum
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, ValidationError
 from starlette.exceptions import HTTPException
 from starlette.responses import JSONResponse
 
@@ -17,6 +17,25 @@ class ErrorCode(StrEnum):
     INVALID_REQUEST = "invalid_request"
     HTTP_ERROR = "http_error"
     INTERNAL_ERROR = "internal_error"
+    PAYLOAD_TOO_LARGE = "payload_too_large"
+    LENGTH_REQUIRED = "length_required"
+    UNSUPPORTED_MEDIA_TYPE = "unsupported_media_type"
+    EMPTY_POSTING = "empty_posting"
+    POSTING_TOO_LONG = "posting_too_long"
+    BLOCKED_BY_POLICY = "blocked_by_policy"
+    FETCH_FAILED = "fetch_failed"
+    NEEDS_BROWSER = "needs_browser"
+    UNSUPPORTED_CONTENT = "unsupported_content"
+    CONTENT_TOO_LARGE = "content_too_large"
+    UNREADABLE_CONTENT = "unreadable_content"
+    INVALID_PDF = "invalid_pdf"
+    PDF_EXTRACTION_UNAVAILABLE = "pdf_extraction_unavailable"
+    UNKNOWN_BACKEND = "unknown_backend"
+    HOSTED_BACKEND_NOT_CONFIRMED = "hosted_backend_not_confirmed"
+    BUDGET_EXCEEDED = "budget_exceeded"
+    REPORT_REFUSED = "report_refused"
+    BANK_NOT_FOUND = "bank_not_found"
+    BANK_INVALID = "bank_invalid"
 
 
 MESSAGES = {
@@ -27,6 +46,25 @@ MESSAGES = {
     ErrorCode.INVALID_REQUEST: "The request is invalid.",
     ErrorCode.HTTP_ERROR: "The request could not be handled.",
     ErrorCode.INTERNAL_ERROR: "The server hit an unexpected error.",
+    ErrorCode.PAYLOAD_TOO_LARGE: "The request body is too large.",
+    ErrorCode.LENGTH_REQUIRED: "The request must declare its length.",
+    ErrorCode.UNSUPPORTED_MEDIA_TYPE: "The content type is not supported here.",
+    ErrorCode.EMPTY_POSTING: "The posting has no text. Paste the posting text.",
+    ErrorCode.POSTING_TOO_LONG: "The posting text is too long.",
+    ErrorCode.BLOCKED_BY_POLICY: "The link is blocked by the fetch policy.",
+    ErrorCode.FETCH_FAILED: "The link could not be fetched. Paste the posting text instead.",
+    ErrorCode.NEEDS_BROWSER: "The page needs a sign in. Paste the posting text instead.",
+    ErrorCode.UNSUPPORTED_CONTENT: "The link did not return a supported kind of page.",
+    ErrorCode.CONTENT_TOO_LARGE: "The page is too large.",
+    ErrorCode.UNREADABLE_CONTENT: "The page could not be read as text. Paste the posting text.",
+    ErrorCode.INVALID_PDF: "The upload is not a PDF.",
+    ErrorCode.PDF_EXTRACTION_UNAVAILABLE: "PDF text extraction is not built yet. Paste the text.",
+    ErrorCode.UNKNOWN_BACKEND: "That backend is not the configured one.",
+    ErrorCode.HOSTED_BACKEND_NOT_CONFIRMED: "A hosted backend must be confirmed in the request.",
+    ErrorCode.BUDGET_EXCEEDED: "The call would pass the configured budget.",
+    ErrorCode.REPORT_REFUSED: "The report was refused because a claim could not be grounded.",
+    ErrorCode.BANK_NOT_FOUND: "The fact bank file was not found.",
+    ErrorCode.BANK_INVALID: "The fact bank is not valid.",
 }
 
 
@@ -61,6 +99,14 @@ class ApiError(Exception):
         self.status_code = status_code
         self.code = code
         self.details = details
+
+
+def details_from_validation_error(error: ValidationError) -> list[ErrorDetail]:
+    """Field paths and rule text only. The submitted values are never copied."""
+    return [
+        ErrorDetail(field=".".join(str(part) for part in item["loc"]), problem=str(item["msg"]))
+        for item in error.errors(include_input=False, include_url=False, include_context=False)
+    ]
 
 
 def error_response(

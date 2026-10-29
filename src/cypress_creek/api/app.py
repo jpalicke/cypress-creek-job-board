@@ -5,27 +5,33 @@ from pathlib import Path
 from fastapi import Depends, FastAPI
 from starlette.staticfiles import StaticFiles
 
+from cypress_creek.api.context import Backend, Database
 from cypress_creek.api.errors import install_error_handlers
-from cypress_creek.api.routes import health, providers, session
+from cypress_creek.api.routes import facts, health, postings, providers, reports, session
 from cypress_creek.api.routes.providers import CostResponse, ProviderInfo
 from cypress_creek.api.security import (
     API_PORT,
+    MAX_BODY_BYTES,
+    MAX_PDF_BYTES,
+    BodyLimitMiddleware,
     HostCheckMiddleware,
     allowed_hosts,
     new_token,
     require_csrf,
 )
 from cypress_creek.config import ProviderSettings
+from cypress_creek.facts.loader import bank_path as default_bank_path
 from cypress_creek.providers import get_provider
+from cypress_creek.storage.db import database_path as default_database_path
 
 DEFAULT_STATIC_DIR = Path(__file__).resolve().parents[3] / "web" / "dist"
 
 
-def describe_provider(settings: ProviderSettings) -> ProviderInfo:
-    capabilities = get_provider(settings).capabilities
+def describe_provider(backend: Backend) -> ProviderInfo:
+    capabilities = backend.provider.capabilities
     return ProviderInfo(
-        provider=settings.provider,
-        model=settings.model,
+        provider=backend.settings.provider,
+        model=backend.settings.model,
         local=capabilities.local,
         strict_schema=capabilities.strict_schema,
         context_tokens=capabilities.context_tokens,
@@ -36,9 +42,16 @@ def describe_provider(settings: ProviderSettings) -> ProviderInfo:
 
 
 def create_app(
-    settings: ProviderSettings | None, *, static_dir: Path | None = DEFAULT_STATIC_DIR
+    settings: ProviderSettings | None,
+    *,
+    static_dir: Path | None = DEFAULT_STATIC_DIR,
+    database_path: Path | None = None,
+    bank_path: Path | None = None,
 ) -> FastAPI:
-    """Build the app. Every call makes a fresh CSRF token, so each server start has its own."""
+    """Build the app. Every call makes a fresh CSRF token, so each server start has its own.
+
+    The database file is created and migrated on first use, and the bank file is read on each
+    request, so an edit to it takes effect without a restart."""
     app = FastAPI(
         title="Cypress Creek",
         docs_url=None,
@@ -46,13 +59,18 @@ def create_app(
         openapi_url=None,
         dependencies=[Depends(require_csrf)],
     )
+    backend = Backend(settings, get_provider(settings)) if settings is not None else None
     app.state.settings = settings
+    app.state.backend = backend
     app.state.csrf_token = new_token()
-    app.state.providers = [describe_provider(settings)] if settings is not None else []
+    app.state.providers = [describe_provider(backend)] if backend is not None else []
+    app.state.database = Database(database_path or default_database_path())
+    app.state.bank_path = bank_path or default_bank_path()
     install_error_handlers(app)
-    for module in (health, providers, session):
+    for module in (health, providers, session, postings, reports, facts):
         app.include_router(module.router)
     if static_dir is not None and static_dir.is_dir():
         app.mount("/", StaticFiles(directory=static_dir, html=True), name="web")
+    app.add_middleware(BodyLimitMiddleware, default_limit=MAX_BODY_BYTES, pdf_limit=MAX_PDF_BYTES)
     app.add_middleware(HostCheckMiddleware, allowed=allowed_hosts(API_PORT))
     return app
