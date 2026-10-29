@@ -129,3 +129,11 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 - Reachability probing lives in providers/ollama.py (is_reachable) because the import guard allows httpx only there; other backends report not_checked. Reverse: widen the guard test's allowed set.
 - The server requires provider settings to start (exit 2 otherwise); create_app(None) exists for tests. Reverse: allow starting with no backends.
 - Owed to Joe P: the card's second human review of the Host and CSRF logic.
+
+## D24. E3 merged (PR #122, 4c7b7d5) with these rulings
+- 2026-10-29, senior engineer ruled, manager merged.
+- Em dashes in verbatim third party fixture text are accepted unnormalized: the rule governs text we author, the posting SHA-256 is its provenance record, no hook checks it, and main has a precedent (tests/fixtures/lever/palantir_page.json). Reverse: normalize and re-hash.
+- Inline `# pragma: allowlist secret` is the repo convention (the .secrets.baseline results map is empty). Reverse: move entries into .secrets.baseline.
+- ADR 0024 went to E3; #120 renumbers to 0025.
+- FOR JOE P'S ATTENTION: CLAUDE.md says do not mention any specific employer or industry in the repo. The E3 fixtures, NOTICE and meta.yaml name publishers (the posting text itself names them), following the card's approved posting list and the palantir_page.json precedent. The reviewer did not treat it as a finding but flagged that this widens the exception. Please confirm or order the fixtures reworked.
+- Optional reviewer items on #122 not yet done: assert the span message in the check_labels test; check fixture id vs directory name in load_fixture; document the intentional echo in _check_cues; a contributing.md sentence exempting verbatim third party fixtures; a note on E4/E8 that the runner must call require_committed_labels.
