@@ -1,4 +1,4 @@
-# ADR 0026: The API security layer: an exact Host allow-list, an app-wide CSRF dependency, a session route and no schema routes
+# ADR 0028: The API security layer: an exact Host allow-list, an app-wide CSRF dependency, a session route and no schema routes
 
 Status: accepted (card G1). Security card: the Host and CSRF logic wants a second human review.
 

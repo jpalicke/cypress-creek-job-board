@@ -11,7 +11,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [evals.md](evals.md) | Eval CLI dry runs and real Ollama smoke runs, whole-run budgets, typed records and traces, SQLite resume, scratch JSONL audit exports, fictional sample fact bank and planted gaps, real posting fixtures with hand labels and the label check |
 | [e3-label-decisions.md](e3-label-decisions.md) | Why each hand label is what it is, the judgment calls for Joe P to review, and the closed postings and their replacements |
 | [validators.md](validators.md) | The grounding validators V1 to V14: what each rejects and its known limits |
-| [providers.md](providers.md) | The provider interface, typed errors, retry policy, backend config, the loopback rule, the Ollama adapter and the budget guard |
+| [providers.md](providers.md) | The provider interface, typed errors, retry policy, backend config, the loopback rule, the Ollama and Anthropic adapters and the budget guard |
 | [setup.md](setup.md) | Fetch one public posting link, inspect raw bytes and provenance, and understand network behavior and typed failures. Also fetch a job board politely, fetch a Greenhouse, a Lever or an Ashby board, the fetch cache location, the three fetch environment variables and how to clear the cache |
 | [architecture.md](architecture.md) | How guarded public HTTP fetching pins the connection, bounds the response and isolates DNS behind a deadline, and how the polite fetch layer (rate limiter, refresh window, ETag cache, backoff) sits on top of it, and the board adapter interface (listings, probe, typed errors, the Greenhouse, Lever and Ashby mappings, Lever paging and region discovery, Ashby unlisted jobs and its shape-only probe, the shared feed helpers and the failure modes) |
 | [threat-model.md](threat-model.md) | The hostile HTML and hidden-content boundary, prompt structure (T1 to T4), URL target validation and guarded HTTP transport, SSRF rules, compatibility limits and test coverage |
@@ -49,7 +49,8 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [0022](adr/0022-lever-pagination-and-region.md) | Lever paging and region: pages end on a short page, a board still full at 50 pages fails whole instead of truncating, a repeated posting keeps its first copy, the host is found by asking US then EU and remembered in memory only, and the feed has no company name |
 | [0023](adr/0023-ashby-unlisted-jobs-probe-shape-and-weak-etag.md) | Ashby: an unlisted job is dropped and counted in `BoardFetch.unlisted` instead of skipped, the skip budget covers listed jobs only, `probe` checks the shape of the board and not each job, and the weak ETag is sent back unchanged and answered with a 304 |
 | [0024](adr/0024-hand-labels-are-written-before-runs-and-carry-provenance.md) | Hand labels are written before any run from the posting and bank alone, carry provenance and a pending review, follow the human reading of importance, and are validated against the posting, the bank and the planted gaps |
-| [0026](adr/0026-api-security-layer.md) | The API security layer: an exact Host allow-list, an app-wide CSRF dependency, a session route that sets no cookie, no docs or schema routes, and httpx ASGI transport tests |
+| [0025](adr/0025-anthropic-native-structured-output.md) | Anthropic adapter: native structured output instead of forced tool use, schema rewrite, error mapping, hosted rules and price defaults |
+| [0028](adr/0028-api-security-layer.md) | The API security layer: an exact Host allow-list, an app-wide CSRF dependency, a session route that sets no cookie, no docs or schema routes, and httpx ASGI transport tests |
 
 ## Configuration
 - `config/aliases.yaml`: tag alias table, described in [data-model.md](data-model.md#tag-alias-table).
@@ -57,7 +58,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 - `config/confusables.txt`: Unicode confusables data (do not hand edit), used for company names and described in [data-model.md](data-model.md#company-names-company_key).
 - `CYPRESS_CREEK_DATA_DIR` (default `data/`, gitignored): where the SQLite database lives, described in [data-model.md](data-model.md#storage-sqlite-and-migrations).
 - Eval `--out` selects that SQLite database, while optional `--export` writes a JSONL audit snapshot only under `evals/scratch/`; see [evals.md](evals.md#run-the-harness).
-- `config/provider.toml` (or the file named by `CYPRESS_CREEK_CONFIG`) and `CYPRESS_CREEK_<FIELD>` variables: which model backend to use and the run budget limits, described in [providers.md](providers.md#configuration). API keys are read only from the environment variable the file names.
+- `config/provider.toml` (or the file named by `CYPRESS_CREEK_CONFIG`) and `CYPRESS_CREEK_<FIELD>` variables: which model backend to use, the run budget limits and optional token prices, described in [providers.md](providers.md#configuration). API keys are read only from the environment variable the file names.
 - `CYPRESS_CREEK_FETCH_REFRESH_SECONDS` (default `900`), `CYPRESS_CREEK_FETCH_HOST_DELAY_SECONDS` (default `1.0`) and `CYPRESS_CREEK_FETCH_MAX_RETRIES` (default `4`, at most `8`): the polite fetch policy, described in [setup.md](setup.md#polite-fetch-settings-and-cache). The fetch cache lives in `fetch_cache` under `CYPRESS_CREEK_DATA_DIR`.
 - `facts.private/bank.yaml` (gitignored) or the path in `CYPRESS_CREEK_BANK`: your fact bank.
 
