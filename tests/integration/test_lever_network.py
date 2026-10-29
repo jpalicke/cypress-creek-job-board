@@ -11,6 +11,7 @@ from cypress_creek.discovery.cache import ResponseCache
 from cypress_creek.discovery.fetch_policy import FetchPolicy
 from cypress_creek.discovery.polite_client import PoliteClient
 from cypress_creek.discovery.rate_limiter import HostRateLimiter, SystemClock
+from cypress_creek.ingest.safe_http import FetchLimits, FetchResponse, fetch_url
 
 pytestmark = pytest.mark.needs_network
 
@@ -111,3 +112,50 @@ def test_a_board_on_the_eu_host_is_found_there_after_the_us_host_says_404(
 
 def _is_aware(moment: datetime) -> bool:
     return moment.tzinfo is not None and moment.utcoffset() is not None
+
+
+class _RecordingFetch:
+    """The real fetch, with each requested URL noted so a test can see which host was asked."""
+
+    def __init__(self) -> None:
+        self.urls: list[str] = []
+
+    def __call__(
+        self,
+        url: str,
+        *,
+        limits: FetchLimits,
+        if_none_match: str | None,
+        pass_through_statuses: bool,
+    ) -> FetchResponse:
+        self.urls.append(url)
+        return fetch_url(
+            url,
+            limits=limits,
+            if_none_match=if_none_match,
+            pass_through_statuses=pass_through_statuses,
+        )
+
+
+def test_a_seeded_eu_region_reaches_the_eu_host_without_asking_the_us_host(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> None:
+    clock = SystemClock()
+    recorder = _RecordingFetch()
+    client = PoliteClient(
+        FetchPolicy(),
+        ResponseCache(tmp_path_factory.mktemp("lever-seeded-cache") / "cache"),
+        HostRateLimiter(clock, delay_seconds=1.0),
+        clock,
+        limits=LEVER_FETCH_LIMITS,
+        fetch=recorder,
+    )
+    seeded = LeverAdapter(client, page_size=SMALL_PAGE)
+    seeded.remember_region(EU_ONLY_BOARD, LeverRegion.EU)
+
+    fetched = seeded.fetch_board(EU_ONLY_BOARD)
+
+    assert not fetched.skipped, f"skipped: {fetched.skipped}"
+    assert recorder.urls, "the real client made no request"
+    assert all(url.startswith("https://api.eu.lever.co/") for url in recorder.urls), recorder.urls
+    assert seeded.region_of(EU_ONLY_BOARD) is LeverRegion.EU

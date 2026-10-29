@@ -425,3 +425,22 @@ def test_a_second_fetch_is_served_from_the_cache(tmp_path: Path) -> None:
         second = adapter.fetch_board(SLUG)
         assert len(requests.received) == 1
     assert second == first
+
+
+def test_a_seeded_region_sends_the_first_fetch_only_to_its_host(tmp_path: Path) -> None:
+    with http_server(_pages("eu", [RECORDED], 100)) as (port, requests):
+        adapter = _adapter(tmp_path, port)
+        adapter.remember_region("ExampleCoBoard", LeverRegion.EU)
+        fetch = adapter.fetch_board(SLUG)
+        assert _paths(requests) == [f"/eu/{SLUG}?mode=json&limit=100&skip=0"]
+    assert len(fetch.listings) == len(RECORDED)
+
+
+def test_a_seeded_region_is_forgotten_when_its_host_answers_404(tmp_path: Path) -> None:
+    with http_server(_pages("us", [RECORDED], 100)) as (port, requests):
+        adapter = _adapter(tmp_path, port)
+        adapter.remember_region(SLUG, LeverRegion.EU)
+        with pytest.raises(BoardNotFound):
+            adapter.fetch_board(SLUG)
+        assert not any(path.startswith("/us/") for path in _paths(requests))
+    assert adapter.region_of(SLUG) is None
