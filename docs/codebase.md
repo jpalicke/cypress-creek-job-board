@@ -109,8 +109,10 @@ evals/
   harness/fixtures.py    Fixture loading, the meta schema and fixture_set_hash
   harness/check_labels.py  Command line check of every posting fixture
   harness/metrics.py     The E1 to E4 metric definitions: score_case, pool, repeat_values, aggregate
+  harness/injection.py   The injection corpus loader and the E6 metrics: load_injection, score_pair, injection_values
   harness/score.py       The scorer CLI: run files and committed labels in, a metrics JSON and a mismatch view out
   fixtures/<ats>-<job id>/  One real posting: posting.txt, meta.yaml, labels.yaml (see evals.md and NOTICE)
+  fixtures/injection/<case id>/  A hand written hostile case: attacked.txt, its clean.txt twin and payload.yaml (see evals.md)
   scratch/               Gitignored local JSONL exports
   results/               Published labeled JSONL exports only after E3 labels exist
 tests/
@@ -207,6 +209,7 @@ See [the fetching architecture](architecture.md), [the SSRF rules and limits](th
 - **Measured truncation signatures are refused.** The Ollama adapter estimates before the call and checks the reported count after it. It raises `ContextTruncated` when the estimate exceeds the configured context or the count matches a measured truncation signature. Other server behavior may need additional detection.
 - **Hosted adapters send the minimum and hide the key.** The Anthropic adapter needs `allow_remote`, sends the system text and the untrusted block as separate fields (prompt building already drops `local_only` facts for a non local backend), offers no tools, never follows a redirect, and scrubs the key from every error. See [ADR 0025](adr/0025-anthropic-native-structured-output.md).
 - **Spend is capped before it happens.** `BudgetedProvider` checks the worst case (estimate plus output cap) against the run limits before a call and records the server's real usage after it. Real usage above an estimate blocks the next call, so the guard fails closed.
+- **Hostile text is data.** The injection corpus keeps attack payloads as files with the exact payload and its offset, next to a clean twin that differs only by that payload. The scorer reads reports, never the payload as an instruction. See [evals.md](evals.md#the-injection-corpus-and-the-e6-metrics).
 - **Scoring reads recorded spans.** `ReportRow` carries the requirement's source span and whether the model tried to raise support, so the scorer matches rows to hand labels by offsets and counts attempted raises before the clamp. Both fields default for reports stored earlier; the scorer refuses a row with no span. The scorer needs committed labels and the run's own bank, and calls a metric with no measurement `not_run`, never 0. See [evals.md](evals.md#scoring-a-run).
 - **Attempted failures count.** A provider error identifies whether a request was attempted and carries complete reported usage when known. The budget counts attempted failed requests, including reported tokens and cost. Unknown usage blocks later calls in that invocation; on eval resume, a context-sized input ceiling and the stage output cap are reserved for that attempt before another call. A preflight refusal spends no request. See [providers.md](providers.md#the-budget-guard) and [evals.md](evals.md#run-the-harness).
 - **Posting text never leaves its block.** `build_prompt` puts the posting between boundary lines carrying a random 128 bit token, keeps it out of the system message and shows extraction no facts. It is the first layer only, the validators are the control.
