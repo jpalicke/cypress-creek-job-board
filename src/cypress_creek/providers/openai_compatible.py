@@ -38,8 +38,10 @@ DEFAULT_BASE_URL = "https://api.openai.com/v1"
 CHARS_PER_TOKEN = 3
 ERROR_BODY_LIMIT = 200
 
-# Phrases servers use when a prompt does not fit. The code is OpenAI's, the others are the
-# wording of the messages a local server sends, matched on lower case text.
+# Phrases that mark a 400 as a context length problem, matched on lower case text. The first is
+# OpenAI's documented error code. The rest are guesses at server wording, none of them verified
+# against a real server. A false match turns an ordinary 400 into ContextTruncated, which fails
+# closed.
 CONTEXT_ERROR_MARKERS = (
     "context_length_exceeded",
     "context length",

@@ -1,4 +1,4 @@
-# ADR 0026: The openai_compatible adapter, and the OpenAI model pick
+# ADR 0027: The openai_compatible adapter, and the OpenAI model pick
 
 Status: proposed, needs Joe P's confirmation of the model pick and of the LM Studio findings (card C4)
 
@@ -21,6 +21,8 @@ This text came from a web page, so treat the model name and prices as data to co
 No LM Studio and no OpenAI key were available when this card was written. Nothing in this ADR or in docs/providers.md reports an LM Studio measurement. The three questions the card names (context length handling, whether `json_schema` is honored, and how a context overflow is reported) are open. The `live_lmstudio` tests answer them when Joe P runs them against his LM Studio, and the findings section in docs/providers.md must then be filled in. The error text markers in `CONTEXT_ERROR_MARKERS` are guesses at server wording, not recordings (the odd phrase "context the overflows" is a recalled LM Studio message, kept only because it was seen once and costs nothing if it never matches).
 
 ## Limits
+- A 400 is mapped to `ContextTruncated` purely by matching the server's text against `CONTEXT_ERROR_MARKERS`. A false match turns an ordinary 400 into a context error. That fails closed (the call stops), but the error is then misleading.
+- Hosted calls send no temperature, so a published OpenAI result is not temperature pinned the way the method rule asks (temperature 0). Whether a different pin is possible for the chosen model is a question for the eval card that publishes the table.
 - The estimate is characters divided by 3, which can undercount dense text. The reported prompt count check only fires when the server reports a count at or above the window.
 - `temperature` is not sent to a hosted server, so hosted output is not pinned to a fixed temperature.
 - A hosted server that rejects `max_completion_tokens` or `json_schema` fails with `ProviderUnavailable` carrying the status and a bounded body.
