@@ -270,3 +270,9 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 ## D49. E8 (first published run) waits for Joe P's review of the E3 labels
 - 2026-10-29, manager.
 - E8 needs no keys and no spend (local backends only), and live.yml's runner could host it with changes (pull qwen3.5:4b and 9b, a longer timeout, artifact upload; 9b may not finish on a CPU runner; run files committed under evals/results/). Blockers in order: (1) the runner does not run labeled fixtures (new issue filed), (2) E5 and E7 are not built, (3) the method rule says labels are frozen before runs and the E3 labels are still `review: pending` with Joe P, so a published run now could be invalidated by a label change. Choice: do not publish a run before Joe P's label review. Build the runner wiring, E5 and E7 meanwhile. Reverse: run E8 now and treat later label changes as a new label version.
+
+## D50. Closed vocabulary implemented (PR #136, Worker G)
+- 2026-10-29, Worker G.
+- In drafts every word must come from a cited fact, except a 33-word pinned connective list, month names and numbers; a small inflection rule and a dropped-negation check apply; any non-ASCII or invisible character absent from a cited fact fails the sentence. Strict V10 mode, drafts only, no model, no new validator id. The impact and rank word lists are deleted. Reverse: restore them from the earlier commit on the branch.
+- FOR JOE P: measured false-positive rate on 22 honest rewordings of the sample facts is 9 of 22 (41 percent), pinned in a test and reported in the PR. Failed sentences are shown as NOT VERIFIED, never hidden and never copyable, so a false positive costs reading time, not correctness. If the rate is too high for the product, widen the connective list or relax the mode, with your call.
+- V8 quantity words can withhold some entailment rationales, which can lower E-lane rationale acceptance numbers (noted in ADR 0033).
