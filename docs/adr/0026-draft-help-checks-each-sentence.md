@@ -18,6 +18,6 @@ The product's rule is that no output asserts a claim without a verified fact beh
 
 ## Limits
 
-The checks are heuristics. Quantity, result, rank and negation claims that no cited fact makes were once unchecked and are now covered by finite word lists, see [ADR 0033](0033-claim-words-in-v8-and-v10.md); lists are finite, meaning is not read, and V8 cannot tell a correct number attached to the wrong thing.
+The checks are heuristics. Words that no cited fact uses are now refused in drafts by a closed vocabulary, see [ADR 0033](0033-draft-closed-vocabulary.md); lists are finite, meaning is not read, and V8 cannot tell a correct number attached to the wrong thing.
 
 See [pipeline.md](../pipeline.md#draft-help).

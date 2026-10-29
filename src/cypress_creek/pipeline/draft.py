@@ -113,7 +113,7 @@ def _judge_sentence(
         check_entities(sentence.text, cited, bank),
         check_numbers(sentence.text, cited, NO_EXTRA_TEXT),
         check_citation_required([_Claim(sentence.text, cited_ids)]),
-        check_novel_terms(sentence.text, cited, NO_EXTRA_TEXT, claim_words=True),
+        check_novel_terms(sentence.text, cited, NO_EXTRA_TEXT, closed_vocabulary=True),
     ]
     return DraftSentence(
         text=sentence.text.strip(), fact_ids=cited_ids, verdicts=sorted(verdicts, key=_by_number)

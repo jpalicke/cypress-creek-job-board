@@ -8,7 +8,7 @@ Write one to three sentences that paraphrase the facts so that they answer the r
 - sentences: a list. Each item has text, one plain sentence, and fact_ids, the ids of the facts that sentence paraphrases, copied exactly from the list.
 
 Rules:
-- Only paraphrase. Use only words, names, dates, numbers, tools and employers that appear in the facts you cite. Never take a number, name, tool or employer from the requirement, even if the requirement asks for it. Do not add, round, combine or improve any detail.
+- Only paraphrase, and reuse the wording of the facts you cite. Every word you write must appear in a fact you cite, apart from plain connecting words such as a, the, of, to, in, with, and, by, as and from. Change the word order and the connecting words only. Never use a synonym, a stronger or softer word, a result, a job title or a number of years that the facts do not state. Never take a number, name, tool or employer from the requirement, even if the requirement asks for it. Use plain ASCII characters only.
 - Every sentence cites at least one fact id from the list. Never cite an id that is not in the list.
 - If the facts do not support the requirement, return an empty list of sentences.
 

@@ -6,15 +6,9 @@ from typing import Protocol
 
 from cypress_creek.facts.models import Fact
 from cypress_creek.terms import normalize_term
-from cypress_creek.validators.claim_words import (
-    NEGATION,
-    fact_text,
-    impact_words,
-    known_in,
-    negation_words,
-    seniority_words,
-)
+from cypress_creek.validators.claim_words import NEGATION, fact_text, known_in, negation_words
 from cypress_creek.validators.verdict import Verdict, fail, ok
+from cypress_creek.validators.vocabulary import unknown_characters, unknown_words
 
 _TOKEN = re.compile(r"[^\s,;:()\[\]{}\"“”]+")
 _SENTENCE_END = re.compile(r"[.!?]$")
@@ -121,30 +115,33 @@ def novel_terms(text: str, cited: Sequence[Fact], requirement_text: str) -> list
 
 
 def check_novel_terms(
-    text: str, cited: Sequence[Fact], requirement_text: str, *, claim_words: bool = False
+    text: str, cited: Sequence[Fact], requirement_text: str, *, closed_vocabulary: bool = False
 ) -> Verdict:
     """V10: flag terms in the text that no cited fact or requirement mentions.
 
-    With `claim_words`, also flag a result (reduced, doubling, saved), a rank (senior, sole) or a
-    negation (never, without) that no cited fact makes, and a negation a cited fact makes that the
-    text drops. Drafts use it, because a draft is a claim about the candidate. It is off for
-    rationales, which may say "the facts do not show".
+    With `closed_vocabulary`, which drafts use, every word of the text must come from the cited
+    facts (or the requirement text when one is passed), apart from the fixed function words, so a
+    synonym, a made up result or a look-alike letter cannot slip past a word list. A negation that
+    a cited fact makes and the text drops also fails. It is off for rationales, which may say
+    "the facts do not show".
     """
     found = novel_terms(text, cited, requirement_text)
     if found:
         return fail("V10", "text uses a term that no cited fact mentions", found[0])
-    if claim_words:
-        return _check_claim_words(text, cited, requirement_text)
+    if closed_vocabulary:
+        return _check_closed_vocabulary(text, cited, requirement_text)
     return ok("V10")
 
 
-def _check_claim_words(text: str, cited: Sequence[Fact], requirement_text: str) -> Verdict:
+def _check_closed_vocabulary(text: str, cited: Sequence[Fact], requirement_text: str) -> Verdict:
     sources = [requirement_text, *(fact_text(fact) for fact in cited)]
-    for finder in (impact_words, seniority_words):
-        for word in sorted(finder(text) - known_in(sources, finder)):
-            return fail("V10", "text makes a claim that no cited fact makes", word)
-    if negation_words(text) - known_in(sources, negation_words):
-        return fail("V10", "text negates something that no cited fact negates", NEGATION)
+    characters = unknown_characters(text, sources)
+    if characters:
+        character = min(characters)
+        return fail("V10", "text has a character that no cited fact has", f"U+{ord(character):04X}")
+    unknown = unknown_words(text, sources)
+    if unknown:
+        return fail("V10", "text uses a word that no cited fact uses", unknown[0])
     if not negation_words(text) and known_in(map(fact_text, cited), negation_words):
         return fail("V10", "text drops a negation that a cited fact makes", f"{NEGATION} dropped")
     return ok("V10")

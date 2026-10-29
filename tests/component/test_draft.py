@@ -394,7 +394,7 @@ def test_unsupported_claim_words_are_flagged_and_never_clean(
 
 LEGITIMATE = [
     "Led 8 engineers in moving a billing system to Python.",
-    "Led an 8 person engineering team migrating the billing system to Python.",
+    "Led 8 engineers moving a billing system to Python at Initech.",
     "Led a team of 8 engineers who moved a billing system to Python at Initech.",
 ]
 
@@ -403,4 +403,36 @@ LEGITIMATE = [
 def test_ordinary_paraphrases_of_the_fact_stay_clean(bank: Bank, sentence: str) -> None:
     result = _judge(bank, (sentence, ["F-0001"]))
     assert result.clean_sentences == [sentence]
+    assert result.needs_human_review is True
+
+
+BASE_SENTENCE = "Led a team of 8 engineers moving a billing system to Python"
+SIBLINGS = [
+    f"{BASE_SENTENCE} for a d\u0435cade.",
+    f"{BASE_SENTENCE} for a dec\u200bade.",
+    f"{BASE_SENTENCE} for many years.",
+    f"{BASE_SENTENCE} for several years.",
+    f"{BASE_SENTENCE} over multiple years.",
+    f"{BASE_SENTENCE} used by a lot of customers.",
+    f"{BASE_SENTENCE}, halving latency.",
+    f"{BASE_SENTENCE}, the first in the industry.",
+    f"{BASE_SENTENCE}, earning a promotion.",
+    f"{BASE_SENTENCE}, which was rolled back.",
+    f"{BASE_SENTENCE}, spearheading the effort.",
+    f"{BASE_SENTENCE} as head of engineering.",
+    f"{BASE_SENTENCE} single handedly.",
+    f"{BASE_SENTENCE} solo.",
+    f"{BASE_SENTENCE} as the founder.",
+    f"{BASE_SENTENCE} as engineering manager.",
+    "Hardly led a team of 8 engineers moving a billing system to Python.",
+    f"{BASE_SENTENCE}, but dont mention it.",
+    f"{BASE_SENTENCE}, away from Python.",
+]
+
+
+@pytest.mark.parametrize("sentence", SIBLINGS)
+def test_unlisted_siblings_of_the_four_classes_are_never_clean(bank: Bank, sentence: str) -> None:
+    result = _judge(bank, (sentence, ["F-0001"]))
+    assert result.clean_sentences == []
+    assert "! NOT VERIFIED" in render_draft(result)
     assert result.needs_human_review is True

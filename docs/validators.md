@@ -69,21 +69,15 @@ Quantity words are checked too: `decade`, `dozen`, `couple`, `half`, `double`, `
 
 This is a heuristic and is deliberately conservative: it flags for review, it never proves a lie. It cannot see a novel word at the start of a sentence or a lowercase one ("terraform"). V7, V8 and V10 together gate the rationale text, which is shown to a human only if all three pass.
 
-`check_novel_terms(text, cited, requirement_text, claim_words=True)` is the strict form that drafts use. It also flags a result, a rank or a negation that no cited fact makes (see [Claim words](#claim-words)). It is off for rationales, which may legitimately say "the facts do not show".
+`check_novel_terms(text, cited, requirement_text, closed_vocabulary=True)` is the strict form that drafts use. Every word of the sentence must come from a cited fact (claim, employer, role, issuer, tag names and levels) or the requirement text when one is passed, apart from a fixed list of connectives, month names and numbers. A synonym, a made up result, a rank or a negation word that is not in the facts therefore fails without a growing word list. Rules, all in `validators/vocabulary.py`:
 
-### Claim words
-`validators/claim_words.py` holds small deterministic word lists, matched on whole lower case words, so a paraphrase stays inside its group ("cut" and "reduced" are one, "doubling" matches "doubled"). For a draft sentence, a group the sentence uses must also be used by a cited fact (claim, employer, role, issuer, tag names and levels) or by the requirement text when one is passed:
+- **Function words** (the whole list, reviewed): a, an, the, of, to, in, on, at, for, with, and, by, as, from, using, while, its, their, into, that, which, who, was, were, is, are, been, it, this, these, those, through, via. Words that can carry a claim (no, not, never, only, first, more, most, all, every, many, over, or, but) are not on it.
+- **Inflection**: one of `ies`, `ing`, `ed`, `es`, `s` is dropped, then a final `e` and a doubled consonant, so "migrating", "migrated" and "migrate" agree, but "manager" and "manage", or "led" and "lead", do not. A possessive drops `'s`. A hyphen splits a compound, so each part needs a fact.
+- **Characters**: after NFKC and without format characters, words are compared lower case. Any non-ASCII character in the sentence that no cited fact itself uses (a Cyrillic or full width look-alike, a zero width or soft hyphen character) fails the sentence, so what is copied is what was checked.
+- **Negation**: if a cited fact negates something ("Never missed a date") and the sentence has no negation word, V10 fails it as a dropped negation. An honest rewrite such as "without downtime" to "with zero downtime" is flagged too; that is safe and costs a human look.
+- **Cost**: on 22 honest rewordings of the sample facts, 9 are flagged (41 percent), each because it swaps in a word the fact does not use. See [ADR 0033](adr/0033-draft-closed-vocabulary.md).
 
-| Group | Words |
-| --- | --- |
-| Quantity (V8) | decade, dozen, couple, half, double, triple, quadruple, hundreds, thousands, millions, billions, numerous |
-| Results (V10) | reduce (reduced, decreased, cut, lowered, shortened, trimmed, slashed), increase (increased, grew, grow, boosted, expanded), improve (improved, enhanced, optimized, streamlined), double and triple, save, revenue (profit, sales), cost (budget), speed (faster, accelerated), award (won, winning, prize) |
-| Rank and scope (V10) | senior, staff, principal, chief, director, executive, architect, expert, sole, solely, single-handedly, world-class, award-winning, large-scale, mission-critical, company-wide, org-wide, global, vp |
-| Negation (V10) | never, not, no, none, nor, neither, without, cannot, unable, except, lack and fail words, and any `n't` |
-
-Negation also works the other way: if a cited fact negates something ("Never missed a date") and the sentence does not, V10 fails it as a dropped negation.
-
-Known limits: the lists are finite, so a result or rank word that is not on them ("spearheaded", "pioneered", "successfully") still passes, and meaning is not read. A paraphrase that moves between groups (a fact says "reduced", the sentence says "improved") is flagged, which is intended; the cost is a human review of an honest sentence. Negation words in a different form ("no" in the fact, "without" in the sentence) are one group, but a fact that negates and a sentence that merely avoids the negated word can still pass. These are the only checks of meaning, so a draft always stays under human review.
+It is off for rationales, which may legitimately say "the facts do not show". Known limits: meaning is not read, so a recombination of cited words can still mislead; a correct number can be attached to the wrong thing; and a tag level word (`working`, `expert`) counts as a fact word. A clean line means only that no check found a problem, so a draft always stays under human review.
 
 ## V11 Requirement cap and dedupe
 `dedupe_requirements(requirements)` keeps the first requirement for each normalized term (same rules as the alias table, so "PostgreSQL" and " postgresql. " are one) and at most 40 (`MAX_REQUIREMENTS`). It is idempotent, never reorders and never adds. `check_requirement_cap(requirements)` is the verdict form: it fails on more than 40, or on two requirements sharing a normalized term. A posting stuffed with repeated requirements therefore cannot inflate a score.
