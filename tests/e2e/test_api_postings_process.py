@@ -4,11 +4,12 @@ import http.client
 import json
 import os
 import socket
+import sqlite3
 import subprocess
 import sys
 import time
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from pathlib import Path
 
 import pytest
@@ -99,3 +100,45 @@ def test_paste_analyze_and_read_the_stored_report_through_the_real_server(tmp_pa
         assert stored["report"] == analysis["report"]
 
     assert (tmp_path / "cypress_creek.sqlite3").is_file()
+
+
+def test_the_database_is_created_and_migrated_when_the_server_starts(tmp_path: Path) -> None:
+    with running_server(tmp_path):
+        database = tmp_path / "cypress_creek.sqlite3"
+        assert database.is_file()
+        with closing(sqlite3.connect(database)) as conn:
+            tables = {
+                row[0]
+                for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
+            }
+    assert {"posting", "report", "schema_version"} <= tables
+
+
+def test_a_database_that_cannot_be_prepared_stops_the_server_with_a_clear_error(
+    tmp_path: Path,
+) -> None:
+    blocker = tmp_path / "not-a-directory"
+    blocker.write_text("a file where the data directory should be", encoding="utf-8")
+    env = {
+        **os.environ,
+        "CYPRESS_CREEK_PROVIDER": "ollama",
+        "CYPRESS_CREEK_MODEL": "qwen3.5:0.8b",
+        "CYPRESS_CREEK_DATA_DIR": str(blocker / "data"),
+    }
+
+    try:
+        result = subprocess.run(
+            [sys.executable, "-m", "cypress_creek.api.server"],
+            cwd=ROOT,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=8,
+            check=False,
+        )
+    except subprocess.TimeoutExpired:
+        pytest.fail("the server kept running although its database could not be prepared")
+
+    assert result.returncode == 2
+    assert "the database could not be prepared" in result.stderr
+    assert "Traceback" not in result.stderr

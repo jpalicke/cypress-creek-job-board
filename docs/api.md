@@ -44,7 +44,7 @@ The draft help route arrives later (G4 and D7).
 A body without a declared `Content-Length` (chunked) is refused with `length_required` (411). A body over 1 MiB is `payload_too_large` (413), and a PDF upload may be up to 10 MiB. The check uses the declared length before the body is read. Pasted text is also capped at 50,000 characters by the normalizer (`posting_too_long`).
 
 ### Storage
-Postings and reports live in the SQLite database (`CYPRESS_CREEK_DATA_DIR`, default `data/`), created and migrated the first time a route needs it. A posting row holds the normalized text and its provenance; a report row holds the whole `GapReport` as JSON and the validator verdicts, and must point at a stored posting. See [data-model.md](data-model.md#postings-and-reports). The fact bank stays in YAML.
+Postings and reports live in the SQLite database (`CYPRESS_CREEK_DATA_DIR`, default `data/`), created and migrated when the server starts (and, for an app built another way, the first time a route needs it). A posting row holds the normalized text and its provenance; a report row holds the whole `GapReport` as JSON and the validator verdicts, and must point at a stored posting. See [data-model.md](data-model.md#postings-and-reports). The fact bank stays in YAML.
 
 ## Error codes
 | Code | Status | Meaning |
