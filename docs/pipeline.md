@@ -624,6 +624,59 @@ analyzer calls: 5
 
 The first run stops at the cap and leaves two unscored, the second finds three stored scores and scores the remaining two, and the third makes no analyzer call at all.
 
+## Company suggestion
+
+Help the user grow the watchlist without letting a model write to it. The model proposes names only, code filters and resolves them, and a human approves or denies. Code is `discovery/profile.py`, `suggestions.py`, `resolver.py`, `suggestion_store.py` and `review.py`.
+
+1. **Profile.** `tag_profile(bank, capabilities)` derives a profile from verified facts: each tag name with the highest level any fact gives it, in name order, and nothing else. No claim text, employer, issuer, role or fact id is in it. For a backend that is not local, `local_only` facts add nothing (the same rule as the other prompts).
+2. **Propose.** `propose_names` makes one model call through the prompt builder (`build_company_prompt`, stage `company`). The system text is static and says nothing about denied or blocked companies. The profile is trusted data and there is no untrusted posting in this call, so there is no boundary token. The answer is a strict schema of names only (`CompanyNamesOutput`, at most 20) and is untrusted data. A provider failure that ends the run raises `ProposalFailed`; the budget guard's error propagates.
+3. **Filter**, in code, in this order (`filter_names`): V14 (plain name shape: no URL, slug, markup, instruction punctuation, mixed scripts), a company key, a repeat of an earlier name in the same answer, the denied list, then the blacklist. The denied list and the blacklist are matched on `company_key`, so case, spacing, punctuation, legal suffixes and lookalike letters do not get past them. V14 is a shape check: a phrase of plain words under six words passes it, and it is the resolver that drops it.
+4. **Resolve** (`Resolver.resolve`): candidate slugs are guessed from the name (the words joined by hyphens, run together, and the first word; ASCII only, a trailing legal suffix ignored) and each adapter's `probe` is asked, through the polite client (rate limited, honest User-Agent). A board that does not exist is remembered in a negative cache for a while (24 hours by default). A failed probe is never remembered as missing. A board that belongs to another company is dropped.
+5. **Evidence grade**, shown to the user: **strong** when the board reports the company's name (a Greenhouse board's organization name matches by company key), **weak** when the board exists but reports no name (all Lever and Ashby give, so only the slug matches), **none** when it is missing or is another company's (dropped). A weak suggestion reaches the user with its grade visible. The best grade across adapters wins; ties go to the adapter listed first.
+6. **Queue.** `suggest_from_names` stores each survivor as a pending row (`SuggestionStore.add_pending`) unless the company or board is denied, the company is already pending or it is already on the watchlist. The blacklist is checked again on the resolved slug. This module path cannot write the watchlist: a test checks that the profile, suggestion, resolver, store, schema and prompt modules do not import `watchlist` or `review`.
+7. **Review.** `review.approve(conn, id, now)` is the only watchlist write. It adds the entry with the stored grade and marks the row approved. `review.deny(conn, id, now)` marks the company's pending rows denied: that is the permanent tombstone, keyed on `company_key` and on `(ats, slug)`, honored by the filter, the store and `Watchlist.add`. Only an explicit `Tombstones.remove` lifts it.
+
+The resolver is a pluggable candidate source in spirit: a curated seed directory (a later card) would add names and slugs before the same filter, review and denied checks, and none of those change.
+
+**Known gaps.** `company_key` does not fold a Cyrillic capital EM to a Latin M (issue #142), so that one lookalike can slip past the denied filter; the resolver would then find no board for it. A made up name that happens to match a real board's slug can reach review with weak evidence, which is why the grade is shown.
+
+## Try company suggestion
+Slug guesses and the filter need no model and no network. The filter denies a company by its key, however it is spelled:
+```bash
+uv run python -c "from cypress_creek.discovery.resolver import candidate_slugs; print(candidate_slugs('Example Co'))"
+uv run python -c "
+import tempfile
+from contextlib import closing
+from datetime import UTC, datetime
+from pathlib import Path
+from cypress_creek.discovery.suggestions import filter_names
+from cypress_creek.discovery.tombstones import Tombstones
+from cypress_creek.storage.db import connect, migrate
+
+with tempfile.TemporaryDirectory() as folder, closing(connect(Path(folder) / 'db.sqlite3')) as conn:
+    migrate(conn)
+    Tombstones(conn).deny(name='Acme Corp', ats=None, slug=None, proposed_by='demo', decided_at=datetime.now(UTC))
+    for d in filter_names(['ACME corporation', 'https://evil.example', 'Globex Inc', 'globex'], Tombstones(conn), []):
+        print(d.raw, '->', d.outcome.value, d.reason)
+"
+```
+The first prints `['example-co', 'exampleco', 'example']`. The second prints `ACME corporation -> denied a human denied this company`, then `https://evil.example -> invalid V14: company name contains a character a company name does not need`, then `Globex Inc -> accepted` and `globex -> duplicate repeated in this answer`. The profile a model would see for the sample bank:
+```bash
+uv run python -c "
+from pathlib import Path
+from cypress_creek.discovery.profile import tag_profile
+from cypress_creek.facts import load_bank
+from cypress_creek.providers.base import Capabilities, CostPerMtok
+caps = Capabilities(context_tokens=8192, strict_schema=True, local=False, cost_per_mtok=CostPerMtok(input=0, output=0))
+print(tag_profile(load_bank(Path('evals/bank/sample_bank.yaml'), strict=True), caps).render())
+"
+```
+It prints `SKILL PROFILE` and one `tag: level` line per tag, with no claim text. The tests are:
+```bash
+uv run pytest tests/unit/test_company_profile.py tests/component/test_company_suggestions.py tests/component/test_company_resolver.py tests/component/test_company_review.py tests/component/test_company_flow.py tests/e2e/test_company_suggestion_process.py -q --no-cov
+```
+`tests/integration/test_company_proposal_live.py` runs one real proposal against Ollama (marker `live`), and `tests/integration/test_company_resolution_network.py` resolves a few well known names on the real boards (marker `needs_network`). Routes for listing, approving and denying suggestions arrive in the next card.
+
 ## Try it locally
 ```bash
 uv run python -c "

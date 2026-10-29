@@ -39,7 +39,7 @@ src/cypress_creek/       The library
     version.py           pipeline_version, fingerprint: a digest of the stages, prompts, validators, scoring code and config, part of the discovery cache key
     run.py               analyze, assess, run_id: the whole run, with provenance and a run id derived from its inputs
     trace.py             PipelineTrace, CallRecord, ValidatorRecord: observed calls and validator verdicts
-    prompts/             Versioned system texts, one file per stage and version (extract_v2.txt, entail_v1.txt, draft_v1.txt)
+    prompts/             Versioned system texts, one file per stage and version (extract_v2.txt, entail_v1.txt, draft_v1.txt, company_v1.txt)
   ingest/                Untrusted posting text in, clean models out
     models.py            Posting, Requirement, typed warnings
     normalize.py         normalize(), text_hash()
@@ -85,6 +85,12 @@ src/cypress_creek/       The library
     migrations/          Numbered .sql files, including 0003_blacklist.sql, 0004_eval_runs.sql, 0005_watchlist_region.sql and 0006_discovery_reports.sql
   discovery/             Discovery state in SQLite, the polite fetch layer over the guarded transport, and the ATS board adapters
     watchlist.py         WatchlistEntry, Watchlist, Tombstoned, AlreadyWatched, IdentityEvidence
+    evidence.py          IdentityEvidence: strong, weak or none, kept apart so the model path never imports the watchlist
+    profile.py           TagProfile, tag_profile: tag names and levels from verified facts, nothing else
+    suggestions.py       filter_names, suggest_from_names, propose_names: V14, the denied list and the blacklist in code, then resolve and queue
+    resolver.py          candidate_slugs, grade_evidence, NegativeCache, Resolver: a name to the boards that exist for it, with an evidence grade
+    suggestion_store.py  SuggestionStore: pending company suggestions, one per company
+    review.py            approve, deny: the only place a suggestion reaches the watchlist, or becomes a permanent tombstone
     tombstones.py        Tombstones, Denial, DenialReason, normalize_board: denied companies kept as denied suggestion rows
     listings.py          Listings, StateChanges: the listing table, with new, seen and closed transitions from a successful board fetch
     dedupe.py            dedupe, MergedListing, fingerprint_text: conservative merge by listing id, then exact cross source fingerprint
@@ -242,6 +248,7 @@ See [the fetching architecture](architecture.md), [the SSRF rules and limits](th
 - **Fetch errors never carry remote bodies.** `PoliteFetchError` subclasses hold a stable `reason_code` (and `RetriesExhausted` the last status number) behind a generic message. They never include the response body or the URL. `FetchConfigError` names a setting, never its value.
 - **ManualClock is time, not a mock.** `ManualClock` is a controllable clock: sleeping advances it and records the request. Everything else in the polite tests is real (files, HTTP servers, the transport). Do not add a fake HTTP layer or a fake provider.
 - **One retry place.** Providers raise typed errors and `providers.call_with_retry` is the only code that retries them. Adapters never loop on their own.
+- **A model never writes the watchlist.** Company suggestion keeps the model to names, filters them in code (V14, the denied list, the blacklist, all on `company_key`), grades the evidence a board belongs to the company, and queues pending rows. Only `discovery/review.py` writes the watchlist, on a human approval, and a test checks that the model path cannot import it. See [pipeline.md](pipeline.md#company-suggestion) and [ADR 0041](adr/0041-company-suggestion-boundaries.md).
 - **An adapter is a contract, not a vendor.** Code that needs a board depends on the `BoardAdapter` protocol (`fetch_board(slug)`, which returns a `BoardFetch`, and `probe(slug)`) and the `Listing` dataclass in `discovery/adapters/base.py`. A vendor module only maps its own feed onto that shape.
 - **Only a 404 means a missing board.** The transport passes 404 through, `PoliteClient` raises `NotFound`, and the adapter turns that into `BoardNotFound` (and `found=False` from `probe`). A 403, a 410 or any other refused status propagates as a transport error and is never reported as missing.
 - **Adapter errors never echo feed values.** `FeedSchemaError` names the field path (for example `jobs[3].title`) and never the value or the validator message. `BoardNotFound` names only the ATS and the slug the caller supplied.
