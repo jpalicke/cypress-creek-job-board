@@ -229,7 +229,7 @@ uv run pre-commit run --all-files  # lint, format, strict types, tests with the 
 How a card goes:
 1. Branch from main, one branch per card. No worktrees.
 2. Write a failing test first and watch it fail. Then write the minimum code to pass, then refactor.
-3. A phase may cover one PR. Aim for about 10 changed files per PR, with a hard cap of 20 per phase and PR; run the gates before continuing.
+3. Keep each phase to at most five files and each PR to about 10 (hard cap 20), run the gates, then continue.
 4. Update docs in the same PR (see the checklist in contributing.md).
 5. Open a PR, get CI green, merge only after review.
 
