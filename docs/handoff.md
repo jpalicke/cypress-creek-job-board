@@ -29,8 +29,10 @@ Never commit with a personal email address. Secrets live in the environment or a
    uv run ruff check src tests
    uv run mypy                       # strict
    uv run pytest tests/unit tests/component --cov --cov-fail-under=80 -q
+   uv run pytest tests/e2e tests/integration -m "not needs_network and not live" -q
    uv run pre-commit run --all-files
    ```
+   The e2e line is an offline gate in CI too. Tests marked `needs_network` or `live` run in `network.yml` and `live.yml` (start them from the Actions tab with `workflow_dispatch` on your branch when your card touches them), and the run is the evidence.
    If a hook fails: read the whole output, name the tool and cause, fix the root cause, re-run. Never use `--no-verify` or any bypass flag.
 8. **Commit and push.** Short imperative message, no attribution lines, no em dashes. The hooks run on commit.
 9. **Open the PR.** Title `<card-id>: <title>`, body starts with `Closes #<issue>` (that closes the card when it merges), then what changed, the split if any, the docs updated, and the file count. No attribution lines.

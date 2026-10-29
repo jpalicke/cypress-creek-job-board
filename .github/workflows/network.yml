@@ -1,0 +1,17 @@
+name: network
+# Runs the tests that need the real internet: public job board feeds and public HTTPS. They talk to
+# third party services, so they are not a gate on pull requests. An unreachable network fails them.
+on:
+  schedule:
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+jobs:
+  network:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+      - run: uv sync --locked
+      - name: Network tests
+        run: uv run --locked pytest tests/integration tests/e2e -m needs_network -q
