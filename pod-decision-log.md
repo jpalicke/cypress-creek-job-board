@@ -84,3 +84,13 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 - 2026-10-29, manager.
 - ADR 0024 is claimed by #120 and #122, 0025 by #123. The reviewer states the next free number at approval and authors renumber before merge.
 - D7 (#22) moved from Worker C to Worker G (idle), stacked on the #116 branch until it merges.
+
+## D16. C4 adapter choices (PR #124, Worker C)
+- 2026-10-29, Worker C.
+- Price setting names input_usd_per_mtok / output_usd_per_mtok, matching C5, one source of truth. Reverse: rename the settings fields and docs.
+- strict_schema is False for loopback LM Studio until verified on a real instance (claiming enforcement unverified would overstate it). Flip after the live_lmstudio run.
+- Hosted requests use max_completion_tokens and no temperature; loopback uses max_tokens and temperature 0. Unproven; adjust build_request after live_openai runs.
+- Needs from Joe P: OPENAI_API_KEY repo secret, an LM Studio live run, confirmation of the model pick. ADR 0026.
+
+## D17. E4 moved to Worker C
+- 2026-10-29, manager. Worker C idle; E4 (#26) stacked on the #122 branch. Worker E keeps G1/G2.
