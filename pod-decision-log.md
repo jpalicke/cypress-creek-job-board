@@ -196,3 +196,11 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 - 2026-10-29, Worker G found, reproduced against a real server on 5309; Worker E fixing.
 - The app-wide CSRF dependency did not cover mounted sub-apps (POST /sub/x without a token returned 200), contradicting ADR and docs. Fix: pure ASGI middleware after the Host check, with a mount test and a route-walk test. Optional items taken test first: custom methods, duplicate token headers, request body limit (a 50 MB body was accepted), hardening headers.
 - Joe P's second human review of the Host and CSRF logic is still owed.
+
+## D35. CI chore merged (PR #127, 35907c6)
+- 2026-10-29, manager merged after senior approval.
+- PRs now run an offline e2e job (`not needs_network and not live and not live_openai and not live_lmstudio`). network.yml (weekly plus dispatch) runs `needs_network and not live and not live_openai` and is not a PR gate. All workflows declare `permissions: contents: read`. e2e tests marked live still run nowhere in CI (issue #128).
+
+## D36. D7 draft help limits accepted and documented (PR #126)
+- 2026-10-29, senior engineer ruled.
+- Four classes still render as clean sentences: quantity words ("for a decade"), invented outcomes ("doubling revenue"), adjective inflation ("senior staff"), and negation ("Never led"). They are shared V8/V10 limits, to be fixed in a separate card; #126 names them in pipeline.md and links a follow-up issue. needs_human_review stays true. FOR JOE P: these are real gaps in the one rule's enforcement for drafts; please prioritise the follow-up.
