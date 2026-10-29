@@ -39,6 +39,8 @@ pythonpath = ["scripts", "."]
 filterwarnings = ["error"]
 markers = [
     "live: needs a real model backend; an unreachable backend is an error, never a skip",
+    "live_openai: calls the real OpenAI API with a key; run by its own workflow or by hand, never in the live job",
+    "live_lmstudio: needs a real LM Studio server (desktop app); local only, never in CI",
     "needs_network: needs the real internet; an unreachable network is an error, never a skip",
 ]
 

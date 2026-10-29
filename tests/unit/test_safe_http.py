@@ -194,6 +194,7 @@ def test_http_client_imports_are_restricted() -> None:
         root / "ingest" / "safe_http.py",
         root / "providers" / "anthropic.py",
         root / "providers" / "ollama.py",
+        root / "providers" / "openai_compatible.py",
     }
     violations = [
         str(path.relative_to(root))
