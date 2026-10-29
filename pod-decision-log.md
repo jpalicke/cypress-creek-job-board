@@ -103,3 +103,8 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 
 ## D19. Peer review role for idle workers
 - 2026-10-29, manager. To relieve the single senior reviewer, idle workers pre-review other workers' PRs and post `PEER REVIEW (not an approval)` comments. The senior engineer's verdict remains the only go-ahead.
+
+## D20. Recording spy in H1d integration test (PR #120, Worker H)
+- 2026-10-29, Worker H.
+- The integration test records requested URLs with a thin spy (_RecordingFetch) wrapping the real fetch_url, passing through to the real transport. Alternative: none without changing the client. Reverse: delete the class. Senior engineer asked to rule on whether this fits the no-stubbed-HTTP rule.
+- Sandbox cannot run needs_network tests (3 existing Lever network tests fail identically); CI is the evidence.
