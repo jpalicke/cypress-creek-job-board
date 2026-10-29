@@ -266,3 +266,7 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 ## D48. F4 and the PDF half of E6 need a PDF library decision from Joe P
 - 2026-10-29, Worker E asked, manager logged.
 - F4 (#34, PDF extraction in a child process) needs a PDF parser (pypdf). `uv add pypdf` was denied by the permission classifier ("Code from External") and the pod did not work around it. Needs from Joe P: approve a library (with an ADR, licence check and pip-audit as the F4 card requires) or name another route. Until then G2 answers a typed 501 `pdf_extraction_unavailable` for PDFs, and E6/F4 are not started.
+
+## D49. E8 (first published run) waits for Joe P's review of the E3 labels
+- 2026-10-29, manager.
+- E8 needs no keys and no spend (local backends only), and live.yml's runner could host it with changes (pull qwen3.5:4b and 9b, a longer timeout, artifact upload; 9b may not finish on a CPU runner; run files committed under evals/results/). Blockers in order: (1) the runner does not run labeled fixtures (new issue filed), (2) E5 and E7 are not built, (3) the method rule says labels are frozen before runs and the E3 labels are still `review: pending` with Joe P, so a published run now could be invalidated by a label change. Choice: do not publish a run before Joe P's label review. Build the runner wiring, E5 and E7 meanwhile. Reverse: run E8 now and treat later label changes as a new label version.
