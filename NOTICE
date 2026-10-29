@@ -39,6 +39,25 @@ It is kept as recorded except that the list was cut to three jobs. It is include
 hostile input sample for tests. The job text belongs to its publisher, and the feed did not
 state a reuse license.
 
+evals/fixtures/greenhouse-* and evals/fixtures/lever-* each hold the plain text of one real,
+public job posting, converted to text and normalized by this project's own code, plus a
+meta.yaml and a labels.yaml. The posting text belongs to its publisher, and the feeds did not
+state a reuse license. They are included only as evaluation inputs, and each is treated as
+hostile input. No recruiter or other personal data is kept. Each meta.yaml records the posting
+URL, the feed URL, the publisher and the retrieval date. Publishers, feeds and retrieval date
+(all retrieved on 2026-10-29 with an honest, versioned User-Agent and no repeated requests):
+- GitLab Inc., public Greenhouse board feed:
+  https://boards-api.greenhouse.io/v1/boards/gitlab/jobs?content=true
+  https://job-boards.greenhouse.io/gitlab/jobs/8701290002
+  https://job-boards.greenhouse.io/gitlab/jobs/8704363002
+  https://job-boards.greenhouse.io/gitlab/jobs/8778943002
+  https://job-boards.greenhouse.io/gitlab/jobs/8889193002
+- Palantir Technologies Inc., public Lever postings feed:
+  https://api.lever.co/v0/postings/palantir?mode=json
+  https://jobs.lever.co/palantir/10dfc8bc-99ad-4ca2-ab76-853cb90a92c2
+  https://jobs.lever.co/palantir/aaee4d20-7f1b-48b1-ad23-d52ffbf42a49
+The labels.yaml files are project-authored and are licensed under this project's MIT License.
+
 Takedown
 --------
 If you are the owner of material in this repository and want it removed, open

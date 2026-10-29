@@ -1,0 +1,15 @@
+fixture_id: greenhouse-8889193002
+ats: greenhouse
+publisher: GitLab Inc.
+job_id: '8889193002'
+title: Cloud Platform Engineer
+url: https://job-boards.greenhouse.io/gitlab/jobs/8889193002
+api_url: https://boards-api.greenhouse.io/v1/boards/gitlab/jobs?content=true
+retrieved: '2026-10-29'
+normalized_sha256: af41e877d65979a5f62f0735839b9055fbcf92f53953bdc56468e4f418463839  # pragma: allowlist secret
+replaces:
+  job_id: '8731564002'
+  reason: Job 8731564002 returned HTTP 404 from the Greenhouse job endpoint and is absent from the board
+    listing on 2026-10-29, so it is closed or removed. This open role from the same board stands in for
+    it. Chosen because its Kubernetes, Terraform and cloud requirements fall on the sample bank's thin
+    and missing support.

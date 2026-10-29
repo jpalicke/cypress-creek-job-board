@@ -1,0 +1,136 @@
+# Hand labels for this posting. Written from the posting text and the bank alone,
+# before any model or pipeline ran. See docs/e3-label-decisions.md for the reasoning.
+fixture_id: greenhouse-8704363002
+provenance:
+  labeled_by: Claude, on delegation from Joe P (Palicke); pending his review
+  review: pending
+  labeled_on: '2026-10-29'
+  model_output_used: false
+requirements:
+- id: L-1
+  span: Experience building and maintaining production Python backend applications, including APIs, asynchronous or background processing, and data models.
+  kind: skill
+  term: python
+  importance: required
+  expected_support: strong
+  expected_status: supported
+  fact_ids:
+  - F-0001
+  - F-0012
+- id: L-2
+  span: Experience with LLM application frameworks such as LangGraph, or designing and shipping AI-powered backend features or harnesses.
+  kind: skill
+  term: llm application frameworks
+  importance: required
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+- id: L-3
+  span: Skill in designing or extending APIs (REST, GraphQL or gRPC) with attention to scalability, maintainability and backward compatibility.
+  kind: skill
+  term: rest apis
+  importance: required
+  expected_support: strong
+  expected_status: supported
+  fact_ids:
+  - F-0012
+  note: F-0012 built REST APIs with FastAPI. The bank tags it fastapi, so a tag match on rest apis finds nothing. A human reads it as supported. Flagged for review.
+- id: L-4
+  span: Comfort working across the stack in a mature codebase.
+  kind: skill
+  term: full stack development
+  importance: required
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+- id: L-5
+  span: Familiarity with Ruby on Rails and/or JavaScript and Vue is a plus.
+  kind: skill
+  term: ruby on rails
+  importance: preferred
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+  note: Three requirements share this sentence and differ in term.
+- id: L-6
+  span: Familiarity with Ruby on Rails and/or JavaScript and Vue is a plus.
+  kind: skill
+  term: javascript
+  importance: preferred
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+- id: L-7
+  span: Familiarity with Ruby on Rails and/or JavaScript and Vue is a plus.
+  kind: skill
+  term: vue
+  importance: preferred
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+- id: L-8
+  span: Experience finding and fixing performance bottlenecks in applications.
+  kind: skill
+  term: performance tuning
+  importance: required
+  expected_support: strong
+  expected_status: supported
+  fact_ids:
+  - F-0016
+  - F-0003
+  note: Both facts are database performance work, not application code in general. Flagged for review.
+- id: L-9
+  span: Clear written and verbal communication, including technical proposals and documentation, in a remote, async, cross-functional team.
+  kind: soft
+  term: communication
+  importance: required
+  expected_support: partial
+  expected_status: gap
+  fact_ids:
+  - F-0021
+  - F-0024
+- id: L-10
+  span: Openness to learning and to applying skills from related technologies or fields.
+  kind: soft
+  term: learning agility
+  importance: required
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+- id: L-11
+  span: Build and improve agentic flows and their reusable parts with LangChain and LangGraph, including the Flow Registry.
+  kind: skill
+  term: langgraph
+  importance: unspecified
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+- id: L-12
+  span: Design, implement and review APIs (including GraphQL and REST) and the backend logic behind them
+  kind: skill
+  term: graphql
+  importance: unspecified
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+- id: L-13
+  span: Improve and extend automated testing (pytest and other frameworks)
+  kind: skill
+  term: pytest
+  importance: unspecified
+  expected_support: strong
+  expected_status: supported
+  fact_ids:
+  - F-0008
+- id: L-14
+  span: Join Tier 2 on-call rotations to troubleshoot production issues
+  kind: responsibility
+  term: on-call
+  importance: unspecified
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+  note: F-0017 mentions on call handover notes, which is not taking part in a rotation.
+cue_sentences:
+- span: Familiarity with Ruby on Rails and/or JavaScript and Vue is a plus.
+  expected: covered
