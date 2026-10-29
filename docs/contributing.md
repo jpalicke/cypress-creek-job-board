@@ -43,7 +43,7 @@ Before a PR is ready, in the same PR:
 - README.md status and "Try what exists" reflect what now works.
 - The docs index (docs/README.md) lists any new doc or decision record.
 - docs/codebase.md matches the code: layout, the flow diagram and the module list.
-- A new design decision has an ADR in `docs/adr/`. Numbers are sequential and the latest is 0024, so the next free number is 0025. Check `ls docs/adr` before you pick one.
+- A new design decision has an ADR in `docs/adr/`. Numbers are sequential and the latest is 0026, so the next free number is 0027. Check `ls docs/adr` before you pick one.
 - Configuration files (for example `config/aliases.yaml`) are described in the doc that owns them.
 
 ## Setup
