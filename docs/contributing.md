@@ -33,7 +33,7 @@ The Ashby adapter has its own `needs_network` integration test: it fetches a rea
 
 The posting fixtures and their hand labels have their own check: `uv run python -m evals.harness.check_labels`. Its tests are listed in [evals.md](evals.md#posting-fixtures-and-hand-labels). Run it when you touch anything under `evals/fixtures/` or `evals/harness/labels.py`. A label edit must be committed before any eval run, and the scorer refuses labels that are not.
 
-The scorer (`evals/harness/score.py`, `metrics.py`) has unit, component, e2e and live tests; the command is in [evals.md](evals.md#scoring-a-run). Run it when you touch either file or `ReportRow`.
+The scorer (`evals/harness/score.py`, `metrics.py`, `injection.py`) and the injection corpus have unit, component, e2e and live tests; the command is in [evals.md](evals.md#scoring-a-run). Run it when you touch either file or `ReportRow`.
 
 The integration and e2e tiers are not in the gated run, so run them by hand when you touch what they cover. For the blacklist: `uv run pytest tests/e2e/test_blacklist_process.py tests/integration/test_blacklist_dns.py -q`. The e2e file starts real child Python processes against a real temp SQLite file. The integration file is marked `needs_network` and resolves a real host, so an unreachable network makes it fail, never skip.
 
