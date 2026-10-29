@@ -268,3 +268,25 @@ def test_the_cli_never_overwrites_a_metrics_file(tmp_path: Path) -> None:
     ]
     assert main(argv) == 0
     assert main(argv) == 1
+
+
+def test_skipping_planted_rows_of_a_real_fixture_counts_only_the_planted_gaps(
+    tmp_path: Path,
+) -> None:
+    case_id = next(
+        name
+        for name, fixture in LOADED.items()
+        if any(r.planted_gap for r in fixture.labels.requirements)
+    )
+    planted = [r for r in LOADED[case_id].labels.requirements if r.planted_gap]
+    path, _ = _run(
+        tmp_path,
+        ids=[case_id],
+        repeats=1,
+        customize={(case_id, 1): {"skip": frozenset(r.id for r in planted)}},
+    )
+    result = _score(path)
+
+    gaps = [r for r in planted if r.expected_status.value == "gap"]
+    assert result.metrics["planted_not_extracted"].runs == [float(len(gaps))]
+    assert result.metrics["gap_recall"].status == "not_run"

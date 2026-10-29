@@ -117,6 +117,13 @@ METRICS = (
         "gap_recall", "E4", Direction.HIGHER, True, "extracted planted gaps not reported as strong"
     ),
     Metric(
+        "planted_not_extracted",
+        "E4",
+        Direction.LOWER,
+        False,
+        "planted gaps the run never extracted, so gap_recall cannot see them",
+    ),
+    Metric(
         "false_support_rate",
         "E4",
         Direction.LOWER,
@@ -329,8 +336,8 @@ def score_case(
     )
     for label_index, label in enumerate(labels.requirements):
         if label_index not in matched:
-            planted = label.planted_gap is not None
-            totals = _add(totals, Counts(planted_not_extracted=int(planted)))
+            planted_gap = label.planted_gap is not None and label.expected_status is Status.GAP
+            totals = _add(totals, Counts(planted_not_extracted=int(planted_gap)))
             lines.append(f"{where} {label.id}: not extracted: {_shown(label.span)}")
             continue
         counts, found, gap = _compare(label, report.rows[matched[label_index]], case_id, repeat)
@@ -402,6 +409,7 @@ def repeat_values(counts: Counts) -> dict[str, float | None]:
         "unverified_citations": count(counts.unverified_citations),
         "uncited_claims": count(counts.uncited_claims),
         "gap_recall": _ratio(counts.planted_caught, counts.planted_matched),
+        "planted_not_extracted": count(counts.planted_not_extracted),
         "false_support_rate": _ratio(counts.false_support, counts.matched),
     }
 

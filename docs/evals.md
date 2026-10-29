@@ -170,11 +170,14 @@ recorded in the report (`ReportRow.span`), so the scorer never searches for text
 | E3 `grounding_violations_per_100` | 100 x (fabricated ids + unverified citations + uncited claims) / reports | lower |
 | E3 `fabricated_ids`, `unverified_citations`, `uncited_claims` | cited ids not in the bank, cited facts without `verified_on`, rows with partial or strong support and no citation (counts) | lower |
 | E4 `gap_recall` | planted gaps that were extracted and not reported strong / planted gaps that were extracted | higher |
+| E4 `planted_not_extracted` | planted gaps (labels with a `planted_gap` row and status gap) that no row matched; strong planted support rows are not counted (a count) | lower |
 | E4 `false_support_rate` | matched rows with more support than the label / matched rows | lower |
 
-A planted gap the run did not extract at all is counted in `planted_not_extracted` (in the
-counts used for the mismatch view), not in `gap_recall`: not extracting a requirement asserts
-nothing, and recall already shows it. A planted gap reported as strong is a fabrication risk. Each
+A planted gap the run did not extract at all is not in `gap_recall`'s denominator (not extracting a
+requirement asserts nothing), so it is published as its own metric, `planted_not_extracted`. Read the
+two together: a run that extracts only some planted gaps can show `gap_recall` 1.0 because the
+skipped ones were never judged, and `planted_not_extracted` is what shows it (if it skips them all,
+`gap_recall` is `not_run`). A planted gap reported as strong is a fabrication risk. Each
 one is listed in `missed_planted_gaps` with the case, repeat, label, the support it claimed and
 the fact ids it cited. "Entailed" means the second opinion ran (`confirmed` or `downgraded`), so a
 row with `not_run` or `not_needed` is not in E2.

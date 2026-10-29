@@ -3,9 +3,12 @@
 from enum import StrEnum
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from cypress_creek.ingest.models import Importance, RequirementKind
+
+MAX_DRAFT_SENTENCES = 5
+MAX_DRAFT_SENTENCE_CHARS = 300
 
 
 class ProposedRequirement(BaseModel):
@@ -43,3 +46,21 @@ class EntailmentOutput(BaseModel):
     verdict: EntailmentVerdict
     fact_ids: list[str]
     rationale: str
+
+
+class DraftSentenceOutput(BaseModel):
+    """One sentence of draft help and the fact IDs the model says it paraphrases."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    text: str = Field(max_length=MAX_DRAFT_SENTENCE_CHARS)
+    fact_ids: list[str]
+
+
+class DraftOutput(BaseModel):
+    """A short draft for one requirement. Every sentence is checked before a person sees it."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    schema_version: Literal[1]
+    sentences: list[DraftSentenceOutput] = Field(max_length=MAX_DRAFT_SENTENCES)
