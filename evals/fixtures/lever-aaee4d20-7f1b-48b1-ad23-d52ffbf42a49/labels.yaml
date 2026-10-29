@@ -1,0 +1,234 @@
+# Hand labels for this posting. Written from the posting text and the bank alone,
+# before any model or pipeline ran. See docs/e3-label-decisions.md for the reasoning.
+fixture_id: lever-aaee4d20-7f1b-48b1-ad23-d52ffbf42a49
+provenance:
+  labeled_by: Claude, on delegation from Joe P (Palicke); pending his review
+  review: pending
+  labeled_on: '2026-10-29'
+  model_output_used: false
+requirements:
+- id: L-1
+  span: Building a performant search and indexing ecosystem for complex granularly permissioned data
+  kind: skill
+  term: search and indexing
+  importance: unspecified
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+  note: F-0016 and F-0021 are PostgreSQL indexing, which is not a search ecosystem.
+- id: L-2
+  span: Contributing to open-source data processing libraries, integrating the latest innovations to achieve performance gains
+  kind: skill
+  term: open source contributions
+  importance: unspecified
+  expected_support: partial
+  expected_status: gap
+  fact_ids:
+  - F-0008
+  note: F-0008 is the candidate's own public library. Flagged for review.
+- id: L-3
+  span: Building the distributed systems that power large scale compute workloads, orchestrating and efficiently scheduling hundreds of thousands of containers every hour
+  kind: skill
+  term: distributed systems
+  importance: unspecified
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+- id: L-4
+  span: Designing architecture and opinionated APIs to keep application developers on the happy path
+  kind: skill
+  term: rest apis
+  importance: unspecified
+  expected_support: strong
+  expected_status: supported
+  fact_ids:
+  - F-0012
+- id: L-5
+  span: Tracing and performance observability in high scale distributed microservice architectures
+  kind: skill
+  term: observability
+  importance: unspecified
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+- id: L-6
+  span: Building reliant, performant, and scalable systems for storage, auth, or asset serving to enable other product teams to build robust applications without deep domain expertise in the underlying systems
+  kind: skill
+  term: storage systems
+  importance: unspecified
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+- id: L-7
+  span: Automating the deployment, management, and operations of complex distributed systems like Cassandra, Elasticsearch, Kafka, and more across different environments
+  kind: skill
+  term: operating distributed systems
+  importance: unspecified
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+  note: F-0018 automated backups, which is not deployment of distributed systems.
+- id: L-8
+  span: Different backend languages, including Java, Rust, and Go
+  kind: skill
+  term: java
+  importance: unspecified
+  expected_support: partial
+  expected_status: gap
+  fact_ids:
+  - F-0011
+  planted_gap: skill:java
+  note: Three requirements share this line and differ in term.
+- id: L-9
+  span: Different backend languages, including Java, Rust, and Go
+  kind: skill
+  term: rust
+  importance: unspecified
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+  planted_gap: skill:rust
+- id: L-10
+  span: Different backend languages, including Java, Rust, and Go
+  kind: skill
+  term: go
+  importance: unspecified
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+  planted_gap: skill:go
+- id: L-11
+  span: Open-source technologies like Cassandra, ElasticSearch, Spark, Kafka, Kubernetes, Flink
+  kind: skill
+  term: kubernetes
+  importance: unspecified
+  expected_support: partial
+  expected_status: gap
+  fact_ids:
+  - F-0004
+  planted_gap: skill:kubernetes
+  note: Two requirements share this line and differ in term.
+- id: L-12
+  span: Open-source technologies like Cassandra, ElasticSearch, Spark, Kafka, Kubernetes, Flink
+  kind: skill
+  term: data infrastructure technologies
+  importance: unspecified
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+  note: Cassandra, Elasticsearch, Spark, Kafka and Flink as one requirement. Flagged for review.
+- id: L-13
+  span: Industry-standard build tooling, including Gradle and GitHub
+  kind: skill
+  term: build tooling
+  importance: unspecified
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+- id: L-14
+  span: Demonstrated ability to collaborate and empathise with a variety of individuals. Able to iterate with users and non-technical stakeholders and understand how technical decisions impact them.
+  kind: soft
+  term: collaboration
+  importance: preferred
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+- id: L-15
+  span: Ability to learn new technology and concepts, even without in-depth experience.
+  kind: soft
+  term: learning agility
+  importance: preferred
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+- id: L-16
+  span: Experience developing and managing highly-available distributed systems is beneficial, but not required.
+  kind: skill
+  term: distributed systems
+  importance: preferred
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+- id: L-17
+  span: Bias towards quality and thoughtful about edge cases
+  kind: soft
+  term: quality focus
+  importance: preferred
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+  note: F-0020 added data quality checks. A human might call that partial. Flagged for review.
+- id: L-18
+  span: Builds solutions and APIs with users in mind while maintaining a high engineering bar.
+  kind: soft
+  term: user focus
+  importance: preferred
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+- id: L-19
+  span: Active US Security clearance, or eligibility and willingness to obtain a US Security clearance is beneficial, but not necessary.
+  kind: certification
+  term: security clearance
+  importance: preferred
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+- id: L-20
+  span: Engineering background in Computer Science, Mathematics, Software Engineering, Physics or similar field
+  kind: education
+  term: computer science
+  importance: required
+  expected_support: strong
+  expected_status: supported
+  fact_ids:
+  - F-0005
+- id: L-21
+  span: Strong coding skills with demonstrated proficiency in programming languages, such as Java, C++, Python, Rust, or similar languages
+  kind: skill
+  term: python
+  importance: required
+  expected_support: strong
+  expected_status: supported
+  fact_ids:
+  - F-0001
+  - F-0023
+  note: Any one of the named languages satisfies it.
+- id: L-22
+  span: Familiarity with storage and data processing systems
+  kind: skill
+  term: data processing
+  importance: required
+  expected_support: strong
+  expected_status: supported
+  fact_ids:
+  - F-0003
+  - F-0009
+- id: L-23
+  span: cloud infrastructure
+  kind: skill
+  term: cloud infrastructure
+  importance: required
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+- id: L-24
+  span: Strong written and verbal communication skills and ability to iterate quickly with teammates, incorporating feedback and holding a high bar for quality
+  kind: soft
+  term: communication
+  importance: required
+  expected_support: partial
+  expected_status: gap
+  fact_ids:
+  - F-0021
+  - F-0024
+cue_sentences:
+- span: Experience developing and managing highly-available distributed systems is beneficial, but not required.
+  expected: covered
+  note: Says not required, which is a preferred reading. The cue word check does not understand negation.
+- span: If you are applying for one of these roles, you must work from the city and or country in which you are employed.
+  expected: not_a_requirement
+  note: Work location policy. The bank holds no location facts.
+- span: If the posting is specified as Onsite, you are required to work from an office.
+  expected: not_a_requirement
+  note: Work arrangement policy. The bank holds no location facts.

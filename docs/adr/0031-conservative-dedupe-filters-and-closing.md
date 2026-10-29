@@ -1,4 +1,4 @@
-# ADR 0025: Dedupe merges only exact fingerprints across sources, filters count their first rejection, and only a clean successful fetch closes a listing
+# ADR 0031: Dedupe merges only exact fingerprints across sources, filters count their first rejection, and only a clean successful fetch closes a listing
 
 Status: accepted (card H6). Builds on [ADR 0021](0021-per-job-skipping.md).
 
