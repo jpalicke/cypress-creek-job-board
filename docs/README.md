@@ -51,7 +51,10 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [0025](adr/0025-anthropic-native-structured-output.md) | Anthropic adapter: native structured output instead of forced tool use, schema rewrite, error mapping, hosted rules and price defaults |
 | [0026](adr/0026-draft-help-checks-each-sentence.md) | Draft help: every sentence checked alone, failures shown as not verified, a gap gets no model call, nothing can be sent |
 | [0031](adr/0031-conservative-dedupe-filters-and-closing.md) | Dedupe merges only exact fingerprints across different sources and never an ambiguous group, filters count each removal under the first filter that rejects it, and only a clean successful fetch closes a listing |
+<<<<<<< HEAD
 | [0034](adr/0034-discovery-run-cap-cache-and-stops.md) | The discovery run caches scores by run id, counts only analyzer calls against the cap (most recent first), stops on a backend outage or a spent budget, and reuses only complete reports |
+=======
+>>>>>>> h6-dedupe-filters
 
 ## Configuration
 - `config/aliases.yaml`: tag alias table, described in [data-model.md](data-model.md#tag-alias-table).
