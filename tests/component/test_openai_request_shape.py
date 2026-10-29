@@ -292,10 +292,10 @@ def _response(status: int, text: str = "", headers: dict[str, str] | None = None
 
 def test_status_429_is_rate_limited_with_retry_after() -> None:
     with pytest.raises(RateLimited) as caught:
-        check_response_status(_response(429, headers={"retry-after": "7"}), 2048, [KEY])
+        check_response_status(_response(429, headers={"retry-after": "7"}), 600, 2048, [KEY])
     assert caught.value.retry_after_seconds == 7.0
     with pytest.raises(RateLimited) as caught:
-        check_response_status(_response(429, headers={"retry-after": "soon"}), 2048, [KEY])
+        check_response_status(_response(429, headers={"retry-after": "soon"}), 600, 2048, [KEY])
     assert caught.value.retry_after_seconds is None
 
 
@@ -308,13 +308,14 @@ def test_status_429_is_rate_limited_with_retry_after() -> None:
     ],
 )
 def test_a_400_about_context_length_is_context_truncated(text: str) -> None:
-    with pytest.raises(ContextTruncated):
-        check_response_status(_response(400, text=text), 2048, [KEY])
+    with pytest.raises(ContextTruncated) as caught:
+        check_response_status(_response(400, text=text), 600, 2048, [KEY])
+    assert (caught.value.input_tokens, caught.value.context_tokens) == (600, 2048)
 
 
 def test_other_failures_are_provider_unavailable_and_scrub_the_key() -> None:
     with pytest.raises(ProviderUnavailable) as caught:
-        check_response_status(_response(401, text=f"bad key {KEY}" + "x" * 5000), 2048, [KEY])
+        check_response_status(_response(401, text=f"bad key {KEY}" + "x" * 5000), 600, 2048, [KEY])
     assert "HTTP 401" in caught.value.reason
     assert KEY not in caught.value.reason
     assert KEY not in str(caught.value)
@@ -324,7 +325,7 @@ def test_other_failures_are_provider_unavailable_and_scrub_the_key() -> None:
 def test_a_redirect_is_refused() -> None:
     with pytest.raises(ProviderUnavailable, match="HTTP 302"):
         check_response_status(
-            _response(302, headers={"location": "http://evil.example/"}), 2048, []
+            _response(302, headers={"location": "http://evil.example/"}), 600, 2048, []
         )
 
 

@@ -107,7 +107,8 @@ tests/
   unit/                  Pure functions and models, including eval case loading and dry-run planning, fetch policy and limiter, adapter contract, and Greenhouse, Lever and Ashby feed mappings
   component/             Real files and local servers, including the no-network eval CLI dry run, response cache, polite client, and the Greenhouse, Lever and Ashby adapters (Lever on US and EU path prefixes, Ashby also answering a weak ETag with a 304)
   integration/           Public DNS and feeds (needs_network), the credentialed live_openai and live_lmstudio tests, real Ollama eval runs and failure persistence, and live Greenhouse, paged US and EU Lever, and Ashby boards (the probe, a made-up slug and a real weak ETag revalidation)
-  e2e/                   Separate-process flows for URL guard, posting fetch, HTML text, blacklist filtering, and eval CLI resume of pending cases
+  e2e/                   Separate-process flows for the openai_compatible adapter against a loopback chat server, URL guard, posting fetch, HTML text, blacklist filtering, and eval CLI resume of pending cases
+  chat_server.py         Test-only real loopback chat completions server that records requests and plays a set reply
   http_support.py        Test-only real HTTP and UDP DNS servers with a loopback resolver; the HTTP server records methods and can route by query string for paged paths and answer an ETag with a 304
   fixtures/              Recorded or hand written inputs
     extraction/          A posting and a recorded real model output for the accept step

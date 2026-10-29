@@ -2,6 +2,7 @@
 # ABOUTME: One adapter serves OpenAI and LM Studio, chosen by base_url. Hosted use needs a key.
 from collections.abc import Mapping, Sequence
 from typing import Any
+from urllib.parse import urlsplit
 
 import httpx
 from pydantic import BaseModel, ValidationError
@@ -56,7 +57,7 @@ def check_pre_flight(input_tokens: int, max_output_tokens: int, context_tokens: 
 
 
 def check_response_status(
-    response: httpx.Response, context_tokens: int, secrets: Sequence[str]
+    response: httpx.Response, input_tokens: int, context_tokens: int, secrets: Sequence[str]
 ) -> None:
     """Map a failed HTTP status to its typed error. Redirects are not followed, so they fail."""
     if response.status_code == 200:
@@ -67,7 +68,7 @@ def check_response_status(
     if response.status_code == 400 and any(
         marker in response.text.lower() for marker in CONTEXT_ERROR_MARKERS
     ):
-        raise ContextTruncated(context_tokens, context_tokens, detected_after_call=True)
+        raise ContextTruncated(input_tokens, context_tokens)
     raise ProviderUnavailable(PROVIDER, f"HTTP {response.status_code}: {text}", secrets)
 
 
@@ -76,12 +77,12 @@ def read_completion[T: BaseModel](
 ) -> StructuredResult[T]:
     """Turn a chat completions reply into a result. The reply is untrusted until it parses."""
     choice = _first_choice(body, secrets)
-    usage = _usage(body, secrets)
     message = choice.get("message")
     if not isinstance(message, dict):
         raise ProviderUnavailable(PROVIDER, "response has no message", secrets)
     if message.get("refusal") or choice.get("finish_reason") == "content_filter":
         raise Refusal(PROVIDER)
+    usage = _usage(body, secrets)
     if usage.input_tokens >= context_tokens:
         raise ContextTruncated(usage.input_tokens, context_tokens, detected_after_call=True)
     content = message.get("content")
@@ -146,6 +147,8 @@ class OpenAICompatibleProvider:
     def _remote_key(self, settings: ProviderSettings, environ: Mapping[str, str] | None) -> str:
         if not settings.allow_remote:
             raise ConfigError(f"{PROVIDER} sends data to a remote host; set allow_remote = true")
+        if urlsplit(self._base_url).scheme != "https":
+            raise ConfigError(f"{PROVIDER} sends an API key, so a remote base_url must be https")
         key = resolve_api_key(settings, environ)
         if key is None:
             raise ConfigError(f"{PROVIDER} needs api_key_env for a remote host")
@@ -221,14 +224,16 @@ class OpenAICompatibleProvider:
         secrets = [self._key] if self._key else []
         observed_usage: Usage | None = None
         try:
-            body = self._post(self.build_request(system, data_block, schema, max_output_tokens))
+            body = self._post(
+                self.build_request(system, data_block, schema, max_output_tokens), input_tokens
+            )
             observed_usage = _observed_usage(body)
             return read_completion(body, schema, context, secrets)
         except ProviderError as error:
             error.mark_attempt(observed_usage)
             raise
 
-    def _post(self, request: dict[str, Any]) -> dict[str, Any]:
+    def _post(self, request: dict[str, Any], input_tokens: int) -> dict[str, Any]:
         secrets = [self._key] if self._key else []
         timeout = httpx.Timeout(
             self._settings.request_timeout_seconds, connect=self._settings.connect_timeout_seconds
@@ -241,7 +246,7 @@ class OpenAICompatibleProvider:
             raise ProviderUnavailable(
                 PROVIDER, f"{type(error).__name__} at {self._base_url}", secrets
             ) from None
-        check_response_status(response, self._settings.context_tokens, secrets)
+        check_response_status(response, input_tokens, self._settings.context_tokens, secrets)
         try:
             body = response.json()
         except ValueError:

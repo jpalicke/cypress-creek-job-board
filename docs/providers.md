@@ -66,7 +66,7 @@ Code is `src/cypress_creek/providers/openai_compatible.py`, registered as provid
 
 - It calls `POST <base_url>/chat/completions` with the system text and the untrusted data block as two separate messages (`system`, then `user`). The fact bank, when a stage shows facts, travels after the data block inside the user message, as the prompt builder lays it out.
 - Output: `response_format` is `json_schema` with `strict: true`. The schema is the pydantic model's, with every property required and unsupported keywords (`minLength`, `maximum`, defaults and the like) removed by `providers/strict_schema.py`. The reply is parsed with the original model, so the removed constraints are still checked.
-- Where it sends data: with no `base_url` the adapter uses `https://api.openai.com/v1`, which needs `allow_remote = true`, an `api_key_env` naming a set variable and both price settings (`input_usd_per_mtok`, `output_usd_per_mtok`, dollars per million tokens). A loopback `base_url` (LM Studio) needs none of these and costs zero. The key goes only in the `Authorization` header and is scrubbed from every error.
+- Where it sends data: with no `base_url` the adapter uses `https://api.openai.com/v1`, which needs `allow_remote = true` (and an https URL, because the key travels in a header), an `api_key_env` naming a set variable and both price settings (`input_usd_per_mtok`, `output_usd_per_mtok`, dollars per million tokens). A loopback `base_url` (LM Studio) needs none of these and costs zero. The key goes only in the `Authorization` header and is scrubbed from every error.
 - `local_only` facts: the adapter reports `local = false` for any host that is not loopback, and `build_prompt` leaves `local_only` facts out of a prompt for a non local backend (validator V6 checks it again on the report). A component test builds a hosted request from a real prompt and shows the fact is absent.
 - Capabilities: `context_tokens` is the setting (default 8192; set it to the window the model is loaded with, or the hosted model's window). `strict_schema` is true for a remote host and false for a loopback one until LM Studio is verified.
 
@@ -74,7 +74,7 @@ Code is `src/cypress_creek/providers/openai_compatible.py`, registered as provid
 | --- | --- |
 | Server unreachable or timed out, or any other HTTP status | `ProviderUnavailable` (the key is scrubbed) |
 | HTTP 429 | `RateLimited` (with `Retry-After` if sent) |
-| HTTP 400 naming a context length problem, or a reported prompt count at or above the window | `ContextTruncated` |
+| HTTP 400 naming a context length problem (carries the estimate, not a server count), or a reported prompt count at or above the window | `ContextTruncated` |
 | Estimate plus output cap over `context_tokens` | `ContextTruncated`, before any request |
 | Output cut off by the cap, or not matching the schema | `SchemaViolation` |
 | A `refusal` field or a `content_filter` finish | `Refusal` |
@@ -219,6 +219,8 @@ print(json.dumps(get_provider(load_settings()).build_request('Reply with a short
 "
 ```
 It prints the request: a `system` message and a `user` message, a strict `json_schema` response format, `max_tokens` 100 and temperature 0. Leave out `CYPRESS_CREEK_BASE_URL` and the adapter refuses with a `ConfigError` saying to set `allow_remote = true`, because the default host is OpenAI.
+
+The adapter's HTTP path (URL, headers, body, status mapping, reply parsing) is tested against a real loopback server in `tests/component/test_openai_http.py`, and `tests/e2e/test_openai_compatible_process.py` runs the factory and a call in a child process against the same kind of server: `uv run pytest tests/component/test_openai_http.py tests/e2e/test_openai_compatible_process.py -q --no-cov`. These prove the plumbing, not what OpenAI or LM Studio do.
 
 The credentialed live tests have their own markers, so `-m live` (and the `live` workflow) never run them:
 
