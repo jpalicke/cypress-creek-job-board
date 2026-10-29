@@ -21,7 +21,7 @@ New here or handing a card to someone else? [handoff.md](handoff.md) is the comp
 - Time goes through the `Clock` protocol in `discovery/rate_limiter.py`. Code that waits or ages data takes a `Clock`, production passes `SystemClock`, and tests pass `ManualClock`, which advances only when told to and records each sleep. That is the one allowed time abstraction. It controls time and is not a mocked collaborator, so do not patch `time.sleep` or add another fake.
 
 ## Tests
-Four tiers exist: unit, component, integration and e2e. Markers `live` (needs a real model backend) and `needs_network` (needs the internet) select tests. The `live` tests need a running Ollama with `qwen3.5:0.8b` (see [providers.md](providers.md#try-it-locally)) and are not in the gated unit and component run. The Anthropic live test also carries `needs_network` and needs `ANTHROPIC_API_KEY` in your shell; run the Ollama ones with `-m "live and not needs_network"` and the Anthropic one with `uv run pytest tests/integration/test_anthropic_live.py -q`. The Anthropic real call has not yet been run with a real key; see [issue #129](https://github.com/jpalicke/cypress-creek-job-board/issues/129). Property tests use Hypothesis, and they run with the rest of the suite.
+Four tiers exist: unit, component, integration and e2e. Markers `live` (needs a real model backend), `live_openai`, `live_lmstudio` and `needs_network` (needs the internet) select tests. The `live` tests need a running Ollama with `qwen3.5:0.8b` (see [providers.md](providers.md#try-it-locally)) and are not in the gated unit and component run (`live.yml` runs them weekly and on demand). The Anthropic live test also carries `needs_network` and needs `ANTHROPIC_API_KEY` in your shell; run the Ollama ones with `-m "live and not needs_network"` and the Anthropic one with `uv run pytest tests/integration/test_anthropic_live.py -q`. The Anthropic real call has not yet been run with a real key; see [issue #129](https://github.com/jpalicke/cypress-creek-job-board/issues/129). The offline e2e and integration tests run in the `e2e` CI job, and the public-internet ones in `network.yml`. **A test that needs a model backend, a credential or a desktop app carries a backend marker (`live`, `live_openai`, `live_lmstudio`), and every CI selector excludes the backend markers it cannot serve.** Property tests use Hypothesis, and they run with the rest of the suite.
 
 The polite fetch layer has a `needs_network` integration test that fetches a real public job board feed through the real transport, then revalidates a stale cache entry and expects a real 304: `uv run pytest tests/integration/test_polite_client_network.py -q`. It needs the internet and fails, never skips, when the network is unreachable. Run it when you touch `discovery/polite_client.py`, `cache.py` or the transport's conditional request handling.
 
@@ -76,6 +76,13 @@ On every commit the hooks run, and CI (`.github/workflows/deterministic.yml`) ru
 - **ABOUTME header check**: every code file starts with the two line header (see below).
 - **mypy --strict**: strict type check over `src`, `tests` and `scripts`.
 - **pytest** over the unit and component tiers with `--cov-fail-under=80`. Only `src/cypress_creek` counts toward coverage.
+
+Two more CI pieces cover the tiers the gated run leaves out:
+
+- **e2e job** (same workflow, every push and pull request): `pytest tests/e2e tests/integration -m "not needs_network and not live and not live_openai and not live_lmstudio"`. These are the offline end to end and integration tests: real child processes, real SQLite files and real loopback servers.
+- **`network.yml`** (weekly and on demand, not a pull request gate): `pytest tests/integration tests/e2e -m "needs_network and not live and not live_openai"`. These talk to public job boards and public HTTPS, so an outage or a changed board must not block a merge. Start it by hand from the Actions tab (`workflow_dispatch`) on the branch whose network tests you changed, and quote the run in the pull request. The `live` tests (a real Ollama) run in `live.yml` the same way.
+
+Every workflow declares `permissions: contents: read` at the top, the minimum a checkout needs. A job that needs more must say why in a comment next to the grant.
 
 Warnings are errors, and a skipped test fails the whole run, so a missing service can never hide as a skip. Tool versions are pinned by `uv.lock`. Run everything by hand with `uv run pre-commit run --all-files`. Never use `--no-verify`.
 
