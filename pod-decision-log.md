@@ -115,3 +115,9 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 - A listing with no `posted_at` passes the age filter.
 - A closed listing that returns becomes `seen`.
 - A skipped job with no id stops closing for that fetch.
+
+## D22. CI does not run e2e or needs_network tests; fix via CI PR
+- 2026-10-29, Worker H found it, manager decided.
+- deterministic.yml runs only tests/unit and tests/component; live.yml runs only `integration -m live`. Nothing runs tests/e2e or needs_network. Choice: Worker H adds an e2e job to deterministic.yml (offline, a fair PR gate) and a separate network.yml (dispatch plus weekly) for needs_network (real third party services, so not a PR gate, to avoid flaky merges).
+- Alternative: run needs_network on every PR. Reverse by moving that job into deterministic.yml.
+- Until merged, green CI is evidence for unit and component only.
