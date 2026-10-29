@@ -31,7 +31,7 @@ def test_the_committed_fixtures_pass_and_the_set_hash_is_printed() -> None:
 
 
 def test_a_bad_span_and_a_bad_fact_exit_nonzero_and_are_named(tmp_path: Path) -> None:
-    source = next(path for path in FIXTURES.iterdir() if path.name.startswith("greenhouse-"))
+    source = FIXTURES / "greenhouse-8701290002"
     copy = tmp_path / source.name
     shutil.copytree(source, copy)
     labels = (copy / "labels.yaml").read_text(encoding="utf-8")
@@ -44,6 +44,7 @@ def test_a_bad_span_and_a_bad_fact_exit_nonzero_and_are_named(tmp_path: Path) ->
 
     assert result.returncode == 1
     assert "F-9999 is not in the sample bank" in result.stderr
+    assert "span is not an exact substring" in result.stderr
     assert "ok " not in result.stdout
 
 

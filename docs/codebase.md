@@ -98,6 +98,8 @@ evals/
   harness/labels.py      Hand label schema, validate_labels, planted_gap_support, require_committed_labels
   harness/fixtures.py    Fixture loading, the meta schema and fixture_set_hash
   harness/check_labels.py  Command line check of every posting fixture
+  harness/metrics.py     The E1 to E4 metric definitions: score_case, pool, repeat_values, aggregate
+  harness/score.py       The scorer CLI: run files and committed labels in, a metrics JSON and a mismatch view out
   fixtures/<ats>-<job id>/  One real posting: posting.txt, meta.yaml, labels.yaml (see evals.md and NOTICE)
   scratch/               Gitignored local JSONL exports
   results/               Published labeled JSONL exports only after E3 labels exist
@@ -106,6 +108,7 @@ tests/
   component/             Real files and local servers, including the no-network eval CLI dry run, response cache, polite client, and the Greenhouse, Lever and Ashby adapters (Lever on US and EU path prefixes, Ashby also answering a weak ETag with a 304)
   integration/           Public DNS and feeds (needs_network), real Ollama eval runs and failure persistence, and live Greenhouse, paged US and EU Lever, and Ashby boards (the probe, a made-up slug and a real weak ETag revalidation)
   e2e/                   Separate-process flows for URL guard, posting fetch, HTML text, blacklist filtering, and eval CLI resume of pending cases
+  eval_support.py        Test-only builders for hand made labels, reports and run files used by the scorer tests
   http_support.py        Test-only real HTTP and UDP DNS servers with a loopback resolver; the HTTP server records methods and can route by query string for paged paths and answer an ETag with a 304
   fixtures/              Recorded or hand written inputs
     extraction/          A posting and a recorded real model output for the accept step
@@ -189,6 +192,7 @@ See [the fetching architecture](architecture.md), [the SSRF rules and limits](th
 - **Safe by default config.** Backends default to loopback only, going remote needs `allow_remote`, and keys come from the environment alone. Config errors never echo a submitted value.
 - **Measured truncation signatures are refused.** The Ollama adapter estimates before the call and checks the reported count after it. It raises `ContextTruncated` when the estimate exceeds the configured context or the count matches a measured truncation signature. Other server behavior may need additional detection.
 - **Spend is capped before it happens.** `BudgetedProvider` checks the worst case (estimate plus output cap) against the run limits before a call and records the server's real usage after it. Real usage above an estimate blocks the next call, so the guard fails closed.
+- **Scoring reads recorded spans.** `ReportRow` carries the requirement's source span and whether the model tried to raise support, so the scorer matches rows to hand labels by offsets and counts attempted raises before the clamp. Both fields default for reports stored earlier; the scorer refuses a row with no span. The scorer needs committed labels and the run's own bank, and calls a metric with no measurement `not_run`, never 0. See [evals.md](evals.md#scoring-a-run).
 - **Attempted failures count.** A provider error identifies whether a request was attempted and carries complete reported usage when known. The budget counts attempted failed requests, including reported tokens and cost. Unknown usage blocks later calls in that invocation; on eval resume, a context-sized input ceiling and the stage output cap are reserved for that attempt before another call. A preflight refusal spends no request. See [providers.md](providers.md#the-budget-guard) and [evals.md](evals.md#run-the-harness).
 - **Posting text never leaves its block.** `build_prompt` puts the posting between boundary lines carrying a random 128 bit token, keeps it out of the system message and shows extraction no facts. It is the first layer only, the validators are the control.
 - **The model proposes, code decides.** The extraction model gives text, kind and term. Spans, ids and importance are set by code, and text that is not in the posting is dropped with a reason. See `pipeline.md`.
