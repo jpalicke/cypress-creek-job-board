@@ -226,3 +226,7 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 
 ## D40. Work assignments after the first wave
 - 2026-10-29, manager. Worker C: E5 (#27) stacked on E4. Worker G: #133 (#128), then #131 (ADR 0033). Worker H: H7 (#46) stacked on H6 (ADR 0034). Worker E: G1 then G2 (ADR 0030), then peer review. Still blocked: E6 chain beyond E5, E8 (needs Ollama/keys), F4 (needs E6), G3 to G5 (need G2, E8).
+
+## D41. G1 will merge before Joe P's second human review
+- 2026-10-29, manager.
+- The G1 card asks for a second human review of the Host and CSRF logic. The senior engineer approved (engineering review), Worker G ran adversarial probes against a real server, and the code is a loopback-only local server on a branch nobody deploys. Waiting for Joe P would stall G2 to G5. Choice: merge #125 after #124, and flag the review as owed. Files and functions to review are listed in the PR comment from the senior engineer (security.py, app.py, session.py, server.py, errors.py). Reverse: revert the merge, or order changes after review.
