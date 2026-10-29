@@ -7,7 +7,8 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [codebase.md](codebase.md) | Start here if you are new: layout, how the pieces fit, ideas to know, how a card goes |
 | [data-model.md](data-model.md) | The fact bank, Posting and Requirement, and the tag alias table (`config/aliases.yaml`) the company name key (`company_key`), the SQLite storage and migrations, and the discovery tables (watchlist, denied companies, blacklist and its filter) |
 | [pipeline.md](pipeline.md) | HTML posting text extraction, posting normalization, the prompt builder (extraction and entailment prompts), accepting extraction output, stage 1 extraction, stage 2 retrieval, stage 3 entailment, stages 4 and 5 score and report, running the pipeline with an optional trace and a derived run id, the support gate, the score |
-| [evals.md](evals.md) | Eval CLI dry runs and real Ollama smoke runs, whole-run budgets, typed records and traces, SQLite resume, scratch JSONL audit exports, fictional sample fact bank and planted gaps |
+| [evals.md](evals.md) | Eval CLI dry runs and real Ollama smoke runs, whole-run budgets, typed records and traces, SQLite resume, scratch JSONL audit exports, fictional sample fact bank and planted gaps, real posting fixtures with hand labels and the label check |
+| [e3-label-decisions.md](e3-label-decisions.md) | Why each hand label is what it is, the judgment calls for Joe P to review, and the closed postings and their replacements |
 | [validators.md](validators.md) | The grounding validators V1 to V14: what each rejects and its known limits |
 | [providers.md](providers.md) | The provider interface, typed errors, retry policy, backend config, the loopback rule, the Ollama and Anthropic adapters and the budget guard |
 | [setup.md](setup.md) | Fetch one public posting link, inspect raw bytes and provenance, and understand network behavior and typed failures. Also fetch a job board politely, fetch a Greenhouse, a Lever or an Ashby board, the fetch cache location, the three fetch environment variables and how to clear the cache |
@@ -46,6 +47,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [0021](adr/0021-per-job-skipping.md) | Per job skipping: a malformed job is skipped and reported in `BoardFetch.skipped`, and a board that skips more than 10 percent of its jobs still fails whole |
 | [0022](adr/0022-lever-pagination-and-region.md) | Lever paging and region: pages end on a short page, a board still full at 50 pages fails whole instead of truncating, a repeated posting keeps its first copy, the host is found by asking US then EU and remembered in memory only, and the feed has no company name |
 | [0023](adr/0023-ashby-unlisted-jobs-probe-shape-and-weak-etag.md) | Ashby: an unlisted job is dropped and counted in `BoardFetch.unlisted` instead of skipped, the skip budget covers listed jobs only, `probe` checks the shape of the board and not each job, and the weak ETag is sent back unchanged and answered with a 304 |
+| [0024](adr/0024-hand-labels-are-written-before-runs-and-carry-provenance.md) | Hand labels are written before any run from the posting and bank alone, carry provenance and a pending review, follow the human reading of importance, and are validated against the posting, the bank and the planted gaps |
 | [0025](adr/0025-anthropic-native-structured-output.md) | Anthropic adapter: native structured output instead of forced tool use, schema rewrite, error mapping, hosted rules and price defaults |
 
 ## Configuration

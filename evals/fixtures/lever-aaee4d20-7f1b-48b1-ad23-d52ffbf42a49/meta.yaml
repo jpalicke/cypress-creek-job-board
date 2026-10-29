@@ -1,0 +1,14 @@
+fixture_id: lever-aaee4d20-7f1b-48b1-ad23-d52ffbf42a49
+ats: lever
+publisher: Palantir Technologies Inc.
+job_id: aaee4d20-7f1b-48b1-ad23-d52ffbf42a49
+title: Backend Software Engineer - Infrastructure, Foundations
+url: https://jobs.lever.co/palantir/aaee4d20-7f1b-48b1-ad23-d52ffbf42a49
+api_url: https://api.lever.co/v0/postings/palantir?mode=json
+retrieved: '2026-10-29'
+normalized_sha256: 48e80bc0943d995d7c939a28a5e73b867e49d6b320d6812bb3ca014fa0615d51  # pragma: allowlist secret
+replaces:
+  job_id: ac978161-6f46-4f6b-ad9e-a258e642751c
+  reason: Job ac978161-6f46-4f6b-ad9e-a258e642751c returned HTTP 404 from the Lever postings endpoint
+    on 2026-10-29, so it is closed or removed. This open role from the same board stands in for it. Chosen
+    because its infrastructure and data systems requirements differ from the other Lever fixture.

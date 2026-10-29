@@ -6,7 +6,7 @@ from typing import Any, Literal
 import pytest
 from pydantic import BaseModel, Field
 
-from cypress_creek.config import ConfigError, parse_settings
+from cypress_creek.config import ConfigError, load_settings, parse_settings
 from cypress_creek.pipeline.schemas import EntailmentOutput, ExtractionOutput
 from cypress_creek.providers import (
     ContextTruncated,
@@ -324,3 +324,18 @@ def test_an_oversized_prompt_is_refused_before_any_request() -> None:
 def test_the_defaults_are_the_documented_ones() -> None:
     assert DEFAULT_BASE_URL == "https://api.anthropic.com"
     assert API_VERSION == "2023-06-01"
+
+
+def test_a_context_set_to_the_settings_default_by_the_environment_is_honored() -> None:
+    environ = {
+        "CYPRESS_CREEK_PROVIDER": "anthropic",
+        "CYPRESS_CREEK_MODEL": "claude-sonnet-5-5",
+        "CYPRESS_CREEK_ALLOW_REMOTE": "true",
+        "CYPRESS_CREEK_API_KEY_ENV": "ANTHROPIC_API_KEY",  # pragma: allowlist secret
+        "CYPRESS_CREEK_CONTEXT_TOKENS": "8192",
+    }
+    explicit = AnthropicProvider(load_settings(environ=environ), environ=ENV)
+    assert explicit.capabilities.context_tokens == 8192
+    del environ["CYPRESS_CREEK_CONTEXT_TOKENS"]
+    unset = AnthropicProvider(load_settings(environ=environ), environ=ENV)
+    assert unset.capabilities.context_tokens == DEFAULT_CONTEXT_TOKENS

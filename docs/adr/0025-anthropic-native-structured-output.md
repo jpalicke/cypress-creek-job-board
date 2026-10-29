@@ -1,6 +1,6 @@
 # ADR 0025: Anthropic adapter uses native structured output
 
-Status: proposed (C5, pending PR review)
+Status: accepted (card C5)
 
 ## Decision
 
@@ -19,9 +19,13 @@ Native structured output constrains the answer to the schema without a tool roun
 
 ## Limits
 
+- **The real structured call has not yet been accepted by the live API.** As of this card, only the wrong-key path has run against it (a real 401, which proves the endpoint, the version header and the auth path). Joe P runs `uv run pytest tests/integration/test_anthropic_live.py -q` once with a real key to close this, tracked in [issue #129](https://github.com/jpalicke/cypress-creek-job-board/issues/129).
+- Refusal fallbacks to another model are not used, on purpose: an eval needs the model identity to stay fixed.
+- The `anthropic-version` header is `2023-06-01`. The body sends no sampling fields, so moving to a newer API version later is a header change, to be done deliberately.
+- 529 (overloaded) maps to `RateLimited` and uses the retry layer's default backoff when no `retry-after` is sent.
 - Thinking is left at the model default (adaptive). Thinking tokens count against `max_tokens`, so a small output cap can end with `max_tokens` and a `SchemaViolation`. Raise the cap rather than disabling thinking, because the accepted `thinking` values differ by model.
 - The token estimate is characters divided by two. It runs high for prose and is only used for the pre-flight check and the budget guard; real usage is recorded after each call.
-- The live test needs a real key and spends a few cents. It fails, never skips, without one. The component tests exercise the same code over real HTTP against a local server that plays hand written responses in the documented shape; they prove our handling, not Anthropic's behavior.
+- The live test needs a real key and spends a fraction of a cent. It fails, never skips, without one. The component tests exercise the same code over real HTTP against a local server that plays hand written responses in the documented shape; they prove our handling, not Anthropic's behavior.
 - Prompt caching, batching and streaming are out of scope.
 
 See [providers.md](../providers.md#the-anthropic-adapter).

@@ -327,8 +327,12 @@ def test_assess_passes_trace_through_entailment_and_report(bank: Bank) -> None:
 
     assert report.status is ReportStatus.INCOMPLETE
     assert [call.stage for call in trace.calls] == ["entail"]
-    assert [item.verdict.validator for item in trace.validators] == ["V4", "V5", "V9"]
-    assert all(item.stage == "report" for item in trace.validators)
+    assert [item.verdict.validator for item in trace.validators] == ["V13", "V4", "V5", "V9"]
+    assert trace.validators[0].stage == "extract"
+    assert trace.validators[0].subject == POSTING.id
+    assert trace.validators[0].verdict.passed is False
+    assert trace.validators[0].verdict.offending == "You must have 3 years of Python experience."
+    assert all(item.stage == "report" for item in trace.validators[1:])
 
 
 def test_trace_cost_and_call_record_require_observed_usage() -> None:

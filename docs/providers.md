@@ -64,6 +64,8 @@ ollama pull qwen3.5:4b
 ## The Anthropic adapter
 Code is `src/cypress_creek/providers/anthropic.py`, registered as provider `anthropic`. It calls the Messages API (`POST /v1/messages`) with native structured output and defaults to the model `claude-sonnet-5-5`. Decisions are in [ADR 0025](adr/0025-anthropic-native-structured-output.md).
 
+**Not yet proven against the live API.** As of this card, the real structured call has not yet been accepted by the live API; only the wrong-key path has run against it. Joe P runs `uv run pytest tests/integration/test_anthropic_live.py -q` once with a real key to close this, see [issue #129](https://github.com/jpalicke/cypress-creek-job-board/issues/129) for the command and what to record.
+
 - **Hosted rules.** It needs `allow_remote = true`, an `api_key_env` naming the variable that holds the key (never the key itself), and an https URL for any remote `base_url`. The key is sent only in the `x-api-key` header, redirects are not followed, and every error scrubs it. Facts marked `local_only` are left out of the prompt for any backend whose `local` capability is false, so they never reach the request body.
 - **Request.** The trusted system text is the top level `system` field. The untrusted data block (the posting inside its boundary, then any trusted facts) is the single user message. The schema goes in `output_config.format` after the adapter closes every object and drops the keywords the grammar rejects (the pydantic model still validates the answer). No tools are offered.
 - **Answer.** Only `text` blocks are read. `refusal` is the typed `Refusal`. An answer cut off at `max_tokens` or not matching the schema is a `SchemaViolation` (retried once with only the error text). Usage is read from the response, including cache token fields, and a response without complete counts is an error.
@@ -89,7 +91,7 @@ api_key_env = "ANTHROPIC_API_KEY"   # pragma: allowlist secret
 # input_usd_per_mtok = 2.0          # defaults exist for claude-sonnet-5-5 (2 and 10),
 # output_usd_per_mtok = 10.0        # claude-opus-5-5 (4 and 20) and claude-fable-5-1 (10 and 50)
 ```
-Another model needs both prices set, or the adapter refuses to start. Thinking is left at the model default and its tokens count against the output cap, so give structured calls a generous `max_output_tokens`.
+Another model needs both prices set, or the adapter refuses to start. Only hosted adapters read `input_usd_per_mtok` and `output_usd_per_mtok`; the Ollama adapter ignores them and costs nothing. Thinking is left at the model default and its tokens count against the output cap, so give structured calls a generous `max_output_tokens`.
 
 Run it once against the real API (costs a fraction of a cent):
 ```bash
@@ -184,7 +186,7 @@ It prints a greeting and the token usage. Change `'Say hi'` to `'word ' * 6000` 
 ```bash
 uv run pytest tests/integration -m "live and not needs_network" -q
 ```
-The `live` GitHub Actions workflow (`.github/workflows/live.yml`) does this on a schedule and on demand with a fresh Ollama and `qwen3.5:0.8b`. It selects `live and not needs_network`, so the Anthropic live test, which needs a key and spends money, never runs there.
+The `live` GitHub Actions workflow (`.github/workflows/live.yml`) does this on a schedule and on demand with a fresh Ollama and `qwen3.5:0.8b`. It selects `live and not needs_network`, so the Anthropic live test, which needs a key and spends money, never runs there. Credentialed or desktop-only live tests that are not `needs_network` must use their own marker (as the OpenAI and LM Studio tests do) so this selector stays correct.
 
 Print the projected cost of a plan (three small calls) with the budget from the same settings. No call is made, so no server needs to be running:
 ```bash

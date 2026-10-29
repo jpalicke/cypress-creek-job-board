@@ -6,7 +6,7 @@ Status: accepted (Joe P, card D5)
 - `build_report` computes the score itself from the final matches, so a score that disagrees with the rows cannot be passed in.
 - A failed extraction gives an incomplete report with no rows, no score and the reason.
 - A requirement whose entailment call failed keeps its rule ceiling in the score. Its row is flagged `not_model_checked`, it cites the candidate facts its ceiling rests on, and the whole report is `incomplete` with a reason naming those requirements. The score is not presented as a full run.
-- Hitting the requirement cap does not make a report incomplete. It is shown as `not_assessed_count`. Cue coverage (V13) is a later card.
+- Hitting the requirement cap does not make a report incomplete. It is shown as `not_assessed_count`. Uncovered cue sentences are listed separately in `not_assessed`, without changing score arithmetic or report status.
 - No requirements gives a complete report with no score, never 100.
 - `build_report` ends with `verify_report`: V4 and V5 over every cited id, and V9 over every row whose support is not none. A failure raises `ReportRefused` and no report is returned.
 - The report is data first. The text view flattens posting and model text to one line, and HTML escaping belongs to the future UI.

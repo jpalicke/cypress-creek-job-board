@@ -210,10 +210,9 @@ class AnthropicProvider:
         self._base_url = (settings.base_url or DEFAULT_BASE_URL).rstrip("/")
         if not self._base_url.startswith("https://") and not _is_loopback_url(self._base_url):
             raise ConfigError("the anthropic provider needs an https base_url for a remote host")
-        if settings.api_key_env is None:
-            raise ConfigError("the anthropic provider needs api_key_env naming the key variable")
         key = resolve_api_key(settings, environ)
-        assert key is not None
+        if key is None:
+            raise ConfigError("the anthropic provider needs api_key_env naming the key variable")
         self._key = key
         self._cost = self._resolve_cost(settings)
         self._context = (

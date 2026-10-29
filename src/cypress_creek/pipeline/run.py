@@ -17,6 +17,7 @@ from cypress_creek.providers.base import Provider, Usage
 from cypress_creek.providers.retry import RetryPolicy
 from cypress_creek.scoring.aliases import AliasTable, load_aliases
 from cypress_creek.scoring.score import Weights
+from cypress_creek.validators.requirements import check_cue_coverage
 
 RUN_ID_HEX_CHARS = 16
 
@@ -52,6 +53,10 @@ def assess(
     candidates = []
     entailed = []
     if extraction.status is ExtractionStatus.OK:
+        if trace is not None:
+            trace.record_validator(
+                "extract", posting.id, check_cue_coverage(posting.text, extraction.requirements)
+            )
         candidates = retrieve(
             extraction.requirements,
             bank,
