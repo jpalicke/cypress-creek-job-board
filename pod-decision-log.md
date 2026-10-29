@@ -164,3 +164,16 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 ## D29. Caught before merge: D7 draft validators whitelisted posting text (PR #126)
 - 2026-10-29, senior engineer found, Worker G fixing.
 - The first D7 version passed requirement.text to V7, V8 and V10, so numbers, employers and skills from the posting counted as allowed. Repro: "Led 10 engineers using Python and Kubernetes at Google for 10 years [F-0001]" rendered as a clean sentence although the fact says 8 engineers, a different employer and no Kubernetes. This breaches the one rule. Fix: the allow-list is the cited facts only, tests first. Nothing merged. Consider a Joe P review of the final D7 validator wiring, since it is the heart of the product.
+
+## D30. G2 design choices (branch G2-posting-analyze-routes, PR opens after #125 merges; Worker E)
+- 2026-10-29, Worker E. Reversal notes in the PR and ADR 0027 (provisional number).
+- Migration 0005 (posting and report tables) matches main today; #120 also adds 0005_watchlist_region.sql. db.py refuses gaps, so whichever merges second renumbers.
+- PDF input (raw application/pdf body or a link returning a PDF) is size-capped and `%PDF-` checked, then answers a typed 501 `pdf_extraction_unavailable` because the F4 extractor is not built. Reverse when F4 lands: call it.
+- Request bodies are limited by declared Content-Length in a middleware (1 MiB, 10 MiB for PDF); chunked bodies get 411.
+- The budget is per analysis request from the provider settings; nothing is saved across requests (a run-wide ledger would need a table). The estimate route covers the extraction call only.
+- Stored and returned verdicts omit the `offending` text since it can hold posting or model text.
+- Database created and migrated on first use; to also be done at server startup (test first). Bank file read on every request.
+- POST /api/facts/validate always answers 200 with `valid` and a short `problem`, never echoing the YAML.
+- No GET /api/postings/{id} yet, because no card needs it.
+- A down backend gives a 200 with an incomplete report, stored and returned.
+- Unverified here: the needs_network link test returns 502 in this sandbox (no public DNS through the guard); the live test needs Ollama.
