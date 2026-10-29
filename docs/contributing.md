@@ -33,6 +33,8 @@ The Ashby adapter has its own `needs_network` integration test: it fetches a rea
 
 The integration and e2e tiers are not in the gated run, so run them by hand when you touch what they cover. For the blacklist: `uv run pytest tests/e2e/test_blacklist_process.py tests/integration/test_blacklist_dns.py -q`. The e2e file starts real child Python processes against a real temp SQLite file. The integration file is marked `needs_network` and resolves a real host, so an unreachable network makes it fail, never skip.
 
+Cue coverage in the report has an e2e test (a child Python process renders the text report for a posting with an omitted cue sentence) and a `live` integration test (a real Ollama extraction of the sample posting, checked against V13, the trace and the rendered count): `uv run pytest tests/e2e/test_cue_coverage_process.py tests/integration/test_cue_coverage_live.py -q`. The live test fails, never skips, when Ollama or the model is missing.
+
 ## Documentation checklist
 Before a PR is ready, in the same PR:
 - The doc the card owns is updated, and any copy and paste command in it was run.

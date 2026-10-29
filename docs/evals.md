@@ -52,6 +52,9 @@ Scratch exports belong under `evals/scratch/`, which Git ignores. Only published
 hand labels belong under `evals/results/`, named with date, backend and model. E3 supplies
 those labels, so an E2b2 scratch file is not benchmark evidence.
 
+For E2's omission rate, read `report.not_assessed` (cue sentences extraction skipped, with offsets)
+and the V13 verdict that the pipeline trace records at stage `extract`.
+
 ## Run the harness
 
 Start Ollama and pull `qwen3.5:0.8b` as described in the [provider guide](providers.md#try-it-locally).
