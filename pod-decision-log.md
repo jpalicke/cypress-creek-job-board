@@ -94,3 +94,12 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 
 ## D17. E4 moved to Worker C
 - 2026-10-29, manager. Worker C idle; E4 (#26) stacked on the #122 branch. Worker E keeps G1/G2.
+
+## D18. D7 draft help choices (Worker G, PR pending #116 merge)
+- 2026-10-29, Worker G.
+- Sentences that fail validators are shown with a visible "! NOT VERIFIED (rule: ...)" warning, never in clean_sentences (the only copyable output). Alternative: drop them. Reverse: filter in render_draft.
+- V4 is checked against the facts supplied to the model, not the whole bank. Reverse: pass the full bank to check_fact_exists.
+- ADR number provisional (0026) until the reviewer states the next free number at approval.
+
+## D19. Peer review role for idle workers
+- 2026-10-29, manager. To relieve the single senior reviewer, idle workers pre-review other workers' PRs and post `PEER REVIEW (not an approval)` comments. The senior engineer's verdict remains the only go-ahead.
