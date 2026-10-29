@@ -6,10 +6,15 @@ readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.13"
 dependencies = [
+    "fastapi>=0.162.0",
     "httpx>=0.28.1",
     "pydantic>=2.13.5",
     "pyyaml>=6.0.3",
+    "uvicorn>=0.54.0",
 ]
+
+[project.scripts]
+cypress-creek-api = "cypress_creek.api.server:main"
 
 [build-system]
 requires = ["hatchling"]

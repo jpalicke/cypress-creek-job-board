@@ -68,6 +68,12 @@ src/cypress_creek/       The library
     budget.py            Budget, BudgetTracker, BudgetedProvider, dry_run_estimate, budget_from_settings
   config/                Backend settings (not the repo level config/ data folder)
     settings.py          ProviderSettings, load_settings, resolve_api_key, ConfigError
+  api/                   The local FastAPI app (see api.md)
+    app.py               create_app: wires the Host check, the CSRF dependency, typed errors and routes
+    security.py          allowed_hosts, HostCheckMiddleware, require_csrf, new_token, API_PORT
+    errors.py            ErrorCode, ApiError, ErrorResponse and the handlers for the one error shape
+    server.py            main, check_bind_host: the uvicorn entry point (`cypress-creek-api`)
+    routes/              health.py, providers.py, session.py (one router each)
   storage/               Mutable state: the company name key and the SQLite database
     company_key.py       company_key, load_confusables: the one company name normalizer
     db.py                data_dir, connect, migrate, schema_version, MigrationError
@@ -102,6 +108,7 @@ tests/
   component/             Real files and local servers, including the no-network eval CLI dry run, response cache, polite client, and the Greenhouse, Lever and Ashby adapters (Lever on US and EU path prefixes, Ashby also answering a weak ETag with a 304)
   integration/           Public DNS and feeds (needs_network), real Ollama eval runs and failure persistence, and live Greenhouse, paged US and EU Lever, and Ashby boards (the probe, a made-up slug and a real weak ETag revalidation)
   e2e/                   Separate-process flows for URL guard, posting fetch, HTML text, blacklist filtering, and eval CLI resume of pending cases
+  api_support.py         A synchronous client that drives the real FastAPI app in process over httpx's ASGI transport
   http_support.py        Test-only real HTTP and UDP DNS servers with a loopback resolver; the HTTP server records methods and can route by query string for paged paths and answer an ETag with a 304
   fixtures/              Recorded or hand written inputs
     extraction/          A posting and a recorded real model output for the accept step
@@ -194,6 +201,7 @@ See [the fetching architecture](architecture.md), [the SSRF rules and limits](th
 - **The pipeline trace records what ran.** Pass a `PipelineTrace` to `analyze` or `assess` for per-attempt provider records and the actual validator verdicts. Extraction, entailment and report assembly append to the same trace. Missing usage is nullable, never guessed in the audit. The eval CLI persists completed case traces and failed terminal attempts through `EvalStore`; see [evals.md](evals.md#run-the-harness).
 - **A report cites or is refused.** `build_report` ends with `verify_report` (V4, V5, V9), so a fabricated or unverified fact id never reaches a report. Failed stages make the report incomplete rather than quietly partial. See `pipeline.md`.
 - **Retrieval is not a model.** `retrieve` matches tags and aliases, ranks and caps the candidates, and sets the support ceiling. A requirement with no candidate is a gap and costs no model call. See `pipeline.md`.
+- **Every API route inherits the security rules from the app, not from itself.** The CSRF check is an app-wide dependency and the Host check is the outermost middleware, so a new route cannot skip them. The route table test fails if any path or operation name suggests submitting, sending or posting outward. See [api.md](api.md) and [ADR 0026](adr/0026-api-security-layer.md).
 - **The sample bank and its gap table cannot drift.** `PLANTED_GAPS.md` is parsed by a test that runs each row through `retrieve`, so a bank edit that changes a gap fails the build. See `evals.md`.
 - **A denial is permanent until a human removes it.** A denied company is a tombstone matched by `company_key` and by normalized board, and `Watchlist.add` refuses it. Only `Tombstones.remove` lifts one. See [ADR 0017](adr/0017-tombstones-are-removed-only-by-a-human-call.md).
 - **The blacklist filter is pure and runs first.** `is_blacklisted(candidate, entries)` takes everything as arguments, touches no database and no network, and returns the `BlockReason` (company key, slug or domain) or `None`. It is meant to run on a discovered company before any fetch. Entries are normalized when created, and `Blacklist` only stores them. See [data-model.md](data-model.md#discovery-the-blacklist).
