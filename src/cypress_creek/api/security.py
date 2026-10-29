@@ -57,15 +57,15 @@ class CsrfMiddleware:
     """Every request that is not known to be safe needs the session token, exactly once.
 
     This is middleware and not a route dependency, so it covers mounted sub-apps, unknown paths
-    and methods nobody registered. Only GET, HEAD and OPTIONS skip it. The comparison is in
-    constant time. It runs after the Host check."""
+    and methods nobody registered. Only the exact upper case GET, HEAD and OPTIONS skip it.
+    The comparison is in constant time. It runs after the Host check."""
 
     def __init__(self, app: ASGIApp, token: str) -> None:
         self._app = app
         self._expected = token.encode("utf-8")
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        if scope["type"] != "http" or scope["method"].upper() in SAFE_METHODS:
+        if scope["type"] != "http" or scope["method"] in SAFE_METHODS:
             await self._app(scope, receive, send)
             return
         sent = [value for name, value in scope["headers"] if name == TOKEN_HEADER_BYTES]
