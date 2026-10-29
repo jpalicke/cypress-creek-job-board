@@ -1,6 +1,6 @@
 # Providers
 
-The provider layer is how the pipeline talks to a model. Every backend (local or hosted) implements one interface, so the pipeline and the eval harness never know which one they use. Code is `src/cypress_creek/providers/`. This page covers the interface, the typed errors, the retry policy, the config that selects a backend and the Ollama adapter. The other adapters arrive in later cards (see the issue board).
+The provider layer is how the pipeline talks to a model. Every backend (local or hosted) implements one interface, so the pipeline and the eval harness never know which one they use. Code is `src/cypress_creek/providers/`. This page covers the interface, the typed errors, the retry policy, the config that selects a backend and the Ollama adapter. The `openai_compatible` adapter is described below. The other adapters arrive in later cards (see the issue board).
 
 ## The interface
 `Provider` is a `typing.Protocol` in `providers/base.py`:
@@ -61,6 +61,53 @@ Local setup: install [Ollama](https://ollama.com), then pull a model. Approved f
 ollama pull qwen3.5:4b
 ```
 
+## The openai_compatible adapter (OpenAI and LM Studio)
+Code is `src/cypress_creek/providers/openai_compatible.py`, registered as provider `openai_compatible`. One adapter serves OpenAI and LM Studio, chosen by `base_url`. Decisions, the model pick and what is still unverified are in [ADR 0026](adr/0026-openai-compatible-adapter-and-model-pick.md).
+
+- It calls `POST <base_url>/chat/completions` with the system text and the untrusted data block as two separate messages (`system`, then `user`). The fact bank, when a stage shows facts, travels after the data block inside the user message, as the prompt builder lays it out.
+- Output: `response_format` is `json_schema` with `strict: true`. The schema is the pydantic model's, with every property required and unsupported keywords (`minLength`, `maximum`, defaults and the like) removed by `providers/strict_schema.py`. The reply is parsed with the original model, so the removed constraints are still checked.
+- Where it sends data: with no `base_url` the adapter uses `https://api.openai.com/v1`, which needs `allow_remote = true`, an `api_key_env` naming a set variable and both price settings (`input_usd_per_mtok`, `output_usd_per_mtok`, dollars per million tokens). A loopback `base_url` (LM Studio) needs none of these and costs zero. The key goes only in the `Authorization` header and is scrubbed from every error.
+- `local_only` facts: the adapter reports `local = false` for any host that is not loopback, and `build_prompt` leaves `local_only` facts out of a prompt for a non local backend (validator V6 checks it again on the report). A component test builds a hosted request from a real prompt and shows the fact is absent.
+- Capabilities: `context_tokens` is the setting (default 8192; set it to the window the model is loaded with, or the hosted model's window). `strict_schema` is true for a remote host and false for a loopback one until LM Studio is verified.
+
+| Situation | Error |
+| --- | --- |
+| Server unreachable or timed out, or any other HTTP status | `ProviderUnavailable` (the key is scrubbed) |
+| HTTP 429 | `RateLimited` (with `Retry-After` if sent) |
+| HTTP 400 naming a context length problem, or a reported prompt count at or above the window | `ContextTruncated` |
+| Estimate plus output cap over `context_tokens` | `ContextTruncated`, before any request |
+| Output cut off by the cap, or not matching the schema | `SchemaViolation` |
+| A `refusal` field or a `content_filter` finish | `Refusal` |
+| Reply with no choices, no content or unusable usage counts | `ProviderUnavailable` |
+
+Config for OpenAI (the model and prices are settings; confirm them against the models page first, see the ADR):
+```toml
+provider = "openai_compatible"
+model = "gpt-6-luna"
+allow_remote = true
+api_key_env = "OPENAI_API_KEY"   # the NAME of the variable  # pragma: allowlist secret
+context_tokens = 32768
+input_usd_per_mtok = 0.10
+output_usd_per_mtok = 0.50
+```
+Config for LM Studio (start its local server and load a model first; the port is LM Studio's default):
+```toml
+provider = "openai_compatible"
+model = "<the identifier LM Studio shows for the loaded model>"
+base_url = "http://localhost:1234/v1"
+context_tokens = 4096            # the context length the model was loaded with
+```
+
+### LM Studio findings (UNVERIFIED)
+Nobody has run this adapter against a real LM Studio yet. Do not read anything below as a measurement. Joe P: run the commands in "Try it locally" and fill in this table, then change this heading.
+
+| Question | Finding |
+| --- | --- |
+| LM Studio version and model tested | not yet tested |
+| Is the loaded context length exposed by the model listing, or must config supply it? | not yet tested (the adapter reads `context_tokens` from config) |
+| Is `response_format` `json_schema` honored for the model? | not yet tested (`strict_schema` is reported false) |
+| How is a prompt over the loaded context reported? | not yet tested (the adapter checks the reported prompt count and 400 bodies naming a context length) |
+
 ## The budget guard
 Code is `src/cypress_creek/providers/budget.py`. A run has four limits, and a call that could pass any of them is refused before it is sent.
 
@@ -92,6 +139,8 @@ base_url = "http://localhost:11434"
 # max_output_tokens = 100000
 # max_requests = 500
 # max_usd = 2.0
+# input_usd_per_mtok = 0.10        # dollars per million tokens, required for a remote host
+# output_usd_per_mtok = 0.50
 ```
 - `provider` and `model` are required. The other fields are optional.
 - Any field can be overridden by `CYPRESS_CREEK_<FIELD>`, for example `CYPRESS_CREEK_MODEL=qwen3`. Blank values are ignored.
@@ -99,7 +148,7 @@ base_url = "http://localhost:11434"
 - Keys: the file holds `api_key_env`, and `resolve_api_key(settings)` reads that variable when an adapter needs it. A missing variable is an error that names the variable, never a value.
 - Every failure is a `ConfigError`. Messages carry field names and rules only, so a key pasted into a URL is not echoed back.
 
-`get_provider(settings)` (in `providers/factory.py`) finds the adapter registered under `settings.provider`. An unknown name raises `UnknownProvider`, a `ConfigError` listing the known names. `ollama` is the only adapter registered so far.
+`get_provider(settings)` (in `providers/factory.py`) finds the adapter registered under `settings.provider`. An unknown name raises `UnknownProvider`, a `ConfigError` listing the known names. `ollama` and `openai_compatible` are registered.
 
 Known limits: the loopback check reads the URL text, so a name that resolves elsewhere or a redirect is not caught (adapters must not follow redirects off the configured host). A backend with a built in remote default URL must demand `allow_remote` itself, because an empty `base_url` passes.
 
@@ -154,3 +203,34 @@ print(dry_run_estimate(get_provider(settings), budget_from_settings(settings), [
 "
 ```
 It prints `input_tokens=159 output_tokens=300 requests=3 usd=0.0`. Set `CYPRESS_CREEK_MAX_REQUESTS=2` in front of it and it fails with `BudgetExceeded: requests limit 2 would be exceeded, reaching 3`.
+
+Build an `openai_compatible` request without sending it (no server or key needed, because a loopback `base_url` is local):
+```bash
+CYPRESS_CREEK_PROVIDER=openai_compatible CYPRESS_CREEK_MODEL=local-model CYPRESS_CREEK_BASE_URL=http://localhost:1234/v1 uv run python -c "
+import json
+from pydantic import BaseModel
+from cypress_creek.config import load_settings
+from cypress_creek.providers import get_provider
+
+class Greeting(BaseModel):
+    text: str
+
+print(json.dumps(get_provider(load_settings()).build_request('Reply with a short greeting.', 'Say hi', Greeting, 100), indent=2))
+"
+```
+It prints the request: a `system` message and a `user` message, a strict `json_schema` response format, `max_tokens` 100 and temperature 0. Leave out `CYPRESS_CREEK_BASE_URL` and the adapter refuses with a `ConfigError` saying to set `allow_remote = true`, because the default host is OpenAI.
+
+The credentialed live tests have their own markers, so `-m live` (and the `live` workflow) never run them:
+
+| Marker | Test file | How to run |
+| --- | --- | --- |
+| `live_lmstudio` | `tests/integration/test_openai_compatible_lmstudio.py` | By hand only. LM Studio is a desktop app, so CI cannot run it. |
+| `live_openai` (and `needs_network`) | `tests/integration/test_openai_live.py` | By hand with `OPENAI_API_KEY` set, or the manual `openai-live` workflow with a repository secret of that name. |
+
+```bash
+# LM Studio: start its local server, load a model, then
+CYPRESS_CREEK_LMSTUDIO_MODEL="<loaded model identifier>" CYPRESS_CREEK_LMSTUDIO_CONTEXT=4096 uv run pytest tests/integration -m live_lmstudio -q
+# OpenAI: put the key in the environment or a gitignored .env loaded into your shell
+OPENAI_API_KEY="<your key>" uv run pytest tests/integration -m live_openai -q  # pragma: allowlist secret
+```
+Both fail, never skip, when the server or the key is missing. `CYPRESS_CREEK_LMSTUDIO_BASE_URL` (default `http://localhost:1234/v1`) and `CYPRESS_CREEK_OPENAI_MODEL` (default `gpt-6-luna`) override the targets. After the LM Studio run, fill in the findings table above.

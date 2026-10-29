@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from cypress_creek.config import ProviderSettings, parse_settings
 from cypress_creek.providers import ContextTruncated, OpenAICompatibleProvider
 
-pytestmark = pytest.mark.live
+pytestmark = pytest.mark.live_lmstudio
 
 BASE_URL = os.environ.get("CYPRESS_CREEK_LMSTUDIO_BASE_URL", "http://localhost:1234/v1")
 MODEL = os.environ.get("CYPRESS_CREEK_LMSTUDIO_MODEL", "")

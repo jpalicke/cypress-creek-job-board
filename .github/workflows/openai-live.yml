@@ -1,0 +1,22 @@
+name: openai-live
+# Runs the one real OpenAI call. Manual only, because it spends money and needs a repository secret.
+on:
+  workflow_dispatch:
+jobs:
+  openai:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+      - run: uv sync --locked
+      - name: Require the key
+        run: |
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "OPENAI_API_KEY is not set. Add it as a repository secret and run again." >&2
+            exit 1
+          fi
+      - name: OpenAI live test
+        run: uv run --locked pytest tests/integration -m live_openai -q

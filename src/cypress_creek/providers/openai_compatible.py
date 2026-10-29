@@ -154,12 +154,12 @@ class OpenAICompatibleProvider:
     def _cost_per_mtok(self, settings: ProviderSettings) -> CostPerMtok:
         if self._local:
             return CostPerMtok(input=0, output=0)
-        if settings.cost_input_per_mtok is None or settings.cost_output_per_mtok is None:
+        if settings.input_usd_per_mtok is None or settings.output_usd_per_mtok is None:
             raise ConfigError(
-                "a remote host needs cost_input_per_mtok and cost_output_per_mtok, "
+                "a remote host needs input_usd_per_mtok and output_usd_per_mtok, "
                 "so the budget guard can price calls"
             )
-        return CostPerMtok(input=settings.cost_input_per_mtok, output=settings.cost_output_per_mtok)
+        return CostPerMtok(input=settings.input_usd_per_mtok, output=settings.output_usd_per_mtok)
 
     @property
     def endpoint(self) -> str:

@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from cypress_creek.config import parse_settings
 from cypress_creek.providers import OpenAICompatibleProvider
 
-pytestmark = [pytest.mark.live, pytest.mark.needs_network]
+pytestmark = [pytest.mark.live_openai, pytest.mark.needs_network]
 
 KEY_ENV = "OPENAI_API_KEY"
 MODEL = os.environ.get("CYPRESS_CREEK_OPENAI_MODEL", "gpt-6-luna")
@@ -28,8 +28,8 @@ def test_one_real_structured_call_returns_a_conforming_object_and_usage() -> Non
             "allow_remote": True,
             "api_key_env": KEY_ENV,  # pragma: allowlist secret
             "context_tokens": 32768,
-            "cost_input_per_mtok": 0.10,
-            "cost_output_per_mtok": 0.50,
+            "input_usd_per_mtok": 0.10,
+            "output_usd_per_mtok": 0.50,
         }
     )
     provider = OpenAICompatibleProvider(settings)

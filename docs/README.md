@@ -46,6 +46,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [0021](adr/0021-per-job-skipping.md) | Per job skipping: a malformed job is skipped and reported in `BoardFetch.skipped`, and a board that skips more than 10 percent of its jobs still fails whole |
 | [0022](adr/0022-lever-pagination-and-region.md) | Lever paging and region: pages end on a short page, a board still full at 50 pages fails whole instead of truncating, a repeated posting keeps its first copy, the host is found by asking US then EU and remembered in memory only, and the feed has no company name |
 | [0023](adr/0023-ashby-unlisted-jobs-probe-shape-and-weak-etag.md) | Ashby: an unlisted job is dropped and counted in `BoardFetch.unlisted` instead of skipped, the skip budget covers listed jobs only, `probe` checks the shape of the board and not each job, and the weak ETag is sent back unchanged and answered with a 304 |
+| [0026](adr/0026-openai-compatible-adapter-and-model-pick.md) | The openai_compatible adapter for OpenAI and LM Studio: strict JSON schema, hosted rules, the truncation guard, and the model pick (proposed, needs confirmation) |
 
 ## Configuration
 - `config/aliases.yaml`: tag alias table, described in [data-model.md](data-model.md#tag-alias-table).

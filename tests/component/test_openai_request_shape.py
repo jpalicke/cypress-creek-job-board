@@ -44,8 +44,8 @@ def _hosted(**extra: object) -> OpenAICompatibleProvider:
         "allow_remote": True,
         "api_key_env": "TEST_OPENAI_KEY",  # pragma: allowlist secret
         "context_tokens": 8192,
-        "cost_input_per_mtok": 0.10,
-        "cost_output_per_mtok": 0.50,
+        "input_usd_per_mtok": 0.10,
+        "output_usd_per_mtok": 0.50,
     }
     values.update(extra)
     return OpenAICompatibleProvider(parse_settings(values), environ=HOSTED_ENV)
@@ -192,8 +192,8 @@ def test_a_remote_backend_needs_a_key_variable_that_is_set() -> None:
                     "model": "m",
                     "allow_remote": True,
                     "api_key_env": "TEST_OPENAI_KEY",  # pragma: allowlist secret
-                    "cost_input_per_mtok": 1,
-                    "cost_output_per_mtok": 1,
+                    "input_usd_per_mtok": 1,
+                    "output_usd_per_mtok": 1,
                 }
             ),
             environ={},
@@ -201,8 +201,8 @@ def test_a_remote_backend_needs_a_key_variable_that_is_set() -> None:
 
 
 def test_a_remote_backend_without_a_cost_is_refused_so_the_budget_cannot_be_blind() -> None:
-    with pytest.raises(ConfigError, match="cost_input_per_mtok"):
-        _hosted(cost_input_per_mtok=None, cost_output_per_mtok=None)
+    with pytest.raises(ConfigError, match="input_usd_per_mtok"):
+        _hosted(input_usd_per_mtok=None, output_usd_per_mtok=None)
 
 
 def test_capabilities_for_hosted_and_loopback() -> None:

@@ -231,17 +231,17 @@ def test_is_loopback_url_reads_the_host(url: str, expected: bool) -> None:
 
 
 def test_cost_per_mtok_defaults_to_unset_and_reads_from_the_environment() -> None:
-    assert _settings().cost_input_per_mtok is None
+    assert _settings().input_usd_per_mtok is None
     environ = {
         "CYPRESS_CREEK_PROVIDER": "openai_compatible",
         "CYPRESS_CREEK_MODEL": "m",
-        "CYPRESS_CREEK_COST_INPUT_PER_MTOK": "0.25",
-        "CYPRESS_CREEK_COST_OUTPUT_PER_MTOK": "1.5",
+        "CYPRESS_CREEK_INPUT_USD_PER_MTOK": "0.25",
+        "CYPRESS_CREEK_OUTPUT_USD_PER_MTOK": "1.5",
     }
     settings = load_settings(environ=environ)
-    assert (settings.cost_input_per_mtok, settings.cost_output_per_mtok) == (0.25, 1.5)
+    assert (settings.input_usd_per_mtok, settings.output_usd_per_mtok) == (0.25, 1.5)
 
 
 def test_negative_cost_is_rejected() -> None:
-    with pytest.raises(ConfigError, match="cost_input_per_mtok"):
-        _settings(cost_input_per_mtok=-1)
+    with pytest.raises(ConfigError, match="input_usd_per_mtok"):
+        _settings(input_usd_per_mtok=-1)
