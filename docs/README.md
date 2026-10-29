@@ -62,6 +62,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [0033](adr/0033-draft-closed-vocabulary.md) | Drafts use a closed vocabulary (every word from a cited fact, plain ASCII, no dropped negation); V8 reads quantity words, which can withhold some rationales |
 | [0034](adr/0034-discovery-run-cap-cache-and-stops.md) | The discovery run caches scores by run id, counts only analyzer calls against the cap (most recent first), stops on a backend outage or a spent budget, and reuses only complete reports |
 | [0035](adr/0035-injection-corpus-pairs-and-score-shift.md) | The injection corpus pairs each attacked posting with a clean twin that differs only by the payload, and score shift is attacked minus clean, averaged per class in a repeat |
+| [0036](adr/0036-watchlist-and-blacklist-routes.md) | The watchlist is written only through a human approval marker with no proposer field, the server stamps the time, the blacklist is checked first and wins, and conflicts are typed 409s with fixed text |
 | [0039](adr/0039-comparison-table-is-generated-from-paired-run-and-metrics-files.md) | The comparison table is generated from paired run and metrics files, a target list owns the rows, conditions are a column, missing is never zero, and CI checks the table is current |
 
 ## Configuration
