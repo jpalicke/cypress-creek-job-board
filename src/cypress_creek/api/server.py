@@ -1,6 +1,5 @@
 # ABOUTME: The uvicorn entry point. It binds to loopback on port 5309 and refuses any other host.
 # ABOUTME: Run it with `uv run cypress-creek-api`. Provider settings come from config or env vars.
-import ipaddress
 import os
 import sys
 
@@ -19,12 +18,9 @@ class RemoteBindRefused(ConfigError):
 
 
 def check_bind_host(host: str) -> str:
-    try:
-        loopback = ipaddress.ip_address(host).is_loopback
-    except ValueError:
-        loopback = False
-    if not loopback:
-        raise RemoteBindRefused("the API only binds to a loopback address, such as 127.0.0.1")
+    """Only 127.0.0.1. Another loopback name would bind, then fail every Host check."""
+    if host != DEFAULT_HOST:
+        raise RemoteBindRefused(f"the API only binds to the loopback address {DEFAULT_HOST}")
     return host
 
 

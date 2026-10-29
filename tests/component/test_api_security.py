@@ -1,8 +1,11 @@
 # ABOUTME: Drives the real FastAPI app through its security layer over httpx's ASGI transport.
 # ABOUTME: Covers the CSRF token on writes, the Host check, absent CORS and the typed error shape.
+from pathlib import Path
+
 import pytest
-from api_support import ApiClient
-from fastapi import APIRouter
+from api_support import ApiClient, csrf_headers
+from fastapi import APIRouter, FastAPI
+from pydantic import BaseModel, ConfigDict
 
 from cypress_creek.api.app import create_app
 from cypress_creek.config import ProviderSettings
@@ -185,3 +188,143 @@ def test_an_unexpected_failure_is_a_typed_500_without_internals(client: ApiClien
     }
     assert "secret-internal-detail" not in response.text
     assert "Traceback" not in response.text
+
+
+def test_every_answer_carries_nosniff(client: ApiClient) -> None:
+    answers = [
+        client.get("/api/health"),
+        client.get("/api/session"),
+        client.get("/nothing-here"),
+        client.post("/api/write-probe"),
+        client.get("/api/health", headers={"Host": "evil.example"}),
+        client.get("/api/boom"),
+    ]
+
+    for answer in answers:
+        assert answer.headers.get("x-content-type-options") == "nosniff"
+
+
+def test_a_malformed_write_does_not_reflect_the_keys_it_was_sent(client: ApiClient) -> None:
+    router = APIRouter()
+
+    class Body(BaseModel):
+        model_config = ConfigDict(extra="forbid")
+        name: str
+
+    @router.post("/api/body-probe")
+    def take_body(body: Body) -> None: ...
+
+    client.app.include_router(router)
+    hostile = {"<script>alert(1)</script>": 1, "ignore previous instructions": 2, "x" * 500: 3}
+
+    with_token = client.post("/api/body-probe", json=hostile, headers=csrf_headers(client))
+    without_token = client.post("/api/body-probe", json=hostile)
+
+    assert with_token.status_code == 422
+    assert with_token.json()["error"]["code"] == "invalid_request"
+    for detail in with_token.json()["error"]["details"]:
+        assert len(detail["field"]) <= 80
+        assert set(detail["field"]) <= set("abcdefghijklmnopqrstuvwxyz_.0123456789?")
+    for answer in (with_token, without_token):
+        assert "script" not in answer.text
+        assert "ignore" not in answer.text
+        assert "xxx" not in answer.text
+
+
+def sub_app() -> FastAPI:
+    sub = FastAPI()
+
+    @sub.post("/x")
+    def write() -> dict[str, bool]:
+        return {"wrote": True}
+
+    return sub
+
+
+def test_a_mounted_sub_app_is_protected_like_any_route(client: ApiClient) -> None:
+    client.app.mount("/sub", sub_app())
+
+    refused = client.post("/sub/x")
+    allowed = client.post("/sub/x", headers=csrf_headers(client))
+
+    assert refused.status_code == 403
+    assert refused.json()["error"]["code"] == "csrf_token_invalid"
+    assert allowed.status_code == 200
+
+
+def test_every_write_operation_in_the_schema_is_refused_without_the_token(
+    client: ApiClient,
+) -> None:
+    safe = {"get", "head", "options"}
+    writes = [
+        (method.upper(), path)
+        for path, operations in client.app.openapi()["paths"].items()
+        for method in operations
+        if method not in safe
+    ]
+    assert writes, "the probe route should give the walk something to check"
+
+    for method, path in writes:
+        assert client.request(method, path).status_code == 403, (method, path)
+
+
+def test_a_write_to_a_path_with_no_route_is_refused_before_routing(client: ApiClient) -> None:
+    for method in ("POST", "PUT", "PATCH", "DELETE"):
+        assert client.request(method, "/api/no-such-route").status_code == 403
+
+
+@pytest.mark.parametrize("method", ["PURGE", "MKCOL", "PROPFIND", "post", "FOO"])
+def test_an_unusual_method_is_a_write_unless_it_is_known_to_be_safe(
+    client: ApiClient, method: str
+) -> None:
+    router = APIRouter()
+    router.add_api_route("/api/odd-probe", accept_write, methods=[method.upper()])
+    client.app.include_router(router)
+
+    refused = client.request(method, "/api/odd-probe")
+    allowed = client.request(method, "/api/odd-probe", headers=csrf_headers(client))
+
+    assert refused.status_code == 403
+    assert allowed.status_code == 200
+
+
+def test_two_token_headers_are_refused_even_when_both_are_right(client: ApiClient) -> None:
+    token = csrf_headers(client)["X-CSRF-Token"]
+
+    one = client.post("/api/write-probe", headers=[("X-CSRF-Token", token)])
+    two = client.post(
+        "/api/write-probe", headers=[("X-CSRF-Token", token), ("X-CSRF-Token", token)]
+    )
+
+    assert one.status_code == 200
+    assert two.status_code == 403
+
+
+def test_hardening_headers_are_on_every_answer_and_no_store_on_the_api(
+    client: ApiClient,
+) -> None:
+    answers = [
+        client.get("/api/health"),
+        client.get("/api/session"),
+        client.get("/nothing-here"),
+        client.post("/api/write-probe"),
+        client.get("/api/health", headers={"Host": "evil.example"}),
+    ]
+
+    for answer in answers:
+        assert answer.headers["x-content-type-options"] == "nosniff"
+        assert answer.headers["x-frame-options"] == "DENY"
+        assert answer.headers["referrer-policy"] == "no-referrer"
+    assert client.get("/api/session").headers["cache-control"] == "no-store"
+    assert client.get("/api/nothing").headers["cache-control"] == "no-store"
+
+
+def test_the_static_bundle_is_not_marked_no_store(tmp_path: Path) -> None:
+    (tmp_path / "index.html").write_text("<html></html>", encoding="utf-8")
+    site = ApiClient(create_app(make_settings(), static_dir=tmp_path))
+
+    answer = site.get("/")
+
+    assert answer.status_code == 200
+    assert answer.headers["x-content-type-options"] == "nosniff"
+    assert "no-store" not in answer.headers.get("cache-control", "")

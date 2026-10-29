@@ -2,7 +2,7 @@
 # ABOUTME: No CORS middleware is ever added, and the interactive docs and schema routes are off.
 from pathlib import Path
 
-from fastapi import Depends, FastAPI
+from fastapi import FastAPI
 from starlette.staticfiles import StaticFiles
 
 from cypress_creek.api.errors import install_error_handlers
@@ -10,10 +10,11 @@ from cypress_creek.api.routes import health, providers, session
 from cypress_creek.api.routes.providers import CostResponse, ProviderInfo
 from cypress_creek.api.security import (
     API_PORT,
+    CsrfMiddleware,
     HostCheckMiddleware,
+    SecurityHeadersMiddleware,
     allowed_hosts,
     new_token,
-    require_csrf,
 )
 from cypress_creek.config import ProviderSettings
 from cypress_creek.providers import get_provider
@@ -44,7 +45,6 @@ def create_app(
         docs_url=None,
         redoc_url=None,
         openapi_url=None,
-        dependencies=[Depends(require_csrf)],
     )
     app.state.settings = settings
     app.state.csrf_token = new_token()
@@ -54,5 +54,8 @@ def create_app(
         app.include_router(module.router)
     if static_dir is not None and static_dir.is_dir():
         app.mount("/", StaticFiles(directory=static_dir, html=True), name="web")
+    # The last one added is the outermost. Headers wrap everything, then the Host check, then CSRF.
+    app.add_middleware(CsrfMiddleware, token=app.state.csrf_token)
     app.add_middleware(HostCheckMiddleware, allowed=allowed_hosts(API_PORT))
+    app.add_middleware(SecurityHeadersMiddleware)
     return app
