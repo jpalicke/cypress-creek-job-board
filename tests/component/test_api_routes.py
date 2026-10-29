@@ -25,7 +25,7 @@ def settings_for(base_url: str, **changes: object) -> ProviderSettings:
 
 
 def test_health_reports_a_backend_that_cannot_be_reached() -> None:
-    client = ApiClient(create_app(settings_for("http://127.0.0.1:1")))
+    client = ApiClient(create_app(settings_for("http://127.0.0.1:1"), static_dir=None))
 
     response = client.get("/api/health")
 
@@ -38,7 +38,7 @@ def test_health_reports_a_backend_that_cannot_be_reached() -> None:
 
 def test_health_reports_a_backend_that_answers() -> None:
     with http_server() as (port, requests):
-        client = ApiClient(create_app(settings_for(f"http://127.0.0.1:{port}")))
+        client = ApiClient(create_app(settings_for(f"http://127.0.0.1:{port}"), static_dir=None))
 
         response = client.get("/api/health")
 
@@ -47,14 +47,16 @@ def test_health_reports_a_backend_that_answers() -> None:
 
 
 def test_health_works_with_no_backend_configured() -> None:
-    client = ApiClient(create_app(None))
+    client = ApiClient(create_app(None, static_dir=None))
 
     assert client.get("/api/health").json() == {"status": "ok", "backends": []}
     assert client.get("/api/providers").json() == {"providers": []}
 
 
 def test_providers_lists_capabilities() -> None:
-    client = ApiClient(create_app(settings_for("http://127.0.0.1:1", context_tokens=4096)))
+    client = ApiClient(
+        create_app(settings_for("http://127.0.0.1:1", context_tokens=4096), static_dir=None)
+    )
 
     response = client.get("/api/providers")
 
@@ -75,7 +77,7 @@ def test_providers_lists_capabilities() -> None:
 
 def test_no_answer_ever_contains_an_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv(KEY_ENV, KEY_VALUE)
-    app = create_app(settings_for("http://127.0.0.1:1", api_key_env=KEY_ENV))
+    app = create_app(settings_for("http://127.0.0.1:1", api_key_env=KEY_ENV), static_dir=None)
     client = ApiClient(app)
 
     answers = [
@@ -124,7 +126,7 @@ def test_without_a_bundle_the_root_is_a_typed_404(tmp_path: Path) -> None:
 
 
 def test_the_docs_and_schema_routes_are_off() -> None:
-    client = ApiClient(create_app(None))
+    client = ApiClient(create_app(None, static_dir=None))
 
     for path in ("/docs", "/redoc", "/openapi.json"):
         assert client.get(path).status_code == 404
