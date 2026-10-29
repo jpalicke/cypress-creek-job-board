@@ -160,3 +160,7 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 - 400 context errors map to ContextTruncated carrying the estimate and the window, no new error class.
 - Remote base_url must be https; a refusal without usage maps to Refusal; no hosted default for context_tokens.
 - Harness note: the PR tool re-adds the attribution footer on create (and possibly on update), so authors check the body after every edit.
+
+## D29. Caught before merge: D7 draft validators whitelisted posting text (PR #126)
+- 2026-10-29, senior engineer found, Worker G fixing.
+- The first D7 version passed requirement.text to V7, V8 and V10, so numbers, employers and skills from the posting counted as allowed. Repro: "Led 10 engineers using Python and Kubernetes at Google for 10 years [F-0001]" rendered as a clean sentence although the fact says 8 engineers, a different employer and no Kubernetes. This breaches the one rule. Fix: the allow-list is the cited facts only, tests first. Nothing merged. Consider a Joe P review of the final D7 validator wiring, since it is the heart of the product.
