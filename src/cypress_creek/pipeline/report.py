@@ -8,7 +8,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from cypress_creek.facts.models import Bank
-from cypress_creek.ingest.models import Importance, Posting, PostingWarning
+from cypress_creek.ingest.models import Importance, Posting, PostingWarning, Requirement
 from cypress_creek.pipeline.entail import EntailedMatch, Entailment
 from cypress_creek.pipeline.extract import Dropped, ExtractionResult, ExtractionStatus
 from cypress_creek.pipeline.retrieve import RequirementCandidates
@@ -62,6 +62,10 @@ class ReportRow(BaseModel):
     entailment: Entailment
     not_model_checked: bool
     failure: str | None
+    # Source offsets of the requirement text and whether the model asked for more support than
+    # the rule ceiling allowed. Both default for reports stored before the scorer read them.
+    span: tuple[int, int] | None = None
+    raise_attempted: bool = False
 
 
 class NotAssessedSentence(BaseModel):
@@ -133,13 +137,13 @@ def _check_alignment(
 
 
 def _row(
-    requirement_text: str, candidate: RequirementCandidates, result: EntailedMatch
+    requirement: Requirement, candidate: RequirementCandidates, result: EntailedMatch
 ) -> ReportRow:
     """A requirement the model never weighed in on cites the candidates its ceiling rests on."""
     not_run = result.entailment is Entailment.NOT_RUN
     return ReportRow(
         requirement_id=result.match.requirement_id,
-        text=requirement_text,
+        text=requirement.text,
         importance=result.match.importance,
         ceiling=result.match.ceiling,
         support=result.match.support,
@@ -149,6 +153,8 @@ def _row(
         entailment=result.entailment,
         not_model_checked=not_run,
         failure=result.failure,
+        span=requirement.span,
+        raise_attempted=result.raise_attempted,
     )
 
 
@@ -182,7 +188,7 @@ def build_report(
             )
         ]
         rows = [
-            _row(requirement.text, candidate, outcome)
+            _row(requirement, candidate, outcome)
             for requirement, candidate, outcome in zip(
                 extraction.requirements, candidates, entailed, strict=True
             )
