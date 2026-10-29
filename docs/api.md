@@ -5,18 +5,19 @@ A FastAPI app that serves JSON (and, later, the built web bundle) to the browser
 ## Rules every route inherits
 | Rule | How it is enforced |
 | --- | --- |
-| Loopback only | `uv run cypress-creek-api` binds to `127.0.0.1` on port 5309. `CYPRESS_CREEK_API_HOST` may name another loopback address. Any other host stops the server with exit code 2 before it listens. There is no `allow_remote` setting for the API. |
+| Loopback only | `uv run cypress-creek-api` binds to `127.0.0.1` on port 5309. `CYPRESS_CREEK_API_HOST` exists only so a wrong value can be refused: anything but `127.0.0.1` (including `127.0.0.2`, `::1`, `localhost` and `0.0.0.0`) stops the server with exit code 2 before it listens. There is no `allow_remote` setting for the API. |
 | Host check | `HostCheckMiddleware` runs before everything else. The request must carry exactly one `Host` header equal to `127.0.0.1:5309` or `localhost:5309`. Any other name, a different port, a missing port, a second Host header or a non ASCII value gets a typed 403 `host_not_allowed`. This blocks DNS rebinding. |
-| CSRF token on writes | Every `POST`, `PUT`, `PATCH` and `DELETE` needs the header `X-CSRF-Token` with the session token. It is compared with `hmac.compare_digest`. A missing or wrong token gets a typed 403 `csrf_token_invalid`. |
+| CSRF token on writes | Every request except `GET`, `HEAD` and `OPTIONS` needs the header `X-CSRF-Token`, exactly once, with the session token. That includes `POST`, `PUT`, `PATCH`, `DELETE` and any unusual method such as `PURGE`. It is compared with `hmac.compare_digest`. A missing, repeated or wrong token gets a typed 403 `csrf_token_invalid`. The check is middleware after the Host check, so it covers every route, mounted sub-apps, unknown paths and static files alike. |
+| Hardening headers | Every answer carries `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` and `Referrer-Policy: no-referrer`. Every `/api` answer also carries `Cache-Control: no-store`, so the session token is never cached. The static bundle is not marked no-store. |
 | No CORS | No CORS middleware exists, so no `Access-Control-*` header is ever sent and a preflight `OPTIONS` is answered 405. Browsers on other origins are denied by default. |
 | One error shape | Failures are `{"error": {"code", "message", "details"?}}` with stable codes. Messages are fixed text. They never carry a secret, a stack trace, a submitted value or remote content. |
 | Nothing goes outward | There is deliberately no route that submits an application, sends mail or posts anywhere. A unit test lists the route table and fails if any path or operation name suggests it. |
 | No docs routes | `/docs`, `/redoc` and `/openapi.json` are off, so the only routes are the ones in the table below. |
 
 ## The token flow
-The token is created when the server process starts (`secrets.token_urlsafe(32)`) and lives only in memory. The UI reads it once with `GET /api/session`, which sets no cookie, and sends it as `X-CSRF-Token` on every write. The Host check keeps other sites from reaching that route, and the lack of CORS keeps them from reading the answer. Restarting the server makes a new token. The CSRF check is a dependency of the whole app, so a route added later is covered without any extra code.
+The token is created when the server process starts (`secrets.token_urlsafe(32)`) and lives only in memory. The UI reads it once with `GET /api/session`, which sets no cookie, and sends it as `X-CSRF-Token` on every write. The Host check keeps other sites from reaching that route, and the lack of CORS keeps them from reading the answer. Restarting the server makes a new token. The CSRF check is middleware for the whole app, so a route, a mounted sub-app or a method added later is covered without any extra code.
 
-Because a CSRF check needs a matched route, a write to a path that does not exist gets a plain 404, and a write to a path that exists only for reads gets 405.
+Because the check runs before routing, a write without the token is refused with 403 whatever the path is. With the token, a write to a path that does not exist gets a plain 404, and a write to a path that exists only for reads gets 405.
 
 ## Routes
 | Route | Answer |

@@ -3,18 +3,19 @@
 import hmac
 import secrets
 
-from fastapi import Request
+from starlette.datastructures import MutableHeaders
 from starlette.responses import Response
-from starlette.types import ASGIApp, Receive, Scope, Send
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from cypress_creek.api.errors import ApiError, ErrorCode, error_response
+from cypress_creek.api.errors import HARDENING_HEADERS, ErrorCode, error_response
 
 API_PORT = 5309
 TOKEN_HEADER = "X-CSRF-Token"
-WRITE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
-TOKEN_BYTES = 32
 MAX_BODY_BYTES = 1024 * 1024
 MAX_PDF_BYTES = 10 * 1024 * 1024
+SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+TOKEN_HEADER_BYTES = TOKEN_HEADER.lower().encode("ascii")
+TOKEN_BYTES = 32
 
 
 def allowed_hosts(port: int) -> frozenset[str]:
@@ -93,11 +94,50 @@ class BodyLimitMiddleware:
         return None
 
 
-def require_csrf(request: Request) -> None:
-    """Every write needs the session token in a header, compared in constant time."""
-    if request.method not in WRITE_METHODS:
-        return
-    sent = request.headers.get(TOKEN_HEADER, "")
-    expected: str = request.app.state.csrf_token
-    if not sent or not hmac.compare_digest(sent.encode("utf-8"), expected.encode("utf-8")):
-        raise ApiError(403, ErrorCode.CSRF_TOKEN_INVALID)
+class CsrfMiddleware:
+    """Every request that is not known to be safe needs the session token, exactly once.
+
+    This is middleware and not a route dependency, so it covers mounted sub-apps, unknown paths
+    and methods nobody registered. Only GET, HEAD and OPTIONS skip it. The comparison is in
+    constant time. It runs after the Host check."""
+
+    def __init__(self, app: ASGIApp, token: str) -> None:
+        self._app = app
+        self._expected = token.encode("utf-8")
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http" or scope["method"].upper() in SAFE_METHODS:
+            await self._app(scope, receive, send)
+            return
+        sent = [value for name, value in scope["headers"] if name == TOKEN_HEADER_BYTES]
+        if len(sent) == 1 and hmac.compare_digest(sent[0], self._expected):
+            await self._app(scope, receive, send)
+            return
+        response: Response = error_response(403, ErrorCode.CSRF_TOKEN_INVALID)
+        await response(scope, receive, send)
+
+
+class SecurityHeadersMiddleware:
+    """Adds hardening headers to every answer, including the ones other middleware sends.
+
+    `Cache-Control: no-store` goes on the API only, so the static bundle can be cached."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self._app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self._app(scope, receive, send)
+            return
+        is_api = scope["path"].startswith("/api/") or scope["path"] == "/api"
+
+        async def send_with_headers(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                headers = MutableHeaders(scope=message)
+                for name, value in HARDENING_HEADERS:
+                    headers[name] = value
+                if is_api:
+                    headers["Cache-Control"] = "no-store"
+            await send(message)
+
+        await self._app(scope, receive, send_with_headers)

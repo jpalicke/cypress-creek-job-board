@@ -96,11 +96,68 @@ def test_the_server_answers_on_loopback_and_enforces_the_host_check() -> None:
         assert isinstance(session, dict) and len(session["csrf_token"]) >= 32
 
 
-def test_a_non_loopback_bind_is_refused_before_anything_listens() -> None:
+def raw_request(
+    method: str, path: str, headers: list[tuple[str, str]]
+) -> tuple[int, dict[str, str], object]:
+    connection = http.client.HTTPConnection("127.0.0.1", PORT, timeout=5)
+    try:
+        connection.putrequest(method, path)
+        for name, value in headers:
+            connection.putheader(name, value)
+        connection.putheader("Content-Length", "0")
+        connection.endheaders()
+        response = connection.getresponse()
+        return (
+            response.status,
+            {name.lower(): value for name, value in response.getheaders()},
+            json.loads(response.read()),
+        )
+    finally:
+        connection.close()
+
+
+def test_writes_need_exactly_one_right_token_on_the_real_server() -> None:
+    with running_server():
+        _, _, session = fetch("/api/session")
+        assert isinstance(session, dict)
+        token = session["csrf_token"]
+
+        for method in ("POST", "PUT", "PATCH", "DELETE", "PURGE"):
+            status, _, body = raw_request(method, "/api/anything", [])
+            assert status == 403, method
+            assert body == {
+                "error": {"code": "csrf_token_invalid", "message": "Missing or invalid CSRF token."}
+            }
+
+        wrong = raw_request("POST", "/api/anything", [("X-CSRF-Token", "wrong" * 8)])
+        twice = raw_request(
+            "POST", "/api/anything", [("X-CSRF-Token", token), ("X-CSRF-Token", token)]
+        )
+        right = raw_request("POST", "/api/anything", [("X-CSRF-Token", token)])
+        assert wrong[0] == 403
+        assert twice[0] == 403
+        assert right[0] == 404
+
+
+def test_hardening_headers_come_with_every_real_answer() -> None:
+    with running_server():
+        ok = fetch("/api/health")
+        refused = fetch("/api/health", host="evil.example:5309")
+        missing = fetch("/api/nothing")
+
+    for _, headers, _ in (ok, refused, missing):
+        assert headers["x-content-type-options"] == "nosniff"
+        assert headers["x-frame-options"] == "DENY"
+        assert headers["referrer-policy"] == "no-referrer"
+        assert headers["cache-control"] == "no-store"
+
+
+@pytest.mark.parametrize("host", ["0.0.0.0", "127.0.0.2", "::1"])
+def test_a_bind_other_than_127_0_0_1_is_refused_before_anything_listens(host: str) -> None:
     result = subprocess.run(
         [sys.executable, "-m", "cypress_creek.api.server"],
         cwd=ROOT,
-        env=child_env(CYPRESS_CREEK_API_HOST="0.0.0.0"),
+        env=child_env(CYPRESS_CREEK_API_HOST=host),
         capture_output=True,
         text=True,
         timeout=30,

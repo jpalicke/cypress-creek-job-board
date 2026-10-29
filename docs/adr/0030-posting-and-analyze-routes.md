@@ -1,6 +1,6 @@
-# ADR 0027: The posting and analyze routes: lazy storage, a budget per request, PDF held back and verdicts without offending text
+# ADR 0030: The posting and analyze routes: lazy storage, a budget per request, PDF held back and verdicts without offending text
 
-Status: accepted (card G2). Builds on [ADR 0026](0026-api-security-layer.md).
+Status: accepted (card G2). Builds on [ADR 0028](0028-api-security-layer.md).
 
 ## Context
 

@@ -1,6 +1,9 @@
 # ABOUTME: The one typed error shape every API failure uses, with stable codes and fixed messages.
 # ABOUTME: Messages never carry secrets, stack traces, submitted values or remote content.
+import re
+from collections.abc import Mapping, Sequence
 from enum import StrEnum
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -101,12 +104,45 @@ class ApiError(Exception):
         self.details = details
 
 
-def details_from_validation_error(error: ValidationError) -> list[ErrorDetail]:
-    """Field paths and rule text only. The submitted values are never copied."""
+HARDENING_HEADERS = (
+    ("X-Content-Type-Options", "nosniff"),
+    ("X-Frame-Options", "DENY"),
+    ("Referrer-Policy", "no-referrer"),
+)
+
+FIELD_PART = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,31}$")
+MAX_FIELD_CHARS = 80
+UNKNOWN_PART = "?"
+
+
+def safe_field(location: Sequence[object], *, last_is_unknown: bool) -> str:
+    """A field path that never repeats a key the caller chose.
+
+    Names that are not plain identifiers become `?`. When the error is an unexpected key, the
+    last part is the caller's own key, so it becomes `?` as well. The result is capped."""
+    parts = []
+    for index, part in enumerate(location):
+        is_unknown_key = last_is_unknown and index == len(location) - 1
+        text = str(part)
+        parts.append(text if not is_unknown_key and FIELD_PART.match(text) else UNKNOWN_PART)
+    return ".".join(parts)[:MAX_FIELD_CHARS]
+
+
+def details_from_errors(errors: Sequence[Mapping[str, Any]]) -> list[ErrorDetail]:
     return [
-        ErrorDetail(field=".".join(str(part) for part in item["loc"]), problem=str(item["msg"]))
-        for item in error.errors(include_input=False, include_url=False, include_context=False)
+        ErrorDetail(
+            field=safe_field(item["loc"], last_is_unknown=item["type"] == "extra_forbidden"),
+            problem=str(item["msg"]),
+        )
+        for item in errors
     ]
+
+
+def details_from_validation_error(error: ValidationError) -> list[ErrorDetail]:
+    """Safe field paths and rule text only. The submitted values and keys are never copied."""
+    return details_from_errors(
+        error.errors(include_input=False, include_url=False, include_context=False)
+    )
 
 
 def error_response(
@@ -131,15 +167,17 @@ async def handle_http_error(_: Request, error: Exception) -> JSONResponse:
 
 async def handle_validation_error(_: Request, error: Exception) -> JSONResponse:
     assert isinstance(error, RequestValidationError)
-    details = [
-        ErrorDetail(field=".".join(str(part) for part in item["loc"]), problem=str(item["msg"]))
-        for item in error.errors()
-    ]
-    return error_response(422, ErrorCode.INVALID_REQUEST, details)
+    return error_response(422, ErrorCode.INVALID_REQUEST, details_from_errors(error.errors()))
 
 
-async def handle_unexpected_error(_: Request, __: Exception) -> JSONResponse:
-    return error_response(500, ErrorCode.INTERNAL_ERROR)
+async def handle_unexpected_error(request: Request, __: Exception) -> JSONResponse:
+    """Starlette answers this one outside the app's own middleware, so it adds its own headers."""
+    response = error_response(500, ErrorCode.INTERNAL_ERROR)
+    for name, value in HARDENING_HEADERS:
+        response.headers[name] = value
+    if request.url.path.startswith("/api"):
+        response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 def install_error_handlers(app: FastAPI) -> None:
