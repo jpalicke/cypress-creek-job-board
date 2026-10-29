@@ -1,5 +1,6 @@
 # ABOUTME: The provider layer: one interface every model backend implements, plus typed errors.
-# ABOUTME: get_provider builds one from settings. The Ollama adapter registers itself here.
+# ABOUTME: get_provider builds one from settings. The Ollama and Anthropic adapters register here.
+from cypress_creek.providers.anthropic import AnthropicProvider
 from cypress_creek.providers.base import (
     Capabilities,
     CostPerMtok,
@@ -28,6 +29,7 @@ from cypress_creek.providers.retry import RetryPolicy, call_with_retry
 
 __all__ = [
     "REGISTRY",
+    "AnthropicProvider",
     "Budget",
     "BudgetExceeded",
     "BudgetTracker",

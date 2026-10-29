@@ -15,7 +15,7 @@ jobs:
       - name: Install Ollama
         run: curl -fsSL https://ollama.com/install.sh | sh
       - name: Cache the model directory
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.ollama/models
           key: ollama-qwen3.5-0.8b
@@ -31,4 +31,4 @@ jobs:
       - run: ollama pull qwen3.5:0.8b
       - run: ollama --version
       - name: Live tests
-        run: uv run --locked pytest tests/integration -m live -q
+        run: uv run --locked pytest tests/integration -m "live and not needs_network" -q

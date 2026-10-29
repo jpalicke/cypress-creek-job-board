@@ -1,0 +1,141 @@
+# Hand labels for this posting. Written from the posting text and the bank alone,
+# before any model or pipeline ran. See docs/e3-label-decisions.md for the reasoning.
+fixture_id: greenhouse-8889193002
+provenance:
+  labeled_by: Claude, on delegation from Joe P (Palicke); pending his review
+  review: pending
+  labeled_on: '2026-10-29'
+  model_output_used: false
+requirements:
+- id: L-1
+  span: Experience operating Kubernetes in production
+  kind: skill
+  term: kubernetes
+  importance: required
+  expected_support: partial
+  expected_status: gap
+  fact_ids:
+  - F-0004
+  planted_gap: skill:kubernetes
+  note: F-0004 is a deployment to a cluster another team ran, familiar level. Production operation is more than that.
+- id: L-2
+  span: 'working with at least one major cloud provider: Amazon Web Services, Google Cloud, or Microsoft Azure'
+  kind: skill
+  term: cloud provider
+  importance: required
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+  note: Any one of three. No fact names any of them.
+- id: L-3
+  span: Experience with Argo CD or comparable GitOps tooling, such as Flux.
+  kind: skill
+  term: argo cd
+  importance: required
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+- id: L-4
+  span: Proficiency in Terraform for cloud infrastructure provisioning, including remote state, workspaces, and module design.
+  kind: skill
+  term: terraform
+  importance: required
+  expected_support: partial
+  expected_status: gap
+  fact_ids:
+  - F-0019
+  planted_gap: skill:terraform
+  note: One edit to a teammate's Terraform. Familiar level.
+- id: L-5
+  span: Ability to write scripts and automation in Python, Bash, or Go.
+  kind: skill
+  term: python
+  importance: required
+  expected_support: strong
+  expected_status: supported
+  fact_ids:
+  - F-0001
+  - F-0018
+  note: Any one of three. Python and Bash facts exist. Go does not.
+- id: L-6
+  span: Familiarity with Helm for Kubernetes package management.
+  kind: skill
+  term: helm
+  importance: required
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+- id: L-7
+  span: Understanding of networking fundamentals, including the Domain Name System (DNS), load balancing, ingress, and service mesh concepts.
+  kind: skill
+  term: networking
+  importance: required
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+- id: L-8
+  span: Clear written and verbal communication, with the ability to document systems and collaborate across teams.
+  kind: soft
+  term: communication
+  importance: required
+  expected_support: partial
+  expected_status: gap
+  fact_ids:
+  - F-0021
+  - F-0024
+- id: L-9
+  span: 'Optional: experience with managed, multi-cluster, or multi-region Kubernetes, service meshes, policy as code, observability, or Kubernetes-native infrastructure as code'
+  kind: skill
+  term: advanced kubernetes
+  importance: preferred
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+- id: L-10
+  span: open source or platform tooling contributions
+  kind: skill
+  term: open source contributions
+  importance: preferred
+  expected_support: partial
+  expected_status: gap
+  fact_ids:
+  - F-0008
+  note: F-0008 is the candidate's own public library. Flagged for review.
+- id: L-11
+  span: or relevant certifications
+  kind: certification
+  term: relevant certifications
+  importance: preferred
+  expected_support: partial
+  expected_status: gap
+  fact_ids:
+  - F-0006
+  note: Which certifications count as relevant is undefined. F-0006 is a cloud certification. Flagged for review.
+- id: L-12
+  span: Monitor platform health, respond to incidents, conduct post-mortems, and improve availability, performance, and observability.
+  kind: responsibility
+  term: incident response
+  importance: unspecified
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+  note: The only incident response fact, F-0007, is local only and is never shown to a model, so the expected result is a gap.
+- id: L-13
+  span: Implement role-based access control, network policies, and secrets management to meet infrastructure security and compliance requirements.
+  kind: skill
+  term: access control
+  importance: unspecified
+  expected_support: none
+  expected_status: gap
+  fact_ids: []
+- id: L-14
+  span: Integrate platform capabilities with continuous integration and continuous delivery (CI/CD) pipelines
+  kind: skill
+  term: continuous integration
+  importance: unspecified
+  expected_support: strong
+  expected_status: supported
+  fact_ids:
+  - F-0013
+  note: 'Same reading as in the other postings: CI/CD maps to continuous integration.'
+cue_sentences: []

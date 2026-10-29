@@ -75,6 +75,7 @@ class RunTerminal(BaseModel):
     run_id: Digest
     status: Literal["complete", "failed"]
     reason: str | None = None
+    calls: list[CallRecord] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_reason(self) -> "RunTerminal":
@@ -82,6 +83,8 @@ class RunTerminal(BaseModel):
             raise ValueError("failed run needs a reason")
         if self.status == "complete" and self.reason is not None:
             raise ValueError("complete run cannot carry a failure reason")
+        if self.status == "complete" and self.calls:
+            raise ValueError("complete run cannot carry failed attempts")
         return self
 
 
@@ -90,6 +93,7 @@ class RunState:
     header: RunHeader
     cases: tuple[CaseRecord, ...] = ()
     terminal: RunTerminal | None = None
+    failed_calls: tuple[CallRecord, ...] = ()
 
     @property
     def pending_pairs(self) -> set[tuple[str, int]]:
@@ -117,7 +121,11 @@ def _check_case(header: RunHeader, case: CaseRecord, seen: set[tuple[str, int]])
         or case.report.provenance.model != header.model
     ):
         raise ValueError("report provider identity does not match header")
-    for call in case.calls:
+    _check_calls(header, case.calls)
+
+
+def _check_calls(header: RunHeader, calls: list[CallRecord]) -> None:
+    for call in calls:
         if (
             header.prompt_hashes.get(call.stage) != call.prompt_hash
             or header.schema_versions.get(call.stage) != call.schema_version
@@ -139,6 +147,7 @@ def parse_run_rows(rows: Iterable[str], expected_header: RunHeader | None = None
     if expected_header is not None and header != expected_header:
         raise ValueError("run identity does not match expected header")
     cases: list[CaseRecord] = []
+    failed_calls: list[CallRecord] = []
     seen: set[tuple[str, int]] = set()
     terminal: RunTerminal | None = None
     for line in source:
@@ -157,11 +166,15 @@ def parse_run_rows(rows: Iterable[str], expected_header: RunHeader | None = None
             terminal = RunTerminal.model_validate(row)
             if terminal.run_id != header.run_id:
                 raise ValueError("terminal run identity does not match header")
+            _check_calls(header, terminal.calls)
+            failed_calls.extend(terminal.calls)
             if terminal.status == "complete" and len(seen) != len(header.case_ids) * header.repeats:
                 raise ValueError("complete run has missing case pairs")
         else:
             raise ValueError("unknown run record type")
-    return RunState(header=header, cases=tuple(cases), terminal=terminal)
+    return RunState(
+        header=header, cases=tuple(cases), terminal=terminal, failed_calls=tuple(failed_calls)
+    )
 
 
 def load_run(path: Path, expected_header: RunHeader | None = None) -> RunState:

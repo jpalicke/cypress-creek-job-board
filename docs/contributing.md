@@ -6,8 +6,8 @@ The binding rules live in [CLAUDE.md](../CLAUDE.md). This page is the short, pla
 New here or handing a card to someone else? [handoff.md](handoff.md) is the complete step by step routine.
 
 - One card (issue) per branch, one pull request per card, merged to main after review. No worktrees.
-- Keep each PR to about 10 changed files (hard cap 20). Split a big card into several PRs, each with its own docs.
-- Work in phases of at most five files. Run verification after each phase and wait for approval before the next.
+- Keep each PR to roughly 20 changed files. Split a card that would go well past that into several PRs, each with its own docs.
+- Work in phases of up to about 20 files. Run verification after each phase and wait for approval before the next.
 - Test first (TDD): write a failing test, watch it fail, write the minimum code to pass, then refactor. When a design changes mid card, change the tests first and watch them fail before changing the code.
 - When asking for a merge, post the same summary as a comment on the card's issue.
 - Git hooks are never bypassed. If a hook fails, fix the cause.
@@ -21,7 +21,7 @@ New here or handing a card to someone else? [handoff.md](handoff.md) is the comp
 - Time goes through the `Clock` protocol in `discovery/rate_limiter.py`. Code that waits or ages data takes a `Clock`, production passes `SystemClock`, and tests pass `ManualClock`, which advances only when told to and records each sleep. That is the one allowed time abstraction. It controls time and is not a mocked collaborator, so do not patch `time.sleep` or add another fake.
 
 ## Tests
-Four tiers exist: unit, component, integration and e2e. Markers `live` (needs a real model backend) and `needs_network` (needs the internet) select tests. The `live` tests need a running Ollama with `qwen3.5:0.8b` (see [providers.md](providers.md#try-it-locally)) and are not in the gated unit and component run. Property tests use Hypothesis, and they run with the rest of the suite.
+Four tiers exist: unit, component, integration and e2e. Markers `live` (needs a real model backend) and `needs_network` (needs the internet) select tests. The `live` tests need a running Ollama with `qwen3.5:0.8b` (see [providers.md](providers.md#try-it-locally)) and are not in the gated unit and component run. The Anthropic live test also carries `needs_network` and needs `ANTHROPIC_API_KEY` in your shell; run the Ollama ones with `-m "live and not needs_network"` and the Anthropic one with `uv run pytest tests/integration/test_anthropic_live.py -q`. The Anthropic real call has not yet been run with a real key; see [issue #129](https://github.com/jpalicke/cypress-creek-job-board/issues/129). Property tests use Hypothesis, and they run with the rest of the suite.
 
 The polite fetch layer has a `needs_network` integration test that fetches a real public job board feed through the real transport, then revalidates a stale cache entry and expects a real 304: `uv run pytest tests/integration/test_polite_client_network.py -q`. It needs the internet and fails, never skips, when the network is unreachable. Run it when you touch `discovery/polite_client.py`, `cache.py` or the transport's conditional request handling.
 
@@ -29,7 +29,13 @@ The Greenhouse adapter has a `needs_network` integration test that maps a real l
 
 The Lever adapter has its own `needs_network` integration test: it reads a real large public board across pages (at a page size of 10, about 32 requests, so it takes about a minute and a half), probes it, probes and fetches a made-up slug, and finds a real board that lives only on the EU host: `uv run pytest tests/integration/test_lever_network.py -q`. It needs the internet and fails, never skips, when the network is unreachable. Run it when you touch `discovery/adapters/lever.py`, `discovery/adapters/feed_common.py` or the paging.
 
+The Ashby adapter has its own `needs_network` integration test: it fetches a real public board, checks every listing, probes it, probes and fetches a made-up slug, and revalidates the stored weak ETag against the real server, which must answer 304: `uv run pytest tests/integration/test_ashby_network.py -q`. It takes a few seconds. It needs the internet and fails, never skips, when the network is unreachable. Run it when you touch `discovery/adapters/ashby.py`, `discovery/adapters/feed_common.py` or the polite client's conditional requests.
+
+The posting fixtures and their hand labels have their own check: `uv run python -m evals.harness.check_labels`. Its tests are listed in [evals.md](evals.md#posting-fixtures-and-hand-labels). Run it when you touch anything under `evals/fixtures/` or `evals/harness/labels.py`. A label edit must be committed before any eval run.
+
 The integration and e2e tiers are not in the gated run, so run them by hand when you touch what they cover. For the blacklist: `uv run pytest tests/e2e/test_blacklist_process.py tests/integration/test_blacklist_dns.py -q`. The e2e file starts real child Python processes against a real temp SQLite file. The integration file is marked `needs_network` and resolves a real host, so an unreachable network makes it fail, never skip.
+
+Cue coverage in the report has an e2e test (a child Python process renders the text report for a posting with an omitted cue sentence) and a `live` integration test (a real Ollama extraction of the sample posting, checked against V13, the trace and the rendered count): `uv run pytest tests/e2e/test_cue_coverage_process.py tests/integration/test_cue_coverage_live.py -q`. The live test fails, never skips, when Ollama or the model is missing.
 
 ## Documentation checklist
 Before a PR is ready, in the same PR:
@@ -37,7 +43,7 @@ Before a PR is ready, in the same PR:
 - README.md status and "Try what exists" reflect what now works.
 - The docs index (docs/README.md) lists any new doc or decision record.
 - docs/codebase.md matches the code: layout, the flow diagram and the module list.
-- A new design decision has an ADR in `docs/adr/`. Numbers are sequential and the latest is 0022, so the next free number is 0023. Check `ls docs/adr` before you pick one.
+- A new design decision has an ADR in `docs/adr/`. Numbers are sequential and the latest is 0024, so the next free number is 0025. Check `ls docs/adr` before you pick one.
 - Configuration files (for example `config/aliases.yaml`) are described in the doc that owns them.
 
 ## Setup
