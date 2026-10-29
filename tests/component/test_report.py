@@ -387,3 +387,29 @@ def test_the_not_assessed_count_is_carried(bank: Bank) -> None:
 def test_a_report_survives_a_json_round_trip(bank: Bank) -> None:
     report = _report(bank)
     assert GapReport.model_validate_json(report.model_dump_json()) == report
+
+
+def test_rows_carry_the_requirement_span_and_whether_a_raise_was_attempted(bank: Bank) -> None:
+    candidates, entailed = _stages(bank, REQUIREMENTS)
+    raising = _answer(EntailmentVerdict.SUPPORTS, "F-0002", "F-0002 shows PostgreSQL work.")
+    entailed[1] = judge(
+        raising, REQUIREMENTS[1], candidates[1].fact_ids, candidates[1].support, bank, LOCAL
+    )
+    report = build_report(
+        POSTING, _extraction(REQUIREMENTS), candidates, entailed, bank, PROVENANCE
+    )
+
+    assert [row.span for row in report.rows] == [requirement.span for requirement in REQUIREMENTS]
+    assert [row.raise_attempted for row in report.rows] == [False, True, False]
+    assert report.rows[1].support is Support.PARTIAL
+
+
+def test_older_row_payloads_load_without_a_span_or_raise_flag(bank: Bank) -> None:
+    payload = _report(bank).model_dump()
+    for row in payload["rows"]:
+        row.pop("span")
+        row.pop("raise_attempted")
+
+    loaded = GapReport.model_validate(payload)
+
+    assert all(row.span is None and row.raise_attempted is False for row in loaded.rows)
