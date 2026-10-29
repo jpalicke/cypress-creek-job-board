@@ -68,9 +68,11 @@ src/cypress_creek/       The library
     factory.py           get_provider, ProviderRegistry, UnknownProvider
     ollama.py            OllamaProvider and its pre-flight and post-flight truncation checks
     anthropic.py         AnthropicProvider: Messages API request, strict schema rewrite, response and error mapping
+    openai_compatible.py OpenAICompatibleProvider (OpenAI and LM Studio), build_request, read_completion
+    strict_schema.py     strict_schema: a pydantic schema in the strict subset hosted APIs accept
     budget.py            Budget, BudgetTracker, BudgetedProvider, dry_run_estimate, budget_from_settings
   config/                Backend settings (not the repo level config/ data folder)
-    settings.py          ProviderSettings, load_settings, resolve_api_key, ConfigError
+    settings.py          ProviderSettings, load_settings, is_loopback_url, resolve_api_key, ConfigError
   storage/               Mutable state: the company name key and the SQLite database
     company_key.py       company_key, load_confusables: the one company name normalizer
     db.py                data_dir, connect, migrate, schema_version, MigrationError
@@ -105,10 +107,11 @@ evals/
   scratch/               Gitignored local JSONL exports
   results/               Published labeled JSONL exports only after E3 labels exist
 tests/
-  unit/                  Pure functions and models, including the Anthropic request, schema rewrite and response parsing, eval case loading and dry-run planning, fetch policy and limiter, adapter contract, and Greenhouse, Lever and Ashby feed mappings
-  component/             Real files and local servers, including the Anthropic adapter over real HTTP (wire request, error mapping, retry, budget guard), the no-network eval CLI dry run, response cache, polite client, and the Greenhouse, Lever and Ashby adapters (Lever on US and EU path prefixes, Ashby also answering a weak ETag with a 304)
-  integration/           Public DNS and feeds (needs_network), real Ollama eval runs and failure persistence, the live Anthropic call (needs a key, fails without one), and live Greenhouse, paged US and EU Lever, and Ashby boards (the probe, a made-up slug and a real weak ETag revalidation)
-  e2e/                   Separate-process flows for URL guard, posting fetch, HTML text, blacklist filtering, and eval CLI resume of pending cases
+  unit/                  Pure functions and models, including the Anthropic request, schema rewrite and response parsing, the strict schema helper, eval case loading and dry-run planning, fetch policy and limiter, adapter contract, and Greenhouse, Lever and Ashby feed mappings
+  component/             Real files and local servers, including the Anthropic and openai_compatible adapters over real HTTP (wire request, error mapping, retry, budget guard), the no-network eval CLI dry run, response cache, polite client, and the Greenhouse, Lever and Ashby adapters (Lever on US and EU path prefixes, Ashby also answering a weak ETag with a 304)
+  integration/           Public DNS and feeds (needs_network), real Ollama eval runs and failure persistence, the live Anthropic call (needs a key, fails without one), the credentialed live_openai and live_lmstudio tests, and live Greenhouse, paged US and EU Lever, and Ashby boards (the probe, a made-up slug and a real weak ETag revalidation)
+  e2e/                   Separate-process flows for the openai_compatible adapter against a loopback chat server, URL guard, posting fetch, HTML text, blacklist filtering, and eval CLI resume of pending cases
+  chat_server.py         Test-only real loopback chat completions server that records requests and plays a set reply
   http_support.py        Test-only real HTTP and UDP DNS servers with a loopback resolver; the HTTP server records methods and can route by query string for paged paths and answer an ETag with a 304
   fixtures/              Recorded or hand written inputs
     extraction/          A posting and a recorded real model output for the accept step

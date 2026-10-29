@@ -50,6 +50,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [0024](adr/0024-hand-labels-are-written-before-runs-and-carry-provenance.md) | Hand labels are written before any run from the posting and bank alone, carry provenance and a pending review, follow the human reading of importance, and are validated against the posting, the bank and the planted gaps |
 | [0025](adr/0025-anthropic-native-structured-output.md) | Anthropic adapter: native structured output instead of forced tool use, schema rewrite, error mapping, hosted rules and price defaults |
 | [0026](adr/0026-draft-help-checks-each-sentence.md) | Draft help: every sentence checked alone, failures shown as not verified, a gap gets no model call, nothing can be sent |
+| [0027](adr/0027-openai-compatible-adapter-and-model-pick.md) | The openai_compatible adapter for OpenAI and LM Studio: strict JSON schema, hosted rules, the truncation guard, and the model pick (proposed, needs confirmation) |
 | [0033](adr/0033-claim-words-in-v8-and-v10.md) | Draft claims about quantity, results, rank and negation are checked with finite deterministic word lists in V8 and V10, strict only for drafts |
 
 ## Configuration
