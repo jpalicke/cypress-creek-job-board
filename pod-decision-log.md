@@ -257,3 +257,8 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 
 ## D46. Migrations numbered in merge order
 - 2026-10-29, manager. The runner is gapless. #120, H7a (#138) and G2 each add a migration; the later merger renumbers. Reverse: none needed.
+
+## D47. Gap recall stays extracted-only, with planted_not_extracted published beside it (PR #135)
+- 2026-10-29, senior engineer recommended, manager accepted.
+- gap_recall's denominator is the planted gaps that were extracted (stage attribution, ADR 0032). To keep the headline honesty number honest, `planted_not_extracted` is published as an E4 metric (lower is better) so a run that skips planted gaps at extraction cannot show gap_recall 1.0 with no visible counter. Alternative: denominator of all planted gaps. To reverse: one line in repeat_values. FOR JOE P: this is the headline honesty metric; you may want the final call.
+- A bug found in review: the unmatched branch counted the strong planted rows (python 3, postgresql, sql) as planted gaps; being fixed test first.
