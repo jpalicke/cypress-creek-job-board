@@ -4,6 +4,8 @@ on:
   schedule:
     - cron: "0 8 * * 1"
   workflow_dispatch:
+permissions:
+  contents: read
 jobs:
   ollama:
     runs-on: ubuntu-latest
@@ -31,4 +33,4 @@ jobs:
       - run: ollama pull qwen3.5:0.8b
       - run: ollama --version
       - name: Live tests
-        run: uv run --locked pytest tests/integration -m live -q
+        run: uv run --locked pytest tests/integration -m "live and not needs_network" -q

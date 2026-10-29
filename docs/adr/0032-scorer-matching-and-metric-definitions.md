@@ -1,4 +1,4 @@
-# ADR 0027: How the scorer matches rows to labels and defines the E1 to E4 metrics
+# ADR 0032: How the scorer matches rows to labels and defines the E1 to E4 metrics
 
 Status: accepted (pod decision under Joe P's delegation, card E4; his review pending)
 
