@@ -32,6 +32,13 @@ https://api.lever.co/v0/postings/palantir?mode=json&limit=3
 It is included as a hostile input sample for tests. The posting text belongs to its
 publisher, and the feed did not state a reuse license.
 
+tests/fixtures/ashby/ashby_board.json holds the first three jobs of a public Ashby job board
+response, recorded on 2026-10-19:
+https://api.ashbyhq.com/posting-api/job-board/ashby
+It is kept as recorded except that the list was cut to three jobs. It is included as a
+hostile input sample for tests. The job text belongs to its publisher, and the feed did not
+state a reuse license.
+
 Takedown
 --------
 If you are the owner of material in this repository and want it removed, open

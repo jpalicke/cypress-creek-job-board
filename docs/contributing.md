@@ -6,8 +6,8 @@ The binding rules live in [CLAUDE.md](../CLAUDE.md). This page is the short, pla
 New here or handing a card to someone else? [handoff.md](handoff.md) is the complete step by step routine.
 
 - One card (issue) per branch, one pull request per card, merged to main after review. No worktrees.
-- Keep each PR to about 10 changed files (hard cap 20). Split a big card into several PRs, each with its own docs.
-- Work in phases of at most five files. Run verification after each phase and wait for approval before the next.
+- Keep each PR to roughly 20 changed files. Split a card that would go well past that into several PRs, each with its own docs.
+- Work in phases of up to about 20 files. Run verification after each phase and wait for approval before the next.
 - Test first (TDD): write a failing test, watch it fail, write the minimum code to pass, then refactor. When a design changes mid card, change the tests first and watch them fail before changing the code.
 - When asking for a merge, post the same summary as a comment on the card's issue.
 - Git hooks are never bypassed. If a hook fails, fix the cause.
@@ -28,6 +28,8 @@ The polite fetch layer has a `needs_network` integration test that fetches a rea
 The Greenhouse adapter has a `needs_network` integration test that maps a real large public board to listings through the real polite client, checks that its skipped jobs stay within the skip budget, then probes a real board and a made-up slug: `uv run pytest tests/integration/test_greenhouse_network.py -q`. It needs the internet and fails, never skips, when the network is unreachable. Run it when you touch anything under `discovery/adapters/` or the transport's 404 handling.
 
 The Lever adapter has its own `needs_network` integration test: it reads a real large public board across pages (at a page size of 10, about 32 requests, so it takes about a minute and a half), probes it, probes and fetches a made-up slug, and finds a real board that lives only on the EU host: `uv run pytest tests/integration/test_lever_network.py -q`. It needs the internet and fails, never skips, when the network is unreachable. Run it when you touch `discovery/adapters/lever.py`, `discovery/adapters/feed_common.py` or the paging.
+
+The Ashby adapter has its own `needs_network` integration test: it fetches a real public board, checks every listing, probes it, probes and fetches a made-up slug, and revalidates the stored weak ETag against the real server, which must answer 304: `uv run pytest tests/integration/test_ashby_network.py -q`. It takes a few seconds. It needs the internet and fails, never skips, when the network is unreachable. Run it when you touch `discovery/adapters/ashby.py`, `discovery/adapters/feed_common.py` or the polite client's conditional requests.
 
 The integration and e2e tiers are not in the gated run, so run them by hand when you touch what they cover. For the blacklist: `uv run pytest tests/e2e/test_blacklist_process.py tests/integration/test_blacklist_dns.py -q`. The e2e file starts real child Python processes against a real temp SQLite file. The integration file is marked `needs_network` and resolves a real host, so an unreachable network makes it fail, never skip.
 
