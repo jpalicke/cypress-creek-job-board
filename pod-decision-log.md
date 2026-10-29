@@ -184,3 +184,10 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 - The gpt-6-luna model pick comes from a web page and needs confirmation.
 - A successful reply with a high reported prompt count is discarded (conservative truncation guard).
 - Two near-duplicate schema rewriters (Anthropic and OpenAI adapters) and different context_tokens defaults remain as optional cleanups.
+
+## D32. ADR numbers pre-assigned instead of merge order
+- 2026-10-29, senior engineer proposed, manager accepted.
+- Plan: #126 = 0026 (core promise fix), #124 = 0027, #125 = 0028, #120 = 0029, G2 = 0030, H6 = 0031, later PRs 0032+. Gaps are fine if a PR is dropped. Reverse: renumber at merge time.
+
+## D33. G1 security review status (PR #125)
+- 2026-10-29, senior engineer probed the Host and CSRF logic (duplicate Host, trailing dot, padded port, no Host, IPv6, lookalikes all 403; compare_digest on every write; no CORS). Joe P's own second human review of the Host and CSRF logic is still owed; exact files and functions are listed in the PR comment.
