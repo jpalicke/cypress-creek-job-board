@@ -214,6 +214,8 @@ def _check_planted(label: LabeledRequirement, planted: dict[str, Support]) -> li
 
 
 def _check_cues(labels: Labels, posting: str) -> list[str]:
+    """Problems with the cue sentences. An unlabeled posting sentence is quoted on purpose: the
+    postings are our own committed fixtures, so the text is known and helps find the gap."""
     problems: list[str] = []
     labeled: list[tuple[int, int]] = []
     for number, cue in enumerate(labels.cue_sentences, start=1):

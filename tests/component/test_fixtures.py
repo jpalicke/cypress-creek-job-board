@@ -107,3 +107,11 @@ def test_the_fixture_set_hash_changes_when_any_posting_changes(tmp_path: Path) -
     )
 
     assert fixture_set_hash([changed, *fixtures[1:]]) != before
+
+
+def test_a_folder_whose_name_differs_from_its_fixture_id_is_refused(tmp_path: Path) -> None:
+    copy = tmp_path / "greenhouse-0000000000"
+    shutil.copytree(DIRECTORIES[0], copy)
+
+    with pytest.raises(LabelError, match="fixture_id"):
+        load_fixture(copy)
