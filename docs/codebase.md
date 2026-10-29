@@ -30,14 +30,15 @@ src/cypress_creek/       The library
   pipeline/              Stages that build model prompts (extraction wording lives in prompts/)
     prompt.py            Stage, Prompt (with user_message), build_prompt, prompt_facts, PromptError
     retrieve.py          retrieve, RequirementCandidates, MAX_CANDIDATES: tag and alias retrieval, no model
-    schemas.py           ExtractionOutput, ProposedRequirement, EntailmentOutput, EntailmentVerdict: the shapes the models answer in
+    schemas.py           ExtractionOutput, ProposedRequirement, EntailmentOutput, EntailmentVerdict, DraftOutput: the shapes the models answer in
     extract.py           extract_requirements, ExtractionResult, accept_proposals, Acceptance, Dropped, DropReason
     entail.py            entail, judge, EntailedMatch, Entailment: stage 3, the verdict only lowers support
+    draft.py             draft, judge_draft, render_draft, Draft: optional draft help, every sentence checked, nothing is sent
     report.py            GapReport, build_report, verify_report, ReportRefused: stage 4, the report as data
     render.py            render_text: stage 5, the plain text view of a report
     run.py               analyze, assess, run_id: the whole run, with provenance and a run id derived from its inputs
     trace.py             PipelineTrace, CallRecord, ValidatorRecord: observed calls and validator verdicts
-    prompts/             Versioned system texts, one file per stage and version (extract_v2.txt, entail_v1.txt)
+    prompts/             Versioned system texts, one file per stage and version (extract_v2.txt, entail_v1.txt, draft_v1.txt)
   ingest/                Untrusted posting text in, clean models out
     models.py            Posting, Requirement, typed warnings
     normalize.py         normalize(), text_hash()
@@ -153,6 +154,8 @@ flowchart LR
     ceiling --> score["scoring.score()"]
     score --> result["score, supported of total, inputs"]
     reqs -. model output .-> val["validators (V1 to V14)"]
+    ceiling --> draftfn["pipeline.draft(): V4 to V10 per sentence, no support means no call"]
+    draftfn -. actual verdicts .-> trace
     val -. actual verdicts .-> trace
     discovery[Discovery caller] --> polite["discovery.polite_client.PoliteClient.get()"]
     polite --> cachefile[(fetch_cache/ by URL hash)]
@@ -162,7 +165,7 @@ flowchart LR
     adapter --> polite
     adapter --> listings["Listing rows: id, title, location, content_text, content_hash"]
 ```
-The diagram shows library components, not a running app workflow. The link fetcher returns raw bytes, and a caller can pass HTML bytes separately to the HTML text extractor before normalization. PDF text extraction, a user-facing app workflow and drafting remain later cards (see the issue board and the spec).
+The diagram shows library components, not a running app workflow. The link fetcher returns raw bytes, and a caller can pass HTML bytes separately to the HTML text extractor before normalization. PDF text extraction and a user-facing app workflow remain later cards. Draft help exists as a library step (`pipeline.draft`) that returns checked data and sends nothing (see the issue board and the spec).
 
 URL validation is a separate library entry point. It rejects unsafe syntax, resolves a hostname once, checks every address, and returns connection coordinates without fetching anything. `fetch_url` uses that selected IP for the connection while retaining the hostname for Host and TLS verification. It revalidates every redirect, bounds the final response and gives DNS resolution a whole-fetch deadline in a child process. The test audit restricts HTTP client imports to this transport and the separate Ollama provider adapter. `PoliteClient.get(url)` is the one entry point for repeat discovery fetches. It sits over the same `fetch_url` transport and adds a per host delay, a refresh window, an ETag disk cache and backoff on 429 and 5xx, then returns a `CachedResponse`. No discovery code calls `fetch_url` directly. See [Polite fetching](architecture.md#polite-fetching), [the setup guide](setup.md#fetch-a-job-board-politely) and [ADR 0019](adr/0019-polite-fetch-timing-and-clocks.md).
 
@@ -192,6 +195,7 @@ See [the fetching architecture](architecture.md), [the SSRF rules and limits](th
 - **A positive verdict must cite.** `judge` counts a `supports` or `partial` verdict with no valid citation (candidate, verified, shareable) as `does_not_support`, and withholds any rationale that fails V7 to V10. See `pipeline.md`.
 - **A run id is derived, not random.** `run_id` hashes the posting, the fact bank, the backend and the model, so the same inputs give the same id and a changed input gives a new one. See `pipeline.md`.
 - **Eval resume identity is stricter than report identity.** `RunHeader.run_id` hashes the complete eval header, including commit, prompts, schemas, fixture set, bank, case plan and repeats. `EvalStore` validates SQLite records and resumes only unrecorded case pairs; JSONL is a read-only export, and only a terminal record marks a run complete. This is separate from the pipeline report's `run_id`, which intentionally excludes prompt versions. See [evals.md](evals.md#run-record-format) and [ADR 0018](adr/0018-eval-run-identity.md).
+- **Draft help can only show data.** `pipeline/draft.py` checks each sentence with V4 to V10, keeps failures visible as `NOT VERIFIED` and never as clean text, answers a gap with `no verified fact supports this` and no model call, and has no send, copy or apply path (a unit test audits its imports). See [pipeline.md](pipeline.md#draft-help).
 - **The pipeline trace records what ran.** Pass a `PipelineTrace` to `analyze` or `assess` for per-attempt provider records and the actual validator verdicts. Extraction, entailment and report assembly append to the same trace. Missing usage is nullable, never guessed in the audit. The eval CLI persists completed case traces and failed terminal attempts through `EvalStore`; see [evals.md](evals.md#run-the-harness).
 - **A report cites or is refused.** `build_report` ends with `verify_report` (V4, V5, V9), so a fabricated or unverified fact id never reaches a report. Failed stages make the report incomplete rather than quietly partial. See `pipeline.md`.
 - **Retrieval is not a model.** `retrieve` matches tags and aliases, ranks and caps the candidates, and sets the support ceiling. A requirement with no candidate is a gap and costs no model call. See `pipeline.md`.
