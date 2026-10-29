@@ -37,6 +37,15 @@ def _is_loopback(host: str) -> bool:
         return False
 
 
+def is_loopback_url(url: str) -> bool:
+    """True when the URL's host is localhost or a loopback address."""
+    try:
+        host = urlsplit(url).hostname
+    except ValueError:
+        return False
+    return host is not None and _is_loopback(host)
+
+
 class ProviderSettings(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 

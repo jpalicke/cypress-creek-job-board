@@ -2,6 +2,8 @@ name: deterministic
 on:
   push:
   pull_request:
+permissions:
+  contents: read
 jobs:
   checks:
     runs-on: ubuntu-latest
@@ -16,3 +18,13 @@ jobs:
       - name: ABOUTME headers
         run: uv run --locked python scripts/check_aboutme.py $(git ls-files '*.py' '*.sh' '*.ts' '*.tsx' '*.js' '*.mjs' '*.cjs' '*.sql' '*.svelte')
       - run: uv run --locked pytest tests/unit tests/component --cov --cov-fail-under=80
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+      - run: uv sync --locked
+      # Offline end to end and integration tests only: real child processes, real SQLite and
+      # real loopback servers. Tests that need the internet or a model run in network.yml and live.yml.
+      - run: uv run --locked pytest tests/e2e tests/integration -m "not needs_network and not live and not live_openai and not live_lmstudio" -q

@@ -95,7 +95,7 @@ print(score(matches, load_weights()).model_dump_json(indent=1))"
 
 | Field | Content |
 | --- | --- |
-| `system` | The trusted, static, versioned text from `pipeline/prompts/` (`extract_v2.txt` for extraction, `entail_v1.txt` for entailment). Never any posting text or facts. |
+| `system` | The trusted, static, versioned text from `pipeline/prompts/` (`extract_v2.txt` for extraction, `entail_v1.txt` for entailment, `draft_v1.txt` for draft help). Never any posting text or facts. |
 | `data_block` | The posting, verbatim, between `<<<POSTING token>>>` and `<<<END POSTING token>>>` lines. This is the only untrusted part. |
 | `facts_block` | The trusted facts for stages that show them: a `VERIFIED FACTS` line, then one `F-0001: claim` line per fact. Always empty for extraction, because the model never sees the bank while extracting. |
 | `boundary_token` | 128 bits from `secrets`, new on every call. |
@@ -106,6 +106,7 @@ print(score(matches, load_weights()).model_dump_json(indent=1))"
 - `prompt_facts(facts, capabilities)` is the fact filter. A fact needs `verified_on`, and a `local_only` fact is dropped unless the backend is local. It does not trust that the caller passed only verified facts.
 - The data block is passed to the provider as `data_block` and the system text as `system`, so the two never merge. A stage that shows facts sends `user_message`, which puts the facts after the closing boundary line, so a fact is never inside the untrusted block and never in the system message.
 - The entailment stage (`Stage.ENTAIL`) passes one requirement's text where the others pass the posting, so that text is untrusted too. It lists only `prompt_facts` of the facts it is given.
+- Draft help (`Stage.DRAFT`) works like entailment: the requirement text is the untrusted block, and the facts it may use come after it. The model answers in `DraftOutput`, see [Draft help](#draft-help).
 - The model answers in `EntailmentOutput` (`pipeline/schemas.py`): `schema_version` 1, a `verdict` of `supports`, `partial` or `does_not_support`, the cited `fact_ids` and a short `rationale`. The verdict can only lower the support ceiling, see [ADR 0011](adr/0011-entailment-can-only-lower-support.md).
 - The prompt is the first layer only. The validators after the model are the real control, see [threat-model.md](threat-model.md#prompt-structure-t1-to-t4).
 - Extraction uses `extract_v2.txt`. To change the wording, add `extract_v3.txt`, point `TEMPLATES` at it and update the tests. Do not edit a released version, so old hashes stay meaningful.
@@ -281,6 +282,45 @@ r = entail(req, cands, bank, provider)
 print(r.entailment.value, r.failure, r.match.support.value, r.fact_ids, r.rationale)"
 ```
 It prints the entailment status, the failure label or `None`, the final support, the validated citations and the rationale. A small model may disagree with the rule ceiling. The support is never above `strong` here, and a failed call prints `not_run` with the ceiling kept.
+
+## Draft help
+`draft(requirement, candidates, bank, provider)` in `pipeline/draft.py` is optional help, last in the pipeline on purpose. The analysis and the gap report are the product. Given one requirement and its stage 2 candidates, the model paraphrases the verified facts into a short bullet (at most 5 sentences, each with the fact IDs it paraphrases). Code then checks every sentence and returns a `Draft`. See [ADR 0026](adr/0026-draft-help-checks-each-sentence.md).
+
+- **The tool never submits anything.** There is no send, copy, apply or post path. `draft` and `judge_draft` return data, and a unit test fails if `pipeline/draft.py` imports anything that can reach a network, process, clipboard or file. A person copies text by hand. Every `Draft` carries `needs_human_review`, which is always true, and the rendered text opens with a review banner.
+- **A gap is never papered over.** If the requirement has no candidates, or its support ceiling is `none`, the answer is `no_support` with the text `no verified fact supports this` and advice to add a verified fact to the bank. No model call is made.
+- **Every sentence gets seven checks, none skipped.** V4 (the cited fact was one of the facts supplied to the model, so a real fact the model never saw cannot be cited), V5 (verified), V6 (shareable on a hosted backend), V7 (dates match, no employer or role of an uncited fact), V8 (every number appears in a cited fact), V9 (it cites at least one fact) and V10 (no name or tool that no cited fact mentions). V2 does not apply, because a draft quotes no posting span. The verdicts stay on the sentence.
+- **The allow-list is the cited facts only.** The posting text is hostile input and a draft is a claim about you, so a number, employer or skill that appears only in the requirement never makes a sentence clean. (Entailment rationales may use the requirement's words, drafts may not.) A sentence is also capped at 300 characters, the length of a fact claim.
+- **Failures are shown, never clean.** A sentence that fails any check stays in `Draft.sentences` with its verdicts, and `render_draft` prints it as `! NOT VERIFIED (V8: ...)`. Only `Draft.clean_sentences` (those that passed every check) is fit to copy. Model text is flattened to one line, so a sentence cannot forge a line or banner.
+- **Failures.** `status` is `drafted`, `no_support` or `not_run`. A typed provider failure, or a model that returns no sentences, is `not_run` with a `failure` label. `BudgetExceeded` is not caught. The model may write at most half the window, never more than 600 tokens. One call, plus the one schema retry.
+- **Limits.** The checks are heuristics, and four classes of unsupported claim are known to pass every check and print as a clean line (tracked in [issue #131](https://github.com/jpalicke/cypress-creek-job-board/issues/131), and pinned by tests so they cannot be forgotten):
+  - quantity words that are not numbers: "... to Python for a decade" passes because V8 reads digits and number words such as `ten`, not `decade`, `dozen` or `half`;
+  - an invented outcome: "..., doubling revenue" passes because V10 only flags capitalised, digit, acronym or camelCase terms;
+  - seniority or adjective inflation: "... 8 senior staff engineers" passes for the same reason;
+  - negation or reversal: "Never led a team of 8 engineers ..." passes because every word and number is in the fact and the validators do not read meaning.
+
+  Also, V8 cannot tell that a correct number is attached to the wrong thing, and citing an unrelated verified fact still passes V4 to V9. So a clean line means only "no check found a problem", never "this is true". A draft is a human-review aid: `needs_human_review` stays true, and you must read every line against your own record before using it. Cover letters and long form writing are out of scope.
+
+### Try judging a draft
+No model is needed. This feeds `judge_draft` a recorded style draft with one good sentence, one that inflates a number and invents an employer, and one that cites nothing.
+```bash
+uv run python -c "
+from cypress_creek.facts import parse_bank
+from cypress_creek.ingest.models import Importance, Requirement, RequirementKind
+from cypress_creek.pipeline.draft import judge_draft, render_draft
+from cypress_creek.pipeline.schemas import DraftOutput
+from cypress_creek.providers.base import Capabilities, CostPerMtok
+
+bank = parse_bank({'facts': [{'id': 'F-0001', 'claim': 'Led a team of 8 engineers moving a billing system to Python.', 'kind': 'project', 'employer': 'Initech', 'tags': [{'name': 'python', 'level': 'expert'}], 'verified_on': '2024-01-01', 'evidence': {'type': 'repo', 'pointer': 'https://example.invalid/a'}, 'share': 'shareable'}]})
+caps = Capabilities(context_tokens=8192, strict_schema=True, local=True, cost_per_mtok=CostPerMtok(input=0, output=0))
+req = Requirement(id='R-1', text='Needs Python.', span=(0, 13), kind=RequirementKind.SKILL, term='python', importance=Importance.REQUIRED)
+out = DraftOutput.model_validate({'schema_version': 1, 'sentences': [
+    {'text': 'Led a team of 8 engineers moving a billing system to Python.', 'fact_ids': ['F-0001']},
+    {'text': 'Led a team of 12 engineers at Globex.', 'fact_ids': ['F-0001']},
+    {'text': 'Mentored every new hire.', 'fact_ids': []},
+]})
+print(render_draft(judge_draft(out, req, ['F-0001'], bank, caps)))"
+```
+It prints the review banner, the requirement, then `- Led a team of 8 engineers ... [F-0001]` for the good sentence and two `! NOT VERIFIED` lines: the second names V8 (the number 12) and V10 (the term `globex`), the third names V9 (no citation).
 
 ## Stages 4 and 5: score and report
 The numbering in this file is one scheme: 0 normalize, 1 extract, 2 retrieve, 3 entail, 4 score and report assembly, 5 render. The spec table also lists a stage 6, drafting, which is post v1 and not built. The card titles that say "stages 4 to 6" use an older count.
