@@ -44,3 +44,11 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 
 ## D8. C5 reassigned from Worker C to Worker G
 - 2026-10-29, manager. Worker G had idle capacity. Worker C keeps #116 fixes, C4 and D7.
+
+## D9. Dependabot PRs with an inherited red audit
+- 2026-10-29, senior engineer proposed, manager adjusted.
+- Reviewer approved #118 and #117 on a local merged-tree audit. Manager choice: do not merge on a stale red check. Ask Dependabot to rebase (`@dependabot rebase`), wait for fresh green CI, then merge one lockfile PR at a time. Each merge makes the others conflict, so they are rebased in turn.
+- To reverse: merge on the reviewer's local verification alone.
+
+## D10. actions/cache v4 to v6 merged (PR #100)
+- 2026-10-29, manager merged after senior approval. The reviewer dispatched the live workflow on the branch (Ollama cache restored, 12 live tests passed) because PRs never run `live.yml`.
