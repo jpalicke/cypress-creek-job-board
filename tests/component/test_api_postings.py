@@ -146,28 +146,33 @@ def test_a_pdf_is_checked_for_size_and_type_before_anything_reads_it(client: Api
     assert plausible.json()["error"]["code"] == "pdf_extraction_unavailable"
 
 
-def test_a_json_body_over_the_limit_is_refused_and_chunked_bodies_need_a_length(
-    client: ApiClient,
-) -> None:
+def test_a_json_body_over_the_limit_is_refused(client: ApiClient) -> None:
     huge = client.post(
         "/api/postings",
         content=b'{"source":"paste","text":"' + b"a" * (1024 * 1024) + b'"}',
         headers=csrf_headers(client, {"content-type": "application/json"}),
     )
+
     assert huge.status_code == 413
     assert huge.json()["error"]["code"] == "payload_too_large"
 
-    async def chunks() -> AsyncIterator[bytes]:
+
+def test_a_chunked_body_is_counted_and_accepted_within_the_limit(client: ApiClient) -> None:
+    async def small() -> AsyncIterator[bytes]:
         yield b'{"source":"paste",'
         yield b'"text":"x"}'
 
-    chunked = client.post(
-        "/api/postings",
-        content=chunks(),
-        headers=csrf_headers(client, {"content-type": "application/json"}),
-    )
-    assert chunked.status_code == 411
-    assert chunked.json()["error"]["code"] == "length_required"
+    async def endless() -> AsyncIterator[bytes]:
+        for _ in range(40):
+            yield b" " * (64 * 1024)
+
+    headers = csrf_headers(client, {"content-type": "application/json"})
+    accepted = client.post("/api/postings", content=small(), headers=headers)
+    refused = client.post("/api/postings", content=endless(), headers=headers)
+
+    assert accepted.status_code == 201
+    assert refused.status_code == 413
+    assert refused.json()["error"]["code"] == "payload_too_large"
 
 
 def test_analyze_needs_a_known_posting_and_the_configured_backend(client: ApiClient) -> None:

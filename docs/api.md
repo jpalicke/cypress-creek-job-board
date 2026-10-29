@@ -42,7 +42,7 @@ The draft help route arrives later (G4 and D7).
 - **No leaks.** No answer contains a key, an environment value, a stack trace or raw remote content. A link that fails says only that it failed and, for a policy block, the stable reason code.
 
 ### Body size limits
-A body without a declared `Content-Length` (chunked) is refused with `length_required` (411). A body over 1 MiB is `payload_too_large` (413), and a PDF upload may be up to 10 MiB. The check uses the declared length before the body is read. Pasted text is also capped at 50,000 characters by the normalizer (`posting_too_long`).
+A request body is limited to 1 MiB, and a PDF upload to `POST /api/postings` (`Content-Type: application/pdf`) to 10 MiB. No other route gets the larger limit, whatever content type it declares. A declared `Content-Length` over the limit is refused with `payload_too_large` (413) before anything is read. Every body is also counted as it is received, so a missing, wrong or chunked length cannot let more through: the request is answered 413 as soon as the count passes the limit. Chunked bodies are accepted within the limit. Pasted text is also capped at 50,000 characters by the normalizer (`posting_too_long`).
 
 ### Storage
 Postings and reports live in the SQLite database (`CYPRESS_CREEK_DATA_DIR`, default `data/`), created and migrated when the server starts (and, for an app built another way, the first time a route needs it). A posting row holds the normalized text and its provenance; a report row holds the whole `GapReport` as JSON and the validator verdicts, and must point at a stored posting. See [data-model.md](data-model.md#postings-and-reports). The fact bank stays in YAML.
@@ -56,7 +56,6 @@ Postings and reports live in the SQLite database (`CYPRESS_CREEK_DATA_DIR`, defa
 | `method_not_allowed` | 405 | The path exists but not for this method. This includes CORS preflights. |
 | `invalid_request` | 422 | The body or query did not match the route's model. `details` lists each `field` and a `problem`, never the submitted value. |
 | `payload_too_large` | 413 | The body is over the size limit. |
-| `length_required` | 411 | The body did not declare its length. |
 | `unsupported_media_type` | 415 | `POST /api/postings` takes JSON or a PDF. |
 | `empty_posting` | 422 | The text, or the page text, is empty. Paste the posting text. |
 | `posting_too_long` | 413 | The text is over 50,000 characters. |

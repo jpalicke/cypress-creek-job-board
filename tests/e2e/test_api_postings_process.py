@@ -142,3 +142,51 @@ def test_a_database_that_cannot_be_prepared_stops_the_server_with_a_clear_error(
     assert result.returncode == 2
     assert "the database could not be prepared" in result.stderr
     assert "Traceback" not in result.stderr
+
+
+def raw_post(token: str, head_lines: list[str], body_parts: list[bytes]) -> bytes:
+    """A POST to /api/postings written onto a real socket, then the start of the answer."""
+    request = (
+        "POST /api/postings HTTP/1.1\r\nHost: 127.0.0.1:5309\r\nConnection: close\r\n"
+        f"Content-Type: application/json\r\nX-CSRF-Token: {token}\r\n"
+        + "".join(line + "\r\n" for line in head_lines)
+        + "\r\n"
+    ).encode()
+    with socket.create_connection(("127.0.0.1", PORT), timeout=10) as connection:
+        connection.sendall(request)
+        try:
+            for part in body_parts:
+                connection.sendall(part)
+        except OSError:
+            pass  # the server may close the connection early, which is the point
+        connection.settimeout(10)
+        answer = b""
+        try:
+            while chunk := connection.recv(65536):
+                answer += chunk
+        except OSError:
+            pass
+    return answer
+
+
+def test_a_large_chunked_or_understated_body_is_stopped_on_the_real_server(tmp_path: Path) -> None:
+    big = b" " * (64 * 1024)
+    with running_server(tmp_path):
+        _, session = call("GET", "/api/session")
+        assert isinstance(session, dict)
+        token = session["csrf_token"]
+
+        chunked = raw_post(
+            token,
+            ["Transfer-Encoding: chunked"],
+            [f"{len(big):x}\r\n".encode() + big + b"\r\n" for _ in range(40)] + [b"0\r\n\r\n"],
+        )
+        understated = raw_post(token, ["Content-Length: 10"], [big] * 40)
+        declared = raw_post(token, [f"Content-Length: {5 * 1024 * 1024}"], [])
+        after, _ = call("GET", "/api/health")
+
+    assert chunked.startswith(b"HTTP/1.1 413")
+    assert b"payload_too_large" in chunked
+    assert understated.startswith((b"HTTP/1.1 413", b"HTTP/1.1 400"))
+    assert declared.startswith(b"HTTP/1.1 413")
+    assert after == 200

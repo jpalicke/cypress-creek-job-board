@@ -13,6 +13,7 @@ API_PORT = 5309
 TOKEN_HEADER = "X-CSRF-Token"
 MAX_BODY_BYTES = 1024 * 1024
 MAX_PDF_BYTES = 10 * 1024 * 1024
+PDF_UPLOAD_ROUTE = ("POST", "/api/postings")
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 TOKEN_HEADER_BYTES = TOKEN_HEADER.lower().encode("ascii")
 TOKEN_BYTES = 32
@@ -55,43 +56,63 @@ class HostCheckMiddleware:
             return False
 
 
-class BodyLimitMiddleware:
-    """Refuses a body whose declared length is over the limit, and any body without a length.
+class _BodyTooLarge(Exception):
+    """Raised inside the receive channel when the bytes read pass the limit."""
 
-    The server reads exactly the declared number of bytes, so the declared length is the limit.
-    A PDF upload may be larger than a JSON body."""
+
+class BodyLimitMiddleware:
+    """Stops a request body at a byte limit, whatever its headers claim.
+
+    A declared length over the limit is refused before anything is read. Every body is also
+    counted as it is received, so a missing, wrong or chunked length cannot let more through. The
+    larger PDF limit applies only to the posting upload route (`POST /api/postings`)."""
 
     def __init__(self, app: ASGIApp, default_limit: int, pdf_limit: int) -> None:
         self._app = app
         self._default_limit = default_limit
         self._pdf_limit = pdf_limit
 
+    def _limit_for(self, scope: Scope, headers: dict[bytes, bytes]) -> int:
+        media = headers.get(b"content-type", b"").split(b";")[0].strip().lower()
+        is_upload = (scope["method"], scope["path"]) == PDF_UPLOAD_ROUTE
+        return self._pdf_limit if is_upload and media == b"application/pdf" else self._default_limit
+
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
             await self._app(scope, receive, send)
             return
         headers = {name: value for name, value in scope["headers"]}
-        refusal = self._refusal(headers)
-        if refusal is None:
-            await self._app(scope, receive, send)
-            return
-        response: Response = refusal
-        await response(scope, receive, send)
-
-    def _refusal(self, headers: dict[bytes, bytes]) -> Response | None:
-        if b"transfer-encoding" in headers:
-            return error_response(411, ErrorCode.LENGTH_REQUIRED)
+        limit = self._limit_for(scope, headers)
         try:
-            length = int(headers.get(b"content-length", b"0") or b"0")
+            declared = int(headers.get(b"content-length", b"0") or b"0")
         except ValueError:
-            return error_response(411, ErrorCode.LENGTH_REQUIRED)
-        media = headers.get(b"content-type", b"").split(b";")[0].strip().lower()
-        limit = self._pdf_limit if media == b"application/pdf" else self._default_limit
-        if length < 0:
-            return error_response(411, ErrorCode.LENGTH_REQUIRED)
-        if length > limit:
-            return error_response(413, ErrorCode.PAYLOAD_TOO_LARGE)
-        return None
+            declared = 0
+        refusal: Response = error_response(413, ErrorCode.PAYLOAD_TOO_LARGE)
+        if declared > limit:
+            await refusal(scope, receive, send)
+            return
+        received = 0
+        started = False
+
+        async def counted_receive() -> Message:
+            nonlocal received
+            message = await receive()
+            received += len(message.get("body", b""))
+            if received > limit:
+                raise _BodyTooLarge
+            return message
+
+        async def tracked_send(message: Message) -> None:
+            nonlocal started
+            started = started or message["type"] == "http.response.start"
+            await send(message)
+
+        try:
+            await self._app(scope, counted_receive, tracked_send)
+        except _BodyTooLarge:
+            if started:
+                raise
+            await refusal(scope, receive, send)
 
 
 class CsrfMiddleware:

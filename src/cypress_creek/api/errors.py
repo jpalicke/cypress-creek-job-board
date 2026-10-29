@@ -21,7 +21,6 @@ class ErrorCode(StrEnum):
     HTTP_ERROR = "http_error"
     INTERNAL_ERROR = "internal_error"
     PAYLOAD_TOO_LARGE = "payload_too_large"
-    LENGTH_REQUIRED = "length_required"
     UNSUPPORTED_MEDIA_TYPE = "unsupported_media_type"
     EMPTY_POSTING = "empty_posting"
     POSTING_TOO_LONG = "posting_too_long"
@@ -50,7 +49,6 @@ MESSAGES = {
     ErrorCode.HTTP_ERROR: "The request could not be handled.",
     ErrorCode.INTERNAL_ERROR: "The server hit an unexpected error.",
     ErrorCode.PAYLOAD_TOO_LARGE: "The request body is too large.",
-    ErrorCode.LENGTH_REQUIRED: "The request must declare its length.",
     ErrorCode.UNSUPPORTED_MEDIA_TYPE: "The content type is not supported here.",
     ErrorCode.EMPTY_POSTING: "The posting has no text. Paste the posting text.",
     ErrorCode.POSTING_TOO_LONG: "The posting text is too long.",
