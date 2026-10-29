@@ -177,3 +177,10 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 - No GET /api/postings/{id} yet, because no card needs it.
 - A down backend gives a 200 with an incomplete report, stored and returned.
 - Unverified here: the needs_network link test returns 502 in this sandbox (no public DNS through the guard); the live test needs Ollama.
+
+## D31. Open questions for Joe P from the C4 peer review (PR #124)
+- 2026-10-29, Worker E peer review, manager logging.
+- Hosted OpenAI calls send no temperature, which affects the temperature-0 rule that the E8 first published run assumes. Needs a decision once the OpenAI live test has run.
+- The gpt-6-luna model pick comes from a web page and needs confirmation.
+- A successful reply with a high reported prompt count is discarded (conservative truncation guard).
+- Two near-duplicate schema rewriters (Anthropic and OpenAI adapters) and different context_tokens defaults remain as optional cleanups.
