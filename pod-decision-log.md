@@ -21,3 +21,18 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 - Reasoning: avoids a new third party dependency and the supply chain review it needs, keeps output pristine, and still exercises the real ASGI app with no mocks.
 - To reverse: `uv add --dev httpx2`, switch the component tests to `fastapi.testclient`, and run `pip-audit` and `check_licenses.py`.
 - Departs from the card text ("FastAPI's real test client").
+
+## D4. Region held on the watchlist entry (H1d, PR #120)
+- 2026-10-29, Worker H.
+- Choice: `WatchlistEntry.region`, `Watchlist.set_region` and `LeverAdapter.remember_region`, with migration 0005.
+- Alternatives: put region on `ExistenceResult`; have the adapter read the database.
+- Reasoning: keeps adapters pure and avoids widening the shared contract.
+- To reverse: drop the migration 0005 column and the two methods.
+
+## D5. H1d naming for the #109 PR
+- 2026-10-29, Worker H.
+- #109 PR is titled "H1d" because the issue belongs with H1. Alternative: a separate id. Retitle to reverse.
+
+## D6. Dependency audit fix as its own PR
+- 2026-10-29, manager.
+- The `audit` CI job fails on virtualenv 21.14.3 CVEs (fixed in 21.14.9), a dev dependency unrelated to any card. Worker H fixes it in a separate minimal lockfile PR so cards stay focused. Reverse by reverting that PR.
