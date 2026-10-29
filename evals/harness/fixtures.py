@@ -85,7 +85,10 @@ def load_fixture(directory: Path) -> Fixture:
     meta = _load_meta(directory / "meta.yaml")
     if meta.normalized_sha256 != text_hash(text):
         raise LabelError([f"{directory.name}: meta hash does not match posting.txt"])
-    return Fixture(directory, text, meta, load_labels(directory / "labels.yaml"))
+    labels = load_labels(directory / "labels.yaml")
+    if not directory.name == meta.fixture_id == labels.fixture_id:
+        raise LabelError([f"{directory.name}: fixture_id must equal the folder name"])
+    return Fixture(directory, text, meta, labels)
 
 
 def fixture_set_hash(fixtures: list[Fixture]) -> str:
