@@ -7,7 +7,7 @@ New here or handing a card to someone else? [handoff.md](handoff.md) is the comp
 
 - One card (issue) per branch, one pull request per card, merged to main after review. No worktrees.
 - Keep each PR to about 10 changed files (hard cap 20). Split a big card into several PRs, each with its own docs.
-- A phase may cover one PR, with at most 20 changed files. Run verification after the phase and wait for approval before another phase.
+- Work in phases of at most five files. Run verification after each phase and wait for approval before the next.
 - Test first (TDD): write a failing test, watch it fail, write the minimum code to pass, then refactor. When a design changes mid card, change the tests first and watch them fail before changing the code.
 - When asking for a merge, post the same summary as a comment on the card's issue.
 - Git hooks are never bypassed. If a hook fails, fix the cause.
