@@ -1,5 +1,7 @@
 # ABOUTME: Deterministic listing filters (keywords, location, remote, seniority, age) with counts.
 # ABOUTME: Cheap rejection before any model call. No model is consulted, and today is injected.
+import re
+import unicodedata
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
@@ -9,6 +11,13 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from cypress_creek.discovery.adapters.base import Listing
 from cypress_creek.discovery.dedupe import fingerprint_text
+
+# A title says the job is remote only in a bracket, after a dash or before one, as in
+# "Engineer (Remote)", "Engineer - Remote" and "Remote - Engineer". The word alone inside a title
+# can be part of the job, as in "Remote Sensing Engineer".
+_REMOTE_IN_TITLE = re.compile(
+    r"[(\[][^)\]]*\bremote\b[^)\]]*[)\]]|[-\u2013\u2014|:]\s*remote\s*$|^\s*remote\s*[-\u2013\u2014|:]"
+)
 
 
 class FilterName(StrEnum):
@@ -82,10 +91,7 @@ def _first_failure(listing: Listing, filters: ListingFilters, today: date) -> Fi
         return FilterName.AGE
     if filters.locations and not _has_any(location, filters.locations):
         return FilterName.LOCATION
-    if (
-        filters.remote is not None
-        and _has_any(f"{location} {title}", ("remote",)) != filters.remote
-    ):
+    if filters.remote is not None and _is_remote(listing, location) != filters.remote:
         return FilterName.REMOTE
     if _has_any(title, filters.exclude_seniority):
         return FilterName.SENIORITY
@@ -94,6 +100,13 @@ def _first_failure(listing: Listing, filters: ListingFilters, today: date) -> Fi
     if filters.include_keywords and not _has_any(text, filters.include_keywords):
         return FilterName.INCLUDE
     return None
+
+
+def _is_remote(listing: Listing, location: str) -> bool:
+    """Whether the location says remote, or the title does in one of its marked forms."""
+    return _has_any(location, ("remote",)) or bool(
+        _REMOTE_IN_TITLE.search(unicodedata.normalize("NFKC", listing.title).casefold())
+    )
 
 
 def _has_any(normalized_text: str, terms: Sequence[str]) -> bool:

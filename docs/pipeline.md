@@ -452,7 +452,7 @@ Discovery turns the listings an adapter fetched into the ones worth scoring, bef
 | --- | --- |
 | `max_age_days` | `today` minus the posted date is at most N days. A listing with no `posted_at` is kept, since age cannot be judged. |
 | `locations` | the location contains any listed place |
-| `remote` | `true`: the location or title says `remote`. `false`: it does not. |
+| `remote` | `true`: the location says `remote`, or the title says it in a marked form (`Engineer (Remote)`, `Engineer - Remote`, `Remote - Engineer`). `false`: it does not. The word alone inside a title, as in `Remote Sensing Engineer`, is not a work location. |
 | `exclude_seniority` | no term appears in the title |
 | `exclude_keywords` | no term appears in the title or description |
 | `include_keywords` | at least one term appears in the title or description |
