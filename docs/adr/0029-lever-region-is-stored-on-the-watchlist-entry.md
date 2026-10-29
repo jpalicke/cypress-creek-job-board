@@ -1,4 +1,4 @@
-# ADR 0026: The Lever region is stored on the watchlist entry and seeded back into the adapter
+# ADR 0029: The Lever region is stored on the watchlist entry and seeded back into the adapter
 
 Status: accepted (card #109). Supersedes the "memory only" part of [ADR 0022](0022-lever-pagination-and-region.md).
 
