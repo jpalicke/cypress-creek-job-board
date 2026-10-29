@@ -69,6 +69,7 @@ def test_a_recorded_output_scores_to_a_hand_computed_value() -> None:
     assert values["gap_recall"] == 1 / 2
     assert values["false_support_rate"] == 1 / 3
     assert case.counts.planted_not_extracted == 1
+    assert values["planted_not_extracted"] == 1
     assert [(m.label_id, m.claimed, m.fact_ids) for m in case.missed] == [
         ("L-2", Support.STRONG, ["F-0001"])
     ]
@@ -90,6 +91,7 @@ def test_a_perfect_run_scores_one_everywhere_and_zero_on_the_bad_counts() -> Non
         assert values[name] == 1.0
     assert values["span_validity_rate"] == 1.0
     assert values["gap_recall"] == 1.0
+    assert values["planted_not_extracted"] == 0
     assert values["false_support_rate"] == 0.0
     assert values["grounding_violations_per_100"] == 0.0
     assert values["attempted_raises"] == 0
@@ -244,3 +246,19 @@ def test_every_rate_is_between_zero_and_one_and_mirroring_the_labels_gives_one(
         assert values["importance_agreement"] == 1.0
     if len(chosen) == len(WANTS):
         assert values["requirement_recall"] == 1.0
+
+
+def test_a_skipped_strong_planted_row_is_not_a_missed_planted_gap() -> None:
+    """PLANTED_GAPS.md also lists strong rows (python 3 years, postgresql, sql). They are
+    planted support checks, not gaps, so skipping them must not count as a skipped gap."""
+    labels = labels_for(
+        "case-2",
+        [
+            Want(PYTHON, Support.STRONG, fact_ids=("F-0001",), planted_gap="skill:python:3"),
+            Want(RUST, Support.NONE, planted_gap="skill:rust"),
+        ],
+    )
+    counts = pool([score_case(labels, POSTING, report_for(POSTING, []), BANK)])
+
+    assert counts.planted_not_extracted == 1
+    assert repeat_values(counts)["planted_not_extracted"] == 1
