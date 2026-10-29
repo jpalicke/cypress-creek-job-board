@@ -72,3 +72,15 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 - Alternatives: change live.yml to supply credentials (none available); skip when absent (forbidden by the repo rules).
 - Needs from Joe P: add the OPENAI_API_KEY repository secret, run the LM Studio live test locally, confirm the OpenAI model pick (gpt-6-luna from a model page fetched 2026-10-29) in the ADR.
 - To reverse: merge the markers back into `live` and drop the new workflow.
+
+## D14. C5 Anthropic adapter choices (PR #123, Worker G)
+- 2026-10-29, Worker G.
+- Native structured output (`output_config.format`), no tools offered, because the docs say claude-sonnet-5-5 rejects forced tool use.
+- The paid live Anthropic test is excluded from live.yml via `live and not needs_network`. Alternative: a repo secret and a separate job. Reverse by adding the job.
+- Models without documented prices need `input_usd_per_mtok` and `output_usd_per_mtok`; the adapter refuses to start without them rather than guessing. Reverse: add a default in KNOWN_PRICES.
+- Needs from Joe P: an ANTHROPIC_API_KEY to run the live test; until then the real request body is not verified against the real API (a wrong key live run did get a real 401).
+
+## D15. ADR numbers assigned in merge order; D7 moved to Worker G
+- 2026-10-29, manager.
+- ADR 0024 is claimed by #120 and #122, 0025 by #123. The reviewer states the next free number at approval and authors renumber before merge.
+- D7 (#22) moved from Worker C to Worker G (idle), stacked on the #116 branch until it merges.
