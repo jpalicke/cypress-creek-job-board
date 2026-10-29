@@ -204,3 +204,7 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 ## D36. D7 draft help limits accepted and documented (PR #126)
 - 2026-10-29, senior engineer ruled.
 - Four classes still render as clean sentences: quantity words ("for a decade"), invented outcomes ("doubling revenue"), adjective inflation ("senior staff"), and negation ("Never led"). They are shared V8/V10 limits, to be fixed in a separate card; #126 names them in pipeline.md and links a follow-up issue. needs_human_review stays true. FOR JOE P: these are real gaps in the one rule's enforcement for drafts; please prioritise the follow-up.
+
+## D37. Merge order follows the ADR plan
+- 2026-10-29, manager.
+- #120 (H1d) is approved (network run 40944431404 passed 33 tests, including the seeded-EU test) but holds ADR 0029, so I merge it after 0026 (D7 #126), 0027 (C4 #124) and 0028 (G1 #125) to avoid churn on the contributing.md "next free ADR" line. Every PR that adds an ADR updates that line. Migration 0005: #120 merges before G2, so G2 renumbers its migration to 0006.
