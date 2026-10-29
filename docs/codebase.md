@@ -78,6 +78,7 @@ src/cypress_creek/       The library
     tombstones.py        Tombstones, Denial, DenialReason, normalize_board: denied companies kept as denied suggestion rows
     listings.py          Listings, StateChanges: the listing table, with new, seen and closed transitions from a successful board fetch
     dedupe.py            dedupe, MergedListing, fingerprint_text: conservative merge by listing id, then exact cross source fingerprint
+    run.py               run_discovery, ranked_listings, rank, RunIdentity, RankedListing, RunSummary: blacklist, fetch, dedupe, filter, score under a cap with a run id cache, rank
     filters.py           ListingFilters, apply_filters, FilterReport, FilterName: deterministic keyword, location, remote, seniority and age filters
     blacklist.py         The pure filter: is_blacklisted, Candidate, BlacklistEntry, BlockReason, normalize_slug, normalize_domain, InvalidBlacklistValue
     blacklist_repository.py  Blacklist (add, remove, rows, entries) and AlreadyBlacklisted: stores and loads entries, no matching
@@ -108,8 +109,8 @@ evals/
 tests/
   unit/                  Pure functions and models, including the Anthropic request, schema rewrite and response parsing, eval case loading and dry-run planning, fetch policy and limiter, adapter contract, and Greenhouse, Lever and Ashby feed mappings
   component/             Real files and local servers, including the Anthropic adapter over real HTTP (wire request, error mapping, retry, budget guard), the no-network eval CLI dry run, response cache, polite client, and the Greenhouse, Lever and Ashby adapters (Lever on US and EU path prefixes, Ashby also answering a weak ETag with a 304)
-  integration/           Public DNS and feeds (needs_network), dedupe, filters and listing states over a real public board, real Ollama eval runs and failure persistence, the live Anthropic call (needs a key, fails without one), and live Greenhouse, paged US and EU Lever, and Ashby boards (the probe, a made-up slug and a real weak ETag revalidation)
-  e2e/                   Separate-process flows for URL guard, posting fetch, HTML text, blacklist filtering, listing state refreshes across processes, and eval CLI resume of pending cases
+  integration/           Public DNS and feeds (needs_network), a live discovery run with a real model, dedupe, filters and listing states over a real public board, real Ollama eval runs and failure persistence, the live Anthropic call (needs a key, fails without one), and live Greenhouse, paged US and EU Lever, and Ashby boards (the probe, a made-up slug and a real weak ETag revalidation)
+  e2e/                   Separate-process flows for URL guard, posting fetch, HTML text, blacklist filtering, listing state refreshes and discovery score reuse across processes, and eval CLI resume of pending cases
   http_support.py        Test-only real HTTP and UDP DNS servers with a loopback resolver; the HTTP server records methods and can route by query string for paged paths and answer an ETag with a 304
   fixtures/              Recorded or hand written inputs
     extraction/          A posting and a recorded real model output for the accept step
@@ -173,6 +174,9 @@ flowchart LR
     store --> db
     listings --> dedupe["discovery.dedupe.dedupe(): exact merge"]
     dedupe --> filt["discovery.filters.apply_filters(): counts per filter"]
+    filt --> drun["discovery.run.run_discovery(): cap, run id cache, rank"]
+    drun --> analyzer["analyzer: pipeline.run.analyze over the listing text"]
+    drun --> db
 ```
 The diagram shows library components, not a running app workflow. The link fetcher returns raw bytes, and a caller can pass HTML bytes separately to the HTML text extractor before normalization. PDF text extraction, a user-facing app workflow and drafting remain later cards (see the issue board and the spec).
 
@@ -210,6 +214,7 @@ See [the fetching architecture](architecture.md), [the SSRF rules and limits](th
 - **Retrieval is not a model.** `retrieve` matches tags and aliases, ranks and caps the candidates, and sets the support ceiling. A requirement with no candidate is a gap and costs no model call. See `pipeline.md`.
 - **Hand labels are inputs, checked against the posting and the bank.** `validate_labels` refuses a label whose span is not exact posting text, whose fact is missing, unverified or local only, or whose planted gap row disagrees. `require_committed_labels` refuses a case whose labels are not committed. Importance is the human reading, not the V3 cue rule. See [ADR 0024](adr/0024-hand-labels-are-written-before-runs-and-carry-provenance.md), [evals.md](evals.md#posting-fixtures-and-hand-labels) and [e3-label-decisions.md](e3-label-decisions.md).
 - **The sample bank and its gap table cannot drift.** `PLANTED_GAPS.md` is parsed by a test that runs each row through `retrieve`, so a bank edit that changes a gap fails the build. See `evals.md`.
+- **A discovery score is cached by run id, capped per run, and stops cleanly.** The run id already covers text, bank, backend and model, so an unchanged listing is never scored again. At most `cap` listings reach the analyzer, most recent first, and the rest are reported unscored. A backend outage or a spent budget ends scoring and keeps what was stored. See [ADR 0034](adr/0034-discovery-run-cap-cache-and-stops.md).
 - **Dedupe is exact or nothing, and only a clean fetch closes.** Cross source listings merge only on equal company key, title and location fingerprints, never inside one source and never in an ambiguous group. `Listings.apply_fetch` closes listings missing from a successful board fetch, and a skipped job it cannot place stops the closing. See [ADR 0031](adr/0031-conservative-dedupe-filters-and-closing.md).
 - **A denial is permanent until a human removes it.** A denied company is a tombstone matched by `company_key` and by normalized board, and `Watchlist.add` refuses it. Only `Tombstones.remove` lifts one. See [ADR 0017](adr/0017-tombstones-are-removed-only-by-a-human-call.md).
 - **The blacklist filter is pure and runs first.** `is_blacklisted(candidate, entries)` takes everything as arguments, touches no database and no network, and returns the `BlockReason` (company key, slug or domain) or `None`. It is meant to run on a discovered company before any fetch. Entries are normalized when created, and `Blacklist` only stores them. See [data-model.md](data-model.md#discovery-the-blacklist).
