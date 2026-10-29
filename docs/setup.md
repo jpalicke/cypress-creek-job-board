@@ -1,6 +1,6 @@
 # Fetch a posting link
 
-Install the pinned dependencies from the repository root with `uv sync`. There is no app to start yet. The public `fetch_posting(url)` library call fetches one user-supplied link and returns bounded, unprocessed bytes. It does not extract text, save a posting, run a model, or apply to a job.
+Install the pinned dependencies from the repository root with `uv sync`. To start the local API instead, jump to [Start the API server](#start-the-api-server). The public `fetch_posting(url)` library call fetches one user-supplied link and returns bounded, unprocessed bytes. It does not extract text, save a posting, run a model, or apply to a job.
 
 Try a public HTML page from the repository root:
 
@@ -28,9 +28,28 @@ Each explicit fetch sends a GET with an honest, versioned `cypress-creek` User-A
 
 Failures are typed and have generic messages that do not echo a URL or response body. `BlockedByPolicy` exposes the guard's stable reason code; `TooLarge`, `UnsupportedContent` and `FetchFailed` distinguish other failures. A zero-byte response raises `Empty` with guidance to paste the posting text manually. HTTP 401 raises `NeedsBrowser` with the same guidance; HTTP 403 and other unsuccessful statuses raise `FetchFailed`. A successful HTML page that requires JavaScript is returned as bytes. The HTML extractor may find no posting text on such a page; paste the posting text manually.
 
+## Start the API server
+
+The local API binds to `127.0.0.1` on port 5309. It needs a provider setting to start, from `config/provider.toml` or `CYPRESS_CREEK_*` variables (see [providers.md](providers.md#try-it-locally)). For a quick look with no model running, set them in the shell and start the server:
+
+```bash
+export CYPRESS_CREEK_PROVIDER=ollama CYPRESS_CREEK_MODEL=qwen3.5:0.8b
+uv run cypress-creek-api
+```
+
+Leave it running and, from a second shell, ask for the health and the session token:
+
+```bash
+curl -s http://127.0.0.1:5309/api/health
+curl -s http://127.0.0.1:5309/api/session
+curl -s -H 'Host: evil.example' http://127.0.0.1:5309/api/health
+```
+
+Expected: the first prints `{"status":"ok","backends":[{"provider":"ollama","model":"qwen3.5:0.8b","reachable":...}]}` where `reachable` is `reachable` if Ollama is running and `unreachable` if not. The second prints a `csrf_token`. The third prints the typed `host_not_allowed` error. Stop the server with Ctrl+C. Setting `CYPRESS_CREEK_API_HOST=0.0.0.0` makes it exit with code 2 and say that the API only binds to a loopback address. The rules, routes and error codes are in [api.md](api.md).
+
 ## Fetch a job board politely
 
-Discovery fetches go through one library, `PoliteClient`, which adds a per-host delay, a refresh window, an ETag disk cache and backoff on top of the guarded transport. There is no app to start yet, so this is a library call. It makes two real requests to a public job board feed, and the cache goes in a throwaway directory so nothing lands in your data directory. From the repository root, in a bash shell:
+Discovery fetches go through one library, `PoliteClient`, which adds a per-host delay, a refresh window, an ETag disk cache and backoff on top of the guarded transport. No API route uses it yet, so this is a library call. It makes two real requests to a public job board feed, and the cache goes in a throwaway directory so nothing lands in your data directory. From the repository root, in a bash shell:
 
 ```bash
 export CYPRESS_CREEK_DATA_DIR="$(mktemp -d)"
@@ -92,7 +111,7 @@ To clear the cache, delete the `fetch_cache` directory under your data directory
 
 ## Fetch a Greenhouse board
 
-`GreenhouseAdapter` reads one public Greenhouse board through `PoliteClient` and returns normalized `Listing` rows. There is no app to start yet, so this is a library call. It makes real requests to a large public board (a board info request for the probe, then the full jobs feed with descriptions, a few megabytes), and the cache goes in a throwaway directory. The client must be built with `GREENHOUSE_FETCH_LIMITS`, because the default limits allow neither JSON nor a body this large. From the repository root, in a bash shell:
+`GreenhouseAdapter` reads one public Greenhouse board through `PoliteClient` and returns normalized `Listing` rows. No API route uses it yet, so this is a library call. It makes real requests to a large public board (a board info request for the probe, then the full jobs feed with descriptions, a few megabytes), and the cache goes in a throwaway directory. The client must be built with `GREENHOUSE_FETCH_LIMITS`, because the default limits allow neither JSON nor a body this large. From the repository root, in a bash shell:
 
 ```bash
 export CYPRESS_CREEK_DATA_DIR="$(mktemp -d)"
@@ -312,3 +331,18 @@ uv run pytest tests/integration/test_ashby_network.py -q
 ```
 
 Real output from 2026-10-21: `7 passed in 5.00s`.
+
+## Run the LM Studio and OpenAI live tests
+These two live tests need something this repo cannot start for you, so they have their own markers and the `live` workflow never runs them. Both fail loudly, never skip, when their prerequisite is missing. What they check and how to read the results is in [providers.md](providers.md#the-openai_compatible-adapter-openai-and-lm-studio).
+
+LM Studio (local only, needs the desktop app): start its local server, load a model, then
+```bash
+CYPRESS_CREEK_LMSTUDIO_MODEL="<loaded model identifier>" CYPRESS_CREEK_LMSTUDIO_CONTEXT=4096 uv run pytest tests/integration -m live_lmstudio -q
+```
+`CYPRESS_CREEK_LMSTUDIO_CONTEXT` must be the context length the model was loaded with. The findings table in providers.md stays marked unverified until you have run this and filled it in.
+
+OpenAI (spends a little money, needs a key): export `OPENAI_API_KEY` (or load a gitignored `.env`) and run
+```bash
+uv run pytest tests/integration -m live_openai -q
+```
+In GitHub, the manual `openai-live` workflow (Actions, Run workflow) runs the same test. It reads the repository secret `OPENAI_API_KEY` and fails at once, with a message, if the secret is not set.

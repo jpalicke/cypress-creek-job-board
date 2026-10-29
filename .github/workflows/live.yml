@@ -33,4 +33,4 @@ jobs:
       - run: ollama pull qwen3.5:0.8b
       - run: ollama --version
       - name: Live tests
-        run: uv run --locked pytest tests/integration -m "live and not needs_network" -q
+        run: uv run --locked pytest tests/e2e tests/integration -m "live and not needs_network and not live_openai and not live_lmstudio" -q

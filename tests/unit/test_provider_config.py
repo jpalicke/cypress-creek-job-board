@@ -8,6 +8,7 @@ from cypress_creek.config import (
     CONFIG_ENV,
     ConfigError,
     ProviderSettings,
+    is_loopback_url,
     load_settings,
     parse_settings,
     resolve_api_key,
@@ -213,6 +214,20 @@ def test_budget_limits_can_come_from_the_environment() -> None:
         "CYPRESS_CREEK_MAX_OUTPUT_TOKENS": "777",
     }
     assert load_settings(environ=environ).max_output_tokens == 777
+
+
+@pytest.mark.parametrize(
+    ("url", "expected"),
+    [
+        ("http://localhost:1234/v1", True),
+        ("http://[::1]:1234", True),
+        ("https://api.example.com/v1", False),
+        ("http://10.0.0.5:1234", False),
+        ("not a url", False),
+    ],
+)
+def test_is_loopback_url_reads_the_host(url: str, expected: bool) -> None:
+    assert is_loopback_url(url) is expected
 
 
 def test_token_prices_are_optional_non_negative_and_can_come_from_the_environment() -> None:

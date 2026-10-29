@@ -6,7 +6,8 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | --- | --- |
 | [codebase.md](codebase.md) | Start here if you are new: layout, how the pieces fit, ideas to know, how a card goes |
 | [data-model.md](data-model.md) | The fact bank, Posting and Requirement, and the tag alias table (`config/aliases.yaml`) the company name key (`company_key`), the SQLite storage and migrations, and the discovery tables (watchlist, denied companies, blacklist and its filter) |
-| [pipeline.md](pipeline.md) | HTML posting text extraction, posting normalization, the prompt builder (extraction and entailment prompts), accepting extraction output, stage 1 extraction, stage 2 retrieval, stage 3 entailment, stages 4 and 5 score and report, running the pipeline with an optional trace and a derived run id, the support gate, the score |
+| [pipeline.md](pipeline.md) | HTML posting text extraction, posting normalization, the prompt builder (extraction, entailment and draft prompts), draft help, accepting extraction output, stage 1 extraction, stage 2 retrieval, stage 3 entailment, stages 4 and 5 score and report, running the pipeline with an optional trace and a derived run id, the support gate, the score |
+| [api.md](api.md) | The local API: loopback bind, Host check, CSRF token flow, typed errors, route table and error codes |
 | [evals.md](evals.md) | Eval CLI dry runs and real Ollama smoke runs, whole-run budgets, typed records and traces, SQLite resume, scratch JSONL audit exports, fictional sample fact bank and planted gaps, real posting fixtures with hand labels and the label check |
 | [e3-label-decisions.md](e3-label-decisions.md) | Why each hand label is what it is, the judgment calls for Joe P to review, and the closed postings and their replacements |
 | [validators.md](validators.md) | The grounding validators V1 to V14: what each rejects and its known limits |
@@ -49,6 +50,9 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [0023](adr/0023-ashby-unlisted-jobs-probe-shape-and-weak-etag.md) | Ashby: an unlisted job is dropped and counted in `BoardFetch.unlisted` instead of skipped, the skip budget covers listed jobs only, `probe` checks the shape of the board and not each job, and the weak ETag is sent back unchanged and answered with a 304 |
 | [0024](adr/0024-hand-labels-are-written-before-runs-and-carry-provenance.md) | Hand labels are written before any run from the posting and bank alone, carry provenance and a pending review, follow the human reading of importance, and are validated against the posting, the bank and the planted gaps |
 | [0025](adr/0025-anthropic-native-structured-output.md) | Anthropic adapter: native structured output instead of forced tool use, schema rewrite, error mapping, hosted rules and price defaults |
+| [0026](adr/0026-draft-help-checks-each-sentence.md) | Draft help: every sentence checked alone, failures shown as not verified, a gap gets no model call, nothing can be sent |
+| [0027](adr/0027-openai-compatible-adapter-and-model-pick.md) | The openai_compatible adapter for OpenAI and LM Studio: strict JSON schema, hosted rules, the truncation guard, and the model pick (proposed, needs confirmation) |
+| [0028](adr/0028-api-security-layer.md) | The API security layer: an exact Host allow-list, an app-wide CSRF middleware after the Host check, hardening headers, a session route that sets no cookie, no docs or schema routes, and httpx ASGI transport tests |
 | [0029](adr/0029-lever-region-is-stored-on-the-watchlist-entry.md) | The Lever region is stored on the watchlist entry (`region` column, `Watchlist.set_region`) and seeded back into the adapter with `remember_region`, so a fresh process asks only the right host |
 
 ## Configuration
