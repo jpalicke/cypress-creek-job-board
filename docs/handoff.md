@@ -29,7 +29,7 @@ Never commit with a personal email address. Secrets live in the environment or a
    uv run ruff check src tests
    uv run mypy                       # strict
    uv run pytest tests/unit tests/component --cov --cov-fail-under=80 -q
-   uv run pytest tests/e2e tests/integration -m "not needs_network and not live" -q
+   uv run pytest tests/e2e tests/integration -m "not needs_network and not live and not live_openai and not live_lmstudio" -q
    uv run pre-commit run --all-files
    ```
    The e2e line is an offline gate in CI too. Tests marked `needs_network` or `live` run in `network.yml` and `live.yml` (start them from the Actions tab with `workflow_dispatch` on your branch when your card touches them), and the run is the evidence.

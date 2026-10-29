@@ -27,4 +27,4 @@ jobs:
       - run: uv sync --locked
       # Offline end to end and integration tests only: real child processes, real SQLite and
       # real loopback servers. Tests that need the internet or a model run in network.yml and live.yml.
-      - run: uv run --locked pytest tests/e2e tests/integration -m "not needs_network and not live" -q
+      - run: uv run --locked pytest tests/e2e tests/integration -m "not needs_network and not live and not live_openai and not live_lmstudio" -q
