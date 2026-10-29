@@ -24,12 +24,14 @@ class Stage(StrEnum):
     EXTRACT = "extract"
     ENTAIL = "entail"
     DRAFT = "draft"
+    COMPANY = "company"
 
 
 TEMPLATES = {
     Stage.EXTRACT: "extract_v2.txt",
     Stage.ENTAIL: "entail_v1.txt",
     Stage.DRAFT: "draft_v1.txt",
+    Stage.COMPANY: "company_v1.txt",
 }
 STAGES_SHOWING_FACTS = {Stage.ENTAIL, Stage.DRAFT}
 
@@ -120,4 +122,20 @@ def build_prompt(
         else "",
         boundary_token=token,
         prompt_hash=_prompt_hash(hashed_system, output_schema),
+    )
+
+
+def build_company_prompt(profile_text: str, output_schema: type[BaseModel]) -> Prompt:
+    """The company name prompt: static system text and the trusted tag profile.
+
+    No posting goes into this call, so there is no untrusted block and no boundary token. The
+    profile holds tag names and levels only. The system text never mentions a denied or blocked
+    company, because those are removed in code and the model is not trusted to honor a list."""
+    system = _system_text(Stage.COMPANY)
+    return Prompt(
+        system=system,
+        data_block=profile_text,
+        facts_block="",
+        boundary_token="",
+        prompt_hash=_prompt_hash(system, output_schema),
     )

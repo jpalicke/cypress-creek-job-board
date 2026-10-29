@@ -64,3 +64,15 @@ class DraftOutput(BaseModel):
 
     schema_version: Literal[1]
     sentences: list[DraftSentenceOutput] = Field(max_length=MAX_DRAFT_SENTENCES)
+
+
+MAX_COMPANY_NAMES = 20
+
+
+class CompanyNamesOutput(BaseModel):
+    """Company names the model proposes. Names only: untrusted until V14 and the filters pass."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    schema_version: Literal[1]
+    names: list[str] = Field(max_length=MAX_COMPANY_NAMES)
