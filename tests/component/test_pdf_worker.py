@@ -46,8 +46,8 @@ def test_the_child_has_an_empty_environment_and_cannot_open_a_socket() -> None:
         del os.environ["CYPRESS_CREEK_PROBE_VALUE"]
 
     report = json.loads(out)
-    # Python itself adds LC_CTYPE when it coerces the locale; nothing else is there.
-    assert set(report["env"]) <= {"LC_CTYPE"}
+    # Python itself adds LC_CTYPE when it coerces the locale, and Windows needs SYSTEMROOT to start.
+    assert set(report["env"]) <= {"LC_CTYPE", "SYSTEMROOT"}
     assert "must-not-leak" not in json.dumps(report)
     assert report["socket_blocked"] is True
     assert report["limits_applied"] is (os.name == "posix")
@@ -133,14 +133,14 @@ def test_only_the_last_two_kilobytes_of_stderr_are_kept(monkeypatch: pytest.Monk
 
 
 def test_the_stderr_tail_is_logged_and_never_sent_to_an_api_caller(
-    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, tmp_path: Path
 ) -> None:
     from api_support import ApiClient, csrf_headers
 
     from cypress_creek.api.app import create_app
 
     monkeypatch.setattr(pdf_text, "worker_command", _crash("Traceback: boom"))
-    client = ApiClient(create_app(None, static_dir=None, database_path=Path("/nonexistent/x.db")))
+    client = ApiClient(create_app(None, static_dir=None, database_path=tmp_path / "x.db"))
     headers = csrf_headers(client, {"content-type": "application/pdf"})
 
     with caplog.at_level("WARNING"):

@@ -117,9 +117,12 @@ def _child_environment() -> dict[str, str]:
 
 def _feed(process: subprocess.Popen[bytes], data: bytes) -> None:
     assert process.stdin is not None
-    with contextlib.suppress(BrokenPipeError, OSError):
-        process.stdin.write(data)
-        process.stdin.close()
+    try:
+        with contextlib.suppress(BrokenPipeError, OSError):
+            process.stdin.write(data)
+    finally:
+        with contextlib.suppress(BrokenPipeError, OSError):
+            process.stdin.close()
 
 
 def _drain(stream: IO[bytes], tail: bytearray) -> None:

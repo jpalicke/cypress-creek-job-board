@@ -83,9 +83,10 @@ On every commit the hooks run, and CI (`.github/workflows/deterministic.yml`) ru
 - **mypy --strict**: strict type check over `src`, `tests` and `scripts`.
 - **pytest** over the unit and component tiers with `--cov-fail-under=80`. Only `src/cypress_creek` counts toward coverage.
 
-Two more CI pieces cover the tiers the gated run leaves out:
+Three more CI pieces cover the tiers the gated run leaves out:
 
 - **e2e job** (same workflow, every push and pull request): `pytest tests/e2e tests/integration -m "not needs_network and not live and not live_openai and not live_lmstudio"`. These are the offline end to end and integration tests: real child processes, real SQLite files and real loopback servers.
+- **windows job** (same workflow, every push and pull request, not a required check): on `windows-latest` it runs only the platform sensitive tests, the PDF extractor (`test_pdf_fixtures.py`, `test_pdf_hostile.py`, `test_pdf_worker.py`), link posting, the API postings routes and the PDF upload against the real server. The extractor starts a child process and uses POSIX resource limits where they exist, so Windows is tested, not assumed. Windows behaviour is asserted in the tests, never skipped. To run it by hand in PowerShell: `uv run pytest tests/unit/test_pdf_fixtures.py tests/integration/test_pdf_hostile.py tests/component/test_pdf_worker.py tests/e2e/test_pdf_upload_process.py -q --no-cov`.
 - **`network.yml`** (weekly and on demand, not a pull request gate): `pytest tests/integration tests/e2e -m "needs_network and not live and not live_openai"`. These talk to public job boards and public HTTPS, so an outage or a changed board must not block a merge. Start it by hand from the Actions tab (`workflow_dispatch`) on the branch whose network tests you changed, and quote the run in the pull request. The `live` tests (a real Ollama), under both `tests/integration` and `tests/e2e`, run in `live.yml` the same way. `tests/unit/test_ci_selectors.py` fails if a directory holding a `live` test is not selected there or if any other workflow selects `live` tests.
 
 Every workflow declares `permissions: contents: read` at the top, the minimum a checkout needs. A job that needs more must say why in a comment next to the grant.
