@@ -342,3 +342,7 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 ## D64. Closed vocabulary for drafts stays as is (decision on D44, D50, D51)
 - 2026-10-30, Joe P.
 - Keep the closed vocabulary and its measured 45 percent false-positive rate (10 of 22 honest rewordings flagged) unchanged for now. Revisit after Joe P has used the tool on his real resume and real job listings; the live flag rate from E5 and E8 runs is the other input. Options held for then: a reviewed extension of the 32-word connective list, or a relaxed mode. Nothing to change in code or docs now.
+
+## D65. One senior plus the manager reviewing PRs
+- 2026-10-30, Joe P.
+- Senior A (a66bc9c84628b82fb) wraps up, hands over its open work and shuts down. Senior B (ab6bba535d773e2bb) is the only agent writing code; the manager reviews every PR (reads the diff, checks CI, scope, footers, em dashes and rules) and merges. B no longer cross-reviews. Reason: usage-window pressure and fewer moving parts. Trade-off: no independent second reviewer between the author and main apart from the manager; Joe P's Opus pass at the end is the backstop.
