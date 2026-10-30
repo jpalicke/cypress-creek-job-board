@@ -18,6 +18,6 @@ The product's rule is that no output asserts a claim without a verified fact beh
 
 ## Limits
 
-The checks are heuristics. Four classes of unsupported claim pass them and print as clean: quantity words that are not numbers ("for a decade"), an invented lowercase outcome ("doubling revenue"), seniority inflation ("senior staff") and negation ("Never led"). They are limits of the shared V8 and V10 validators, pinned by component tests and tracked in [issue #131](https://github.com/jpalicke/cypress-creek-job-board/issues/131). V8 also cannot tell a correct number attached to the wrong thing. A passing draft is a candidate paraphrase for a person to read, not a proven statement. The live test uses the tiny CI model, so it proves the plumbing and the verdicts, not draft quality.
+The checks are heuristics. Words that no cited fact uses are now refused in drafts by a closed vocabulary, see [ADR 0033](0033-draft-closed-vocabulary.md); lists are finite, meaning is not read, and V8 cannot tell a correct number attached to the wrong thing.
 
 See [pipeline.md](../pipeline.md#draft-help).
