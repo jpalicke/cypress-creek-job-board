@@ -111,7 +111,7 @@ print(result.parsed, result.usage)
 It prints a greeting and the real token usage. Without the variable it fails with `environment variable ANTHROPIC_API_KEY is not set` and makes no request. The live tests are `uv run pytest tests/integration/test_anthropic_live.py -q`. They fail, never skip, when the key is missing (the real call test), and the wrong key test needs only the internet.
 
 ## The openai_compatible adapter (OpenAI and LM Studio)
-Code is `src/cypress_creek/providers/openai_compatible.py`, registered as provider `openai_compatible`. One adapter serves OpenAI and LM Studio, chosen by `base_url`. Decisions, the model pick and what is still unverified are in [ADR 0027](adr/0027-openai-compatible-adapter-and-model-pick.md).
+Code is `src/cypress_creek/providers/openai_compatible.py`, registered as provider `openai_compatible`. One adapter serves OpenAI and LM Studio, chosen by `base_url`. The live OpenAI call passed once on 2026-10-30 (see ADR 0027); LM Studio is still untested. Decisions, the model pick and what is still unverified are in [ADR 0027](adr/0027-openai-compatible-adapter-and-model-pick.md).
 
 - It calls `POST <base_url>/chat/completions` with the system text and the untrusted data block as two separate messages (`system`, then `user`). The fact bank, when a stage shows facts, travels after the data block inside the user message, as the prompt builder lays it out.
 - Output: `response_format` is `json_schema` with `strict: true`. The schema is the pydantic model's, with every property required and unsupported keywords (`minLength`, `maximum`, defaults and the like) removed by `providers/strict_schema.py`. The reply is parsed with the original model, so the removed constraints are still checked.
