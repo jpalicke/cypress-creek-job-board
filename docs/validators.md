@@ -106,7 +106,7 @@ Known limit: a short plain phrase such as "Ignore previous instructions" has the
 2. `number_not_in_source`: every number in the claim (digits with their separators, so `1,200` is not `1,200,000`) and every quantity word (such as dozen or decade) must be in the source.
 3. `month_not_in_source`: every capitalised month name or abbreviation in the claim must be a month named in the source.
 4. `name_not_in_source`: every capitalised word of the claim must be a word of the source, compared by case folding only. This includes the first word of the claim, so a claim must reuse the resume's own opening word. The pronoun `I` is exempt.
-5. `tag_not_in_source`: every tag must be in the source, as the tag or as one of its aliases from `config/aliases.yaml`.
+5. `tag_not_in_source`: every tag must be in the source, as the tag or as one of its aliases from `config/aliases.yaml`. The term must stand alone, so `c` is not found in `company` or `java` in `JavaScript`.
 
 Known limits: a claim can be true to its words and still mislead by what it leaves out; lower case words are not checked (a wrong verb or tool in lower case passes if its capitalised and numeric parts are grounded), and number words such as "five" are only caught when they are in the quantity list. A person reads every candidate. The check is strict on purpose: a proposal that fails is dropped and counted, never repaired.
 

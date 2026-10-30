@@ -49,6 +49,11 @@ def _months(text: str) -> set[int]:
     return {number for word in _MONTH_WORD.findall(text) if (number := month_of(word))}
 
 
+def _mentions(text: str, term: str) -> bool:
+    """True if the term stands alone in the text, so "c" is not found inside "company"."""
+    return re.search(rf"(?<![\w+#]){re.escape(term)}(?![\w+#])", text) is not None
+
+
 def _folded_words(text: str) -> set[str]:
     return {word.strip(".,;:'’").casefold() for word in _WORD.findall(_collapse(text))}
 
@@ -75,6 +80,8 @@ def check_candidate_grounded(resume: str, fact: ProposedFact) -> Verdict:
             return fail(VALIDATOR_ID, "name_not_in_source", bare)
     lowered = unicodedata.normalize("NFKC", source).casefold()
     for tag in fact.tags:
-        if not any(term in lowered for term in _aliases().terms_for(tag) | {normalize_term(tag)}):
+        if not any(
+            _mentions(lowered, term) for term in _aliases().terms_for(tag) | {normalize_term(tag)}
+        ):
             return fail(VALIDATOR_ID, "tag_not_in_source", tag)
     return ok(VALIDATOR_ID)

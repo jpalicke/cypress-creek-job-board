@@ -118,6 +118,31 @@ def test_a_tag_that_is_not_in_the_source_fails() -> None:
     assert verdict.reason == "tag_not_in_source" and verdict.offending == "kubernetes"
 
 
+@pytest.mark.parametrize(
+    ("tag", "source"),
+    [
+        ("c", "Built dashboards at the company"),
+        ("r", "Built dashboards for the finance team"),
+        ("go", "Built good dashboards"),
+        ("java", "Built JavaScript dashboards"),
+    ],
+)
+def test_a_tag_inside_a_longer_word_does_not_ground_it(tag: str, source: str) -> None:
+    verdict = check_candidate_grounded(
+        source, fact(claim="Built dashboards", source=source, tags=[tag])
+    )
+
+    assert verdict.reason == "tag_not_in_source" and verdict.offending == tag
+
+
+@pytest.mark.parametrize(
+    ("tag", "source"),
+    [("c++", "Wrote C++ drivers"), ("c#", "Wrote C# services"), (".net", "Wrote .NET services")],
+)
+def test_a_tag_with_symbols_is_grounded_by_the_whole_term(tag: str, source: str) -> None:
+    assert check_candidate_grounded(source, fact(claim=source, source=source, tags=[tag])).passed
+
+
 def test_a_tag_may_appear_in_the_source_as_an_alias() -> None:
     resume = "Ran k8s clusters for the team."
 
