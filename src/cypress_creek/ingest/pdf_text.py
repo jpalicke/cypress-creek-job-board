@@ -147,8 +147,8 @@ def _stopped(process: subprocess.Popen[bytes], tail: bytearray) -> PdfResourceLi
 def run_worker(limits: PdfLimits, data: bytes, *flags: str) -> bytes:
     """Run the worker with an empty environment in an empty folder.
 
-    The answer is read with a hard cap while the child runs, and the child is killed the moment
-    it passes the cap or the timeout, so a flooding child cannot fill the parent's memory."""
+    The answer is read with a hard cap while the child runs. The child is killed the moment it
+    passes the cap or the timeout, and only then: a child that has answered is waited for."""
     cap = limits.max_chars * 4 + OUTPUT_SLACK_BYTES
     options: dict[str, Any] = {"start_new_session": True} if os.name == "posix" else {}
     with tempfile.TemporaryDirectory() as empty:
@@ -165,8 +165,9 @@ def run_worker(limits: PdfLimits, data: bytes, *flags: str) -> bytes:
         timed_out = threading.Event()
 
         def expire() -> None:
-            timed_out.set()
-            process.kill()
+            if process.poll() is None:
+                timed_out.set()
+                process.kill()
 
         timer = threading.Timer(limits.timeout_seconds, expire)
         timer.start()
@@ -181,10 +182,14 @@ def run_worker(limits: PdfLimits, data: bytes, *flags: str) -> bytes:
             out = process.stdout.read(cap + 1)
             if len(out) > cap:
                 process.kill()
+            # End of file can come before the process has exited. Let it finish: the timer kills
+            # it at the deadline, and killing a process that is already answering gives a bad exit.
+            process.wait()
         finally:
             timer.cancel()
-            process.kill()
-            process.wait()
+            if process.poll() is None:
+                process.kill()
+                process.wait()
             feeder.join()
             drainer.join(timeout=2)
             if process.stdout is not None:

@@ -165,3 +165,36 @@ def test_a_worker_that_floods_its_output_is_stopped_while_reading(
         extract_pdf_text(_read("clean.pdf"), PdfLimits(max_chars=1000, timeout_seconds=30))
 
     assert time.monotonic() - started < 10
+
+
+def _answer_then_linger(seconds: float) -> object:
+    code = (
+        "import os, sys, time\n"
+        "sys.stdout.write('{\"ok\": true}')\n"
+        "sys.stdout.flush()\n"
+        "os.close(1)\n"
+        f"time.sleep({seconds})\n"
+    )
+    return lambda _limits, *_flags: [sys.executable, "-I", "-c", code]
+
+
+def test_a_good_answer_is_kept_when_the_child_is_still_exiting(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # stdout reaches end of file as soon as the child closes it, which can be before the process
+    # has exited. Killing it then gave exit code 1 on Windows and 9 on Linux for a good answer.
+    monkeypatch.setattr(pdf_text, "worker_command", _answer_then_linger(1.0))
+
+    assert pdf_text.run_worker(PdfLimits(), b"") == b'{"ok": true}'
+
+
+def test_a_child_that_never_finishes_is_killed_at_the_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(pdf_text, "worker_command", _answer_then_linger(30))
+    started = time.monotonic()
+
+    with pytest.raises(PdfTimeout):
+        pdf_text.run_worker(PdfLimits(timeout_seconds=1.5), b"")
+
+    assert time.monotonic() - started < 10
