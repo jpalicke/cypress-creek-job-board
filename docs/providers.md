@@ -118,7 +118,7 @@ Code is `src/cypress_creek/providers/openai_compatible.py`, registered as provid
 - Where it sends data: with no `base_url` the adapter uses `https://api.openai.com/v1`, which needs `allow_remote = true` (and an https URL, because the key travels in a header), an `api_key_env` naming a set variable and both price settings (`input_usd_per_mtok`, `output_usd_per_mtok`, dollars per million tokens). A loopback `base_url` (LM Studio) needs none of these and costs zero. The key goes only in the `Authorization` header and is scrubbed from every error.
 - `local_only` facts: the adapter reports `local = false` for any host that is not loopback, and `build_prompt` leaves `local_only` facts out of a prompt for a non local backend (validator V6 checks it again on the report). A component test builds a hosted request from a real prompt and shows the fact is absent.
 - Temperature: hosted calls send none. `gpt-6-luna` rejects `temperature: 0` (HTTP 400, "Only the default (1) value is supported", recorded 2026-10-30), so a hosted row is never temperature pinned; see ADR 0027.
-- Capabilities: `context_tokens` is the setting (default 8192; set it to the window the model is loaded with, or the hosted model's window). `strict_schema` is true for a remote host and false for a loopback one until LM Studio is verified.
+- Capabilities: `context_tokens` is the setting (default 8192; set it to the window the model is loaded with, or the hosted model's window). For a loopback server the adapter also asks LM Studio's own listing, `GET <origin>/api/v0/models`, once when it is built, and reads `loaded_context_length` for the configured model when its state is `loaded`. With no `context_tokens` in the config it uses that value; a configured value at or below it wins; a configured value above it is refused with a `ConfigError` naming both numbers. A server without that endpoint, a model that is not loaded or a reply of another shape changes nothing (the configured or default value is used). `strict_schema` is true: for a remote host because hosted strict mode is documented, and for loopback because LM Studio 0.4.17 was verified to enforce the schema (see the findings table); every reply is still validated against the schema.
 
 | Situation | Error |
 | --- | --- |
@@ -150,7 +150,7 @@ base_url = "http://localhost:1234/v1"
 context_tokens = 4096            # the context length the model was loaded with
 ```
 
-### LM Studio findings (partly verified)
+### LM Studio findings (verified for LM Studio 0.4.17 and one model)
 The command to run, what to record and the other open sign-offs for this adapter are in [issue #130](https://github.com/jpalicke/cypress-creek-job-board/issues/130).
 
 On 2026-10-30 Joe P ran both `live_lmstudio` tests against his LM Studio and they passed (`2 passed`). The run itself recorded no server wording; the version, model and loaded context length were reported afterwards. The rows below say only what the passing tests establish. Everything else is still not known.
@@ -158,8 +158,8 @@ On 2026-10-30 Joe P ran both `live_lmstudio` tests against his LM Studio and the
 | Question | Finding |
 | --- | --- |
 | LM Studio version and model tested | LM Studio 0.4.17 (Build 4), model `gemma-4-e4b` (the identifier LM Studio lists carries a vendor prefix), loaded with a context length of 8192, the same value passed to the tests as `CYPRESS_CREEK_LMSTUDIO_CONTEXT` (reported by Joe P after the run) |
-| Is the loaded context length exposed by the model listing, or must config supply it? | not recorded (the adapter reads `context_tokens` from config; the test config supplied it). The model was loaded with 8192 and both the load and the tests used 8192 |
-| Is `response_format` `json_schema` honored for the model? | not established: a conforming reply passes either way because every reply is validated against the schema; `strict_schema` stays false |
+| Is the loaded context length exposed by the model listing, or must config supply it? | Yes, by LM Studio's own listing `/api/v0/models`: `loaded_context_length` 8192 and `max_context_length` 131072 for the loaded model (recorded 2026-10-30). Whether the standard `/v1/models` listing carries it was not recorded. The adapter now reads it (see Capabilities) |
+| Is `response_format` `json_schema` honored for the model? | Yes, for this model and version: a prompt that told the model to answer "gamma" against a schema allowing only "alpha" or "beta" returned `alpha` (Joe P, 2026-10-30, one probe). `strict_schema` is therefore true for loopback. Other local servers are untested |
 | How is a prompt over the loaded context reported? | LM Studio 0.4.17 answers with an error body whose `error` is a plain string: "The number of tokens to keep from the initial prompt is greater than the context length (n_keep: 20015>= n_ctx: 8192). Try to load the model with a larger context length, or provide a shorter input." (recorded by Joe P on 2026-10-30; the HTTP status was not shown, the adapter treats a 400 as the overflow). The existing `context length` marker matches it, and a component test pins the recorded text. The other markers are still guesses |
 
 ## The budget guard
