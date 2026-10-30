@@ -338,3 +338,7 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 - 2026-10-30, Joe P.
 - Confirmed the model pick gpt-6-luna and its prices ($0.10 / $0.50 per Mtok).
 - Temperature: Joe P ran two curl probes. Without a temperature the model answered HTTP 200 (conforming reply, 39 prompt and 18 completion tokens). With `temperature: 0` it answered HTTP 400, "'temperature' does not support 0 with this model. Only the default (1) value is supported." So a hosted OpenAI row cannot be pinned to temperature 0. Choice (option 1, recommended): the adapter keeps sending no temperature; the comparison table labels an OpenAI row as not temperature pinned (it varies between repeats by design). E8 itself runs local models only. Alternative rejected: leave hosted rows out of the comparison. Recorded in ADR 0027, docs/providers.md, docs/evals.md (PR #155, which now closes #130).
+
+## D64. Closed vocabulary for drafts stays as is (decision on D44, D50, D51)
+- 2026-10-30, Joe P.
+- Keep the closed vocabulary and its measured 45 percent false-positive rate (10 of 22 honest rewordings flagged) unchanged for now. Revisit after Joe P has used the tool on his real resume and real job listings; the live flag rate from E5 and E8 runs is the other input. Options held for then: a reviewed extension of the 32-word connective list, or a relaxed mode. Nothing to change in code or docs now.
