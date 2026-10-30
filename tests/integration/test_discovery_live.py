@@ -82,7 +82,14 @@ def test_a_run_over_recorded_postings_scores_them_with_a_real_model_and_reuses_t
     bank = load_bank(bank_path)
     provider = OllamaProvider(
         parse_settings(
-            {"provider": "ollama", "model": MODEL, "base_url": BASE_URL, "context_tokens": 8192}
+            {
+                "provider": "ollama",
+                "model": MODEL,
+                "base_url": BASE_URL,
+                "context_tokens": 8192,
+                # A slow shared runner can take minutes for one call of a small model.
+                "request_timeout_seconds": 900,
+            }
         )
     )
     calls: list[str] = []
