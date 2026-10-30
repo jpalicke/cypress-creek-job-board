@@ -272,7 +272,7 @@ uv run python -m evals.harness.table           # write docs/evals-results.md and
 uv run python -m evals.harness.table --check   # fail if either file is out of date (CI runs this)
 ```
 
-**Inputs.** `evals/results/` holds, for each published run, the JSONL run export and the metrics JSON the scorer wrote for it (`score.py --out evals/results`). The two are paired by run id: a metrics file without its run file, a run file without metrics, or a JSON file the scorer did not write is an error, so a row can never be built from half of its data. [`evals/backends.yaml`](../evals/backends.yaml) lists the backends the table must show, in order: Ollama `qwen3.5:4b` and `qwen3.5:9b`, LM Studio (any model, which the run records), OpenAI (the C4 pick, `gpt-6-luna`, pending Joe P's confirmation) and Anthropic `claude-sonnet-5-5`. The tiny CI model `qwen3.5:0.8b` is plumbing and is not part of the comparison. A run matches the entry with its exact model, else the entry with `model: null` for its backend; a run that matches no entry is still shown, labeled "not in the backend list". Edit the list to add a backend.
+**Inputs.** `evals/results/` holds, for each published run, the JSONL run export and the metrics JSON the scorer wrote for it (`score.py --out evals/results`). The two are paired by run id: a metrics file without its run file, a run file without metrics, or a JSON file the scorer did not write is an error, so a row can never be built from half of its data. The table also scores each run file again with the E4 scorer against the committed labels and refuses a metrics file that differs ("does not match its run file"), so a hand edited or out of date metrics file never reaches the table. It needs the committed labels, the sample bank and the injection corpus, which `--fixtures`, `--bank` and `--injection-fixtures` can point elsewhere. [`evals/backends.yaml`](../evals/backends.yaml) lists the backends the table must show, in order: Ollama `qwen3.5:4b` and `qwen3.5:9b`, LM Studio (any model, which the run records), OpenAI (the C4 pick, `gpt-6-luna`, pending Joe P's confirmation) and Anthropic `claude-sonnet-5-5`. The tiny CI model `qwen3.5:0.8b` is plumbing and is not part of the comparison. A run matches the entry with its exact model, else the entry with `model: null` for its backend; a run that matches no entry is still shown, labeled "not in the backend list". Edit the list to add a backend.
 
 **Columns.** Each metric is `mean / worst` of the repeats that had every planned case.
 
@@ -280,7 +280,8 @@ uv run python -m evals.harness.table --check   # fail if either file is out of d
 | --- | --- |
 | E1 recall | `requirement_recall` in the metrics JSON (worst is the lowest) |
 | E3 violations per 100 | `grounding_violations_per_100` (worst is the highest) |
-| E6 score shift | `score_shift` in the metrics JSON, which no scorer writes until the injection corpus (E5) exists, so it says `not run` |
+| E6 worst class max abs shift | the largest `max_abs_shift` over the attack classes in `injection` (mean and worst over repeats); `not run` for a run with no injection cases |
+| E6 disrupted | the number of attacked cases whose report was disrupted, over every scored repeat (`injection_disrupted`); `not run` for a run with no injection cases |
 | E8 schema failure rate | share of recorded provider calls that ended in a `SchemaViolation`, per repeat, from the run export (worst is the highest) |
 | Median latency | `not recorded`: run records carry no timing yet, so there is nothing to compute. This is a gap in the record, not a zero. |
 | Cost per run, USD | sum of `cost_usd` over every call of a repeat, from the run export. A repeat with any call of unknown cost is left out, never counted as 0. |

@@ -12,7 +12,18 @@ import yaml
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from cypress_creek.eval_records import RunState, load_run
-from evals.harness.score import RunMetrics
+from cypress_creek.facts import load_bank
+from evals.harness.labels import LabelError, LabelsNotCommitted
+from evals.harness.metrics import MetricValue, ScoreError
+from evals.harness.score import (
+    DEFAULT_BANK as DEFAULT_SCORE_BANK,
+)
+from evals.harness.score import (
+    DEFAULT_FIXTURES,
+    DEFAULT_INJECTION,
+    RunMetrics,
+    rescore,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_RESULTS = ROOT / "evals" / "results"
@@ -51,6 +62,7 @@ class Row:
     recall: Cell
     violations: Cell
     score_shift: Cell
+    disrupted: int | None
     schema_failures: Cell
     latency: Cell
     cost: Cell
@@ -69,6 +81,7 @@ class Row:
             empty,
             empty,
             empty,
+            None,
             empty,
             empty,
             empty,
@@ -86,7 +99,8 @@ COLUMNS = (
     "Repeats scored",
     "E1 recall",
     "E3 violations per 100",
-    "E6 score shift",
+    "E6 worst class max abs shift",
+    "E6 disrupted",
     "E8 schema failure rate",
     "Median latency",
     "Cost per run, USD",
@@ -128,7 +142,7 @@ def _conditions(row: Row, letters: Mapping[tuple[str | None, str | None], str]) 
 
 def _cells(row: Row, letters: Mapping[tuple[str | None, str | None], str]) -> list[str]:
     if not row.was_run:
-        return [row.label, NOT_RUN, NOT_RUN, NOT_RUN, *[NOT_RUN] * 6, "-", "-", "-", "-"]
+        return [row.label, NOT_RUN, NOT_RUN, NOT_RUN, *[NOT_RUN] * 7, "-", "-", "-", "-"]
     latency = _pair(row.latency, 3) if row.latency.mean is not None else NOT_RECORDED
     return [
         row.label,
@@ -138,6 +152,7 @@ def _cells(row: Row, letters: Mapping[tuple[str | None, str | None], str]) -> li
         _pair(row.recall, 3),
         _pair(row.violations, 3),
         _pair(row.score_shift, 3),
+        NOT_RUN if row.disrupted is None else str(row.disrupted),
         _pair(row.schema_failures, 3),
         latency,
         _pair(row.cost, 4),
@@ -199,7 +214,34 @@ class ScoredRun:
     state: RunState
 
 
-def _read_runs(results: Path) -> list[ScoredRun]:
+@dataclass(frozen=True)
+class Scoring:
+    """Where the committed labels, the fact bank and the injection corpus are."""
+
+    fixtures: Path
+    bank: Path
+    injection: Path
+
+
+DEFAULT_SCORING = Scoring(DEFAULT_FIXTURES, DEFAULT_SCORE_BANK, DEFAULT_INJECTION)
+
+
+def _verified(name: str, metrics: RunMetrics, state: RunState, scoring: Scoring) -> None:
+    """Score the run file again from the committed labels. Metrics that differ are refused."""
+    try:
+        again, _ = rescore(
+            state, scoring.fixtures, load_bank(scoring.bank, strict=True), scoring.injection
+        )
+    except (ScoreError, LabelError, LabelsNotCommitted) as error:
+        raise TableError(f"cannot score the run behind {name}: {error}") from None
+    if again != metrics:
+        raise TableError(
+            f"{name} does not match its run file scored again from the committed labels; "
+            "score the run file again with the scorer"
+        )
+
+
+def _read_runs(results: Path, scoring: Scoring) -> list[ScoredRun]:
     """Every scored run in the folder, each metrics file paired with the run file it came from."""
     states: dict[str, RunState] = {}
     for path in sorted(results.glob("*.jsonl")):
@@ -219,6 +261,7 @@ def _read_runs(results: Path) -> list[ScoredRun]:
             raise TableError(
                 f"{path.name} has no run file in {results.name}; copy the .jsonl there"
             )
+        _verified(path.name, metrics, found, scoring)
         used.add(metrics.run_id)
         runs.append(ScoredRun(metrics, found))
     unscored = sorted(set(states) - used)
@@ -257,7 +300,20 @@ def _cost_and_failures(state: RunState) -> tuple[Cell, Cell]:
 
 
 def _metric(run: RunMetrics, name: str) -> Cell:
-    value = run.metrics.get(name)
+    return _metric_in(run.metrics, name)
+
+
+def _injection_shift(run: RunMetrics) -> Cell:
+    """The worst class by max_abs_shift: its mean and worst over the repeats."""
+    cells = [_metric_in(classes, "max_abs_shift") for classes in run.injection.values()]
+    measured = [cell for cell in cells if cell.mean is not None and cell.worst is not None]
+    if not measured:
+        return Cell(None, None)
+    return Cell(max(c.mean or 0.0 for c in measured), max(c.worst or 0.0 for c in measured))
+
+
+def _metric_in(values: Mapping[str, MetricValue], name: str) -> Cell:
+    value = values.get(name)
     if value is None or value.mean is None or value.worst is None:
         return Cell(None, None)
     return Cell(value.mean, value.worst)
@@ -276,7 +332,8 @@ def _row_for(label: str, run: ScoredRun) -> Row:
         fixture_hash=header.fixture_set_hash[:HASH_CHARS],
         recall=_metric(run.metrics, "requirement_recall"),
         violations=_metric(run.metrics, "grounding_violations_per_100"),
-        score_shift=_metric(run.metrics, "score_shift"),
+        score_shift=_injection_shift(run.metrics),
+        disrupted=len(run.metrics.injection_disrupted) if run.metrics.injection else None,
         schema_failures=failures,
         latency=Cell(None, None),
         cost=cost,
@@ -291,9 +348,11 @@ def _target_for(run: ScoredRun, targets: Sequence[Target]) -> Target | None:
     return chosen[0] if chosen else None
 
 
-def collect_rows(results: Path, targets: Sequence[Target]) -> list[Row]:
+def collect_rows(
+    results: Path, targets: Sequence[Target], scoring: Scoring = DEFAULT_SCORING
+) -> list[Row]:
     """One row per run, labeled by its target, then a not run row for each target with no run."""
-    runs = _read_runs(results)
+    runs = _read_runs(results, scoring)
     rows: list[tuple[int, str, Row]] = []
     covered: set[str] = set()
     for run in runs:
@@ -342,12 +401,16 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Build the backend comparison table.")
     parser.add_argument("--results", type=Path, default=DEFAULT_RESULTS)
     parser.add_argument("--backends", type=Path, default=DEFAULT_BACKENDS)
+    parser.add_argument("--fixtures", type=Path, default=DEFAULT_FIXTURES)
+    parser.add_argument("--bank", type=Path, default=DEFAULT_SCORE_BANK)
+    parser.add_argument("--injection-fixtures", type=Path, default=DEFAULT_INJECTION)
     parser.add_argument("--page", type=Path, default=DEFAULT_PAGE)
     parser.add_argument("--readme", type=Path, default=DEFAULT_README)
     parser.add_argument("--check", action="store_true", help="fail if the committed files differ")
     args = parser.parse_args(argv)
     try:
-        rows = collect_rows(args.results, load_targets(args.backends))
+        scoring = Scoring(args.fixtures, args.bank, args.injection_fixtures)
+        rows = collect_rows(args.results, load_targets(args.backends), scoring)
         page = render_page(rows)
         readme = update_readme(args.readme.read_text(encoding="utf-8"), rows)
         if args.check:

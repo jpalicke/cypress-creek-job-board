@@ -7,8 +7,10 @@ def scored(mean: float, worst: float) -> Cell:
     return Cell(mean, worst)
 
 
-def run_row(label: str, *, prompt: str = "p" * 12, fixture: str = "f" * 12, **cells: Cell) -> Row:
-    values = {
+def run_row(
+    label: str, *, prompt: str = "p" * 12, fixture: str = "f" * 12, **cells: Cell | int | None
+) -> Row:
+    values: dict[str, Cell | int | None] = {
         "recall": scored(0.8333333, 0.5),
         "violations": scored(0.0, 0.0),
         "score_shift": Cell(None, None),
@@ -25,7 +27,8 @@ def run_row(label: str, *, prompt: str = "p" * 12, fixture: str = "f" * 12, **ce
         prompt_hash=prompt,
         fixture_hash=fixture,
         latency=Cell(None, None),
-        **values,
+        disrupted=values.pop("disrupted", None),  # type: ignore[arg-type]
+        **values,  # type: ignore[arg-type]
     )
 
 
@@ -63,7 +66,7 @@ def test_a_metric_no_run_measured_is_not_run_even_in_a_run_row() -> None:
     table = render_table([run_row("Alpha")])
 
     head = lines(table)[0]
-    assert lines(table)[2][head.index("E6 score shift")] == "not run"
+    assert lines(table)[2][head.index("E6 worst class max abs shift")] == "not run"
     assert lines(table)[2][head.index("Median latency")] == "not recorded"
 
 
@@ -128,3 +131,21 @@ def test_a_short_hash_is_a_stable_twelve_character_prefix() -> None:
     )
     assert len(short_hash({"extract": "a" * 64})) == 12
     assert short_hash({"extract": "a" * 64}) != short_hash({"extract": "b" * 64})
+
+
+def test_e6_shows_the_worst_class_shift_and_the_disrupted_count() -> None:
+    table = render_table([run_row("Alpha", score_shift=scored(0.1, 0.4), disrupted=2)])
+
+    head = lines(table)[0]
+    row = lines(table)[2]
+    assert row[head.index("E6 worst class max abs shift")] == "0.100 / 0.400"
+    assert row[head.index("E6 disrupted")] == "2"
+
+
+def test_e6_without_injection_results_says_not_run() -> None:
+    table = render_table([run_row("Alpha")])
+
+    head = lines(table)[0]
+    row = lines(table)[2]
+    assert row[head.index("E6 worst class max abs shift")] == "not run"
+    assert row[head.index("E6 disrupted")] == "not run"

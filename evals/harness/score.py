@@ -306,20 +306,23 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
 
+def rescore(
+    state: RunState, fixtures_root: Path, bank: Bank, injection_root: Path
+) -> tuple[RunMetrics, list[CaseScore]]:
+    """Score one run from the committed labels: the only way metrics are computed."""
+    needed = set(state.header.case_ids)
+    fixtures = _load_fixtures(
+        fixtures_root, {case_id for case_id in needed if not case_pair(case_id)}
+    )
+    injections = load_corpus(injection_root) if any(case_pair(c) for c in needed) else {}
+    scores = score_cases(state, fixtures, bank)
+    return summarize(state, scores, score_pairs(state, injections, bank)), scores
+
+
 def _score_all(args: argparse.Namespace) -> int:
     bank = load_bank(args.bank, strict=True)
     states = [load_run(path) for path in args.run]
-    needed = {case_id for state in states for case_id in state.header.case_ids}
-    fixtures = _load_fixtures(
-        args.fixtures, {case_id for case_id in needed if not case_pair(case_id)}
-    )
-    has_pairs = any(case_pair(case_id) for case_id in needed)
-    injections = load_corpus(args.injection_fixtures) if has_pairs else {}
-    results: list[tuple[RunMetrics, list[CaseScore]]] = []
-    for state in states:
-        scores = score_cases(state, fixtures, bank)
-        pairs = score_pairs(state, injections, bank)
-        results.append((summarize(state, scores, pairs), scores))
+    results = [rescore(state, args.fixtures, bank, args.injection_fixtures) for state in states]
     seen = {result.backend for result, _ in results}
     results += [(not_run(name), []) for name in args.expect_backend if name not in seen]
     ok = True

@@ -50,7 +50,7 @@ def test_generate_check_and_catch_a_hand_edit(tmp_path: Path) -> None:
     assert (tmp_path / "page.md").read_bytes() == page
     assert run_table(tmp_path, "--check").returncode == 0
 
-    (tmp_path / "page.md").write_bytes(page.replace(b"0.750", b"0.999"))
+    (tmp_path / "page.md").write_bytes(page.replace(b"1.000", b"0.999"))
     edited = run_table(tmp_path, "--check")
     assert edited.returncode == 1
     assert "out of date" in edited.stderr
