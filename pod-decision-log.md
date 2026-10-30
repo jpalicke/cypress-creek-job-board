@@ -322,3 +322,9 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 ## D60. The Anthropic adapter is proven against the live API (issue #129)
 - 2026-10-30, Joe P ran `uv run pytest tests/integration/test_anthropic_live.py -q` with a real key: "2 passed in 3.00s".
 - The "not yet proven" wording in docs/providers.md, ADR 0025 and docs/contributing.md is replaced by the dated result (PR #153, closes #129). No model id or usage numbers were reported, so none are recorded. D14's "needs from Joe P: an ANTHROPIC_API_KEY" is satisfied. The C4 OpenAI and LM Studio sign-offs (#130) remain open.
+
+## D61. The OpenAI live call passed (issue #130 item 1)
+- 2026-10-30, Joe P ran `uv run pytest tests/integration -m live_openai -q`: "1 passed, 72 deselected in 2.06s".
+- Recorded in ADR 0027 and docs/providers.md via PR (openai-live-verified). #130 stays open: LM Studio findings, explicit confirmation of the gpt-6-luna pick and prices, and the temperature decision for E8 (the call passed without a temperature, so hosted rows are not temperature-pinned; E8 as scoped runs only local models, so this only matters when a hosted row is added).
+- No model id or usage numbers were reported.
+- Both seniors hit the 5-hour usage limit again at about 03:20 UTC (reset 04:10 UTC); they are resumed after that.
