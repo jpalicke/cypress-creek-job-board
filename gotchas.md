@@ -8,27 +8,27 @@ Never commit with a personal email address. The repo identity is `user.name` "jp
 Why: the first commit carried a personal address, which was publicly exposed; the commit had to be amended and force-pushed.
 
 ## Documentation ships with the change
-Update documentation affected by a behavior change in the same PR. Do not defer necessary docs to a later PR. Check `README.md` status and "Try what exists" whenever user-visible behavior or run instructions change. For split work, each PR carries the documentation necessary for what it delivers.
+Rule: `CLAUDE.md` (Documentation).
 
 Why: the README went stale across two cards, and a separate docs branch was rejected.
 
 ## Keep PRs reviewable
-Aim for about 10 changed files, with 20 as a practical upper bound. Propose a split if a card will be substantially larger, but do not split a coherent fix merely to meet an arbitrary file count. Each split needs its own relevant documentation.
+Rule: `CLAUDE.md` (Development approach).
 
 Why: B4 landed as a roughly 40-file PR that was difficult to review.
 
 ## Audit documentation affected by a change
-Before reporting a card complete, run the grep-based audit in `CLAUDE.md` (Documentation).
+Rule: `CLAUDE.md` (Documentation), before reporting a card complete.
 
 Why: on B5, weights configuration and the PR-size rule were omitted from several relevant docs until Joe P asked whether they were current.
 
 ## Test changed behavior before implementation
-For new or changed observable behavior, first write or adjust a relevant test and confirm it fails for the right reason. This applies to behavioral changes discovered midway through a card. If an existing failing test already demonstrates the requirement, it suffices; do not add another just to follow a ritual. Pure refactoring does not require a new failing test when existing tests protect the behavior. Keep tests focused on distinct defects, and consolidate redundant cases.
+Rule: `CLAUDE.md` (TDD and test selection).
 
 Why: on B6a, the implementation was rewritten for full Unicode confusables data before the tests were updated. The failure was changing behavior without first establishing the expected behavior in tests, not an insufficient number of tests.
 
 ## Post the merge summary on the issue too
-When asking Joe P to merge, post the same concise summary as a comment on the card's issue so the ticket records the completed work.
+Rule: `CLAUDE.md` (Development approach), so the ticket records the completed work.
 
 Why: Joe P requested this on B6a.
 
@@ -48,6 +48,11 @@ Store resumable evaluation runs in SQLite transactions. Preserve each record's J
 Why: direct JSONL append can leave a torn final row, while rewriting the whole file adds recovery work already handled by SQLite transactions.
 
 ## Retrospective tests must demonstrate effectiveness
-When writing tests for behavior that already exists, deliberately introduce a representative defect in each distinct behavior being protected, verify that the relevant test detects it, then restore the implementation. Record what was checked in the PR, including which tiers would and would not detect important failures. Do not mutate every assertion or minor implementation detail, and do not repeat this exercise when a test already demonstrated a genuine red-green cycle.
+Rule: `CLAUDE.md` (TDD and test selection). Introduce one representative defect per distinct protected behavior, not one per assertion or implementation detail.
 
 Why: on H3, deliberate wrong assertions made tests appear red even though the adapter already existed. Those failures did not demonstrate that the tests could catch real defects such as lost unescaping, incorrect 404 mapping, or a missing budget check. Live feeds also did not exercise hostile-input handling.
+
+## Windows scratch paths and escapes
+Harmless CRLF warnings may appear on Windows. Keep generated scratch files in a short path such as `C:/Temp/ccb`, and use an editor tool for files with backslash escapes rather than shell heredocs.
+
+Why: the original record did not include a separate incident description.
