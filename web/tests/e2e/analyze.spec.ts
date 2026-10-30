@@ -40,9 +40,11 @@ test("the Analyze flow works with the keyboard alone", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByLabel("Backend")).toContainText("openai_compatible");
 
-  // Tab order: the nav link, the mode radios (one stop), the text box, the backend, the button.
+  // Tab order: the two nav links, the mode radios (one stop), the text box, the backend, the button.
   await page.keyboard.press("Tab");
   await expect(page.getByRole("link", { name: "Analyze" })).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("link", { name: "Fact bank" })).toBeFocused();
   await page.keyboard.press("Tab");
   await expect(page.getByLabel("Paste text")).toBeFocused();
   await page.keyboard.press("Tab");

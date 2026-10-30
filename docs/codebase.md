@@ -19,7 +19,7 @@ docs/                    Documentation, indexed in docs/README.md
 scripts/                 Repo tooling run by hooks and CI (ABOUTME check, license check, UI type generator, UI test fixtures)
 web/                     The browser UI: Svelte 5, Vite and TypeScript strict, no SvelteKit
   src/lib/               api.ts (typed client, CSRF token flow), types.ts (generated from the pydantic models), grouping.ts
-  src/routes/            Analyze.svelte, DraftHelp.svelte (the review gate), GapReport.svelte, ReportPage.svelte
+  src/routes/            Analyze.svelte, DraftHelp.svelte (the review gate), FactBank.svelte, GapReport.svelte, ReportPage.svelte
   src/App.svelte         The shell and the hash router
   scripts/check-dist.mjs Build check: no {@html}, inline script or remote origin
   tests/e2e/             Playwright tests against the real API on 5309; tests/live/ needs a real Ollama
@@ -90,7 +90,7 @@ src/cypress_creek/       The library
     security.py          allowed_hosts, HostCheckMiddleware, CsrfMiddleware, SecurityHeadersMiddleware, new_token, API_PORT
     errors.py            ErrorCode, ApiError, ErrorResponse and the handlers for the one error shape
     server.py            main, check_bind_host: the uvicorn entry point (`cypress-creek-api`)
-    routes/              health.py, providers.py, session.py, postings.py, reports.py, suggestions.py, facts.py, watchlist.py, blacklist.py, discovery.py (one router each)
+    routes/              health.py, providers.py, session.py, postings.py, reports.py, suggestions.py, facts.py (list, validate, add, edit, share, verify, delete), watchlist.py, blacklist.py, discovery.py (one router each)
     context.py           Database (created on first use), Backend, and the dependencies the routes share
     schemas.py           Request and response models for the posting, analyze, report and fact routes
     backends.py          check_backend_choice: name the configured backend, confirm a hosted one

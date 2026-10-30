@@ -1,6 +1,7 @@
 # ABOUTME: Seeds the UI end to end tests with stored reports, including one full of hostile markup.
 # ABOUTME: Run by the Playwright web server before the API starts; writes the ids to fixtures.json.
 import json
+import shutil
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -143,7 +144,13 @@ def seed(path: Path) -> dict[str, str]:
     }
 
 
+SAMPLE_BANK = Path(__file__).resolve().parents[1] / "evals" / "bank" / "sample_bank.yaml"
+
+
 def main() -> int:
+    # The fact bank screen edits its file, so the tests get their own copy of the fictional bank.
+    data_dir().mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(SAMPLE_BANK, data_dir() / "bank.yaml")
     ids = seed(database_path())
     target = data_dir() / "fixtures.json"
     target.write_text(json.dumps(ids), encoding="utf-8")

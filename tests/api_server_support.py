@@ -18,14 +18,14 @@ PORT = 5309
 
 
 @contextmanager
-def running_server(data_dir: Path) -> Iterator[None]:
+def running_server(data_dir: Path, bank: Path | None = None) -> Iterator[None]:
     env = {
         **os.environ,
         "CYPRESS_CREEK_PROVIDER": "ollama",
         "CYPRESS_CREEK_MODEL": "qwen3.5:0.8b",
         "CYPRESS_CREEK_BASE_URL": "http://127.0.0.1:1",
         "CYPRESS_CREEK_DATA_DIR": str(data_dir),
-        "CYPRESS_CREEK_BANK": str(ROOT / "evals" / "bank" / "sample_bank.yaml"),
+        "CYPRESS_CREEK_BANK": str(bank or ROOT / "evals" / "bank" / "sample_bank.yaml"),
     }
     process = subprocess.Popen(
         [sys.executable, "-m", "cypress_creek.api.server"],
