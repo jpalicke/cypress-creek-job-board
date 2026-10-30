@@ -314,3 +314,7 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 ## D58. Joe P reviewed G1
 - 2026-10-30, Joe P ("G1 looks good").
 - Treated as the second human review the G1 card asked for (Host and CSRF logic). Recorded in ADR 0028's status line via PR #149; the claim is limited to what he said. He can still order changes. D33, D34 and D41 are closed by this.
+
+## D59. Trap: the label guard blocks `git merge main` on older branches
+- 2026-10-30, senior A found, manager prioritised the fix.
+- After the labels went to `review: reviewed` (PR #147), the pre-commit pytest gate's committed-labels check (evals/harness/labels.py) compares labels.yaml against HEAD, so a merge in progress fails it. Workarounds used without any hook bypass: update_pull_request_branch (server side) or cherry-pick onto a branch from main (H1c became PR #150, #146 closed). Senior A fixes the check (red test first; the guard must still refuse a real uncommitted edit).
