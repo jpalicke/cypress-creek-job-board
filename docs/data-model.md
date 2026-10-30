@@ -189,7 +189,7 @@ The repository, `Blacklist(conn)`:
 - `remove(entry_id)` deletes by id and returns whether a row was there. `rows()` returns `(id, entry)` pairs, oldest first. `entries()` returns just the entries, ready to pass to `is_blacklisted`.
 - The repository stores and loads. It never matches.
 
-Known limits: the `/api/watchlist` and `/api/blacklist` routes are not built yet. They come in H1c, after G1, and card issue #40 stays open until then. Domains are compared as exact hosts, so blocking `acme.com` does not block `jobs.acme.com`. Slugs are compared as plain text and are not scoped to an ATS. Company keys inherit the limits listed under `company_key`. Nothing calls the filter from a fetch path yet.
+Known limits: the `/api/watchlist` and `/api/blacklist` routes exist (see [api.md](api.md)), and the discovery run calls the filter before every fetch. Domains are compared as exact hosts, so blocking `acme.com` does not block `jobs.acme.com`. Slugs are compared as plain text and are not scoped to an ATS. Company keys inherit the limits listed under `company_key`. Nothing calls the filter from a fetch path yet.
 
 ## Try the blacklist
 ```bash

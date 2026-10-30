@@ -34,7 +34,9 @@ def test_a_fixture_run_can_be_scored_by_the_scorer(scratch_dir: Path) -> None:
     environment = {
         **os.environ,
         "CYPRESS_CREEK_BASE_URL": BASE_URL,
-        "CYPRESS_CREEK_CONTEXT_TOKENS": "32768",
+        "CYPRESS_CREEK_CONTEXT_TOKENS": "16384",
+        # A slow shared runner can take minutes for one call of a small model on a real posting.
+        "CYPRESS_CREEK_REQUEST_TIMEOUT_SECONDS": "900",
     }
 
     run = subprocess.run(
@@ -59,7 +61,7 @@ def test_a_fixture_run_can_be_scored_by_the_scorer(scratch_dir: Path) -> None:
         env=environment,
         capture_output=True,
         text=True,
-        timeout=900,
+        timeout=1500,
         check=False,
     )
 

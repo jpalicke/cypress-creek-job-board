@@ -97,6 +97,32 @@ Expected: the first prints the blacklist entry; its `value` is the normalized co
 
 The estimate prints the extraction call's `input_tokens`, `output_tokens` and a `usd` of 0 for a local model. With Ollama running and `qwen3.5:0.8b` pulled, the report has rows and a score. With it not running, the report shows `"status": "incomplete"` and `extraction failed: provider_unavailable`. A write without the `X-CSRF-Token` header is refused with `csrf_token_invalid`. Stop the server with Ctrl+C. Setting `CYPRESS_CREEK_API_HOST=0.0.0.0` makes it exit with code 2 and say that the API only binds to a loopback address. The rules, routes and error codes are in [api.md](api.md).
 
+Run discovery on a watched company and list the ranking. A blacklisted company is skipped and its board is never contacted, so this runs with no network and no model; the run summary says what it did. (A watched company that is not blacklisted is fetched for real from its public board, and scoring needs the model backend, so with Ollama not running the summary says `"stopped_by": "backend"` and the rows are `unscored`.) With the server started as above:
+
+```bash
+export CYPRESS_CREEK_DATA_DIR="$(mktemp -d)"
+export CYPRESS_CREEK_BANK=evals/bank/sample_bank.yaml
+export CYPRESS_CREEK_PROVIDER=ollama CYPRESS_CREEK_MODEL=qwen3.5:0.8b
+uv run cypress-creek-api &
+sleep 3
+API=http://127.0.0.1:5309
+TOKEN=$(curl -s $API/api/session | python3 -c 'import json,sys; print(json.load(sys.stdin)["csrf_token"])')
+JSON='Content-Type: application/json'
+curl -s -X POST $API/api/watchlist -H "X-CSRF-Token: $TOKEN" -H "$JSON" \
+  -d '{"display_name": "Acme Corp", "ats": "greenhouse", "slug": "acme", "identity_evidence": "strong", "approval": "human_confirmed"}' > /dev/null
+curl -s -X POST $API/api/blacklist -H "X-CSRF-Token: $TOKEN" -H "$JSON" \
+  -d '{"match_kind": "company_key", "value": "Acme", "reason": "agency"}' > /dev/null
+curl -s -X POST $API/api/discovery/refresh -H "X-CSRF-Token: $TOKEN" -H "$JSON" \
+  -d '{"backend": "ollama", "cap": 10}'
+echo
+curl -s $API/api/discovery/listings
+echo
+kill %1
+unset CYPRESS_CREEK_DATA_DIR CYPRESS_CREEK_BANK CYPRESS_CREEK_PROVIDER CYPRESS_CREEK_MODEL
+```
+
+Expected: the refresh prints `"blocked_boards":1`, `"fetched":0`, `"errors":[]` and `"stopped_by":null`, and the listing answer has an empty `listings` array with a `note` that says the score is for triage and not a probability. Without the blacklist call, the watched board would be fetched and its listings would come back unscored when no model is running. A write without the token is refused with `csrf_token_invalid`.
+
 ## Run the web UI
 
 The browser UI is a small Svelte app in `web/` (Vite, TypeScript strict, no SvelteKit). It needs Node 22 or newer with npm, and the API from the section above. From a fresh clone:
@@ -137,7 +163,7 @@ npm run e2e         # Playwright against the real API on 5309 (needs the bundle 
 
 ## Fetch a job board politely
 
-Discovery fetches go through one library, `PoliteClient`, which adds a per-host delay, a refresh window, an ETag disk cache and backoff on top of the guarded transport. No API route uses it yet, so this is a library call. It makes two real requests to a public job board feed, and the cache goes in a throwaway directory so nothing lands in your data directory. From the repository root, in a bash shell:
+Discovery fetches go through one library, `PoliteClient`, which adds a per-host delay, a refresh window, an ETag disk cache and backoff on top of the guarded transport. The discovery routes use it for every board; this example uses it directly. It makes two real requests to a public job board feed, and the cache goes in a throwaway directory so nothing lands in your data directory. From the repository root, in a bash shell:
 
 ```bash
 export CYPRESS_CREEK_DATA_DIR="$(mktemp -d)"

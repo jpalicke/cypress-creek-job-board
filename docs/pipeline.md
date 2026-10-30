@@ -533,7 +533,7 @@ The cache key is the run id, which covers the listing text, the bank, the backen
 
 Scoring stops early, and the rest stay unscored, when the backend cannot answer (`stopped_by="backend"`: provider unavailable or rate limited) or the budget is spent (`stopped_by="budget"`). Scores already stored are kept. A listing whose extraction fails for another reason is left unscored and the run goes on.
 
-`ranked_listings(conn, boards, filters, identity, today)` rebuilds the ranked list from storage with no fetch and no model call. Every row carries its `run_id`, which is the key of the stored gap report. The score is for triage only, not a probability. There is no apply or send action anywhere in discovery.
+`ranked_listings(conn, boards, filters, identity, today)` rebuilds the ranked list from storage with no fetch and no model call. Every row carries its `run_id`, which is the key of the stored gap report. The score is for triage only, not a probability. There is no apply or send action anywhere in discovery. The API runs it with `POST /api/discovery/refresh` and reads it back with `GET /api/discovery/listings` (see [api.md](api.md) and [ADR 0037](adr/0037-discovery-routes.md)).
 
 ### Try a discovery run
 No network and no model: the board is not fetched (no adapters are passed, so the run reports a `NoAdapter` error and scores what is stored), and the analyzer is the real pipeline after extraction over one hand written requirement. From the repository root, in a bash shell:
