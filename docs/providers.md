@@ -156,8 +156,8 @@ On 2026-10-30 Joe P ran both `live_lmstudio` tests against his LM Studio and the
 
 | Question | Finding |
 | --- | --- |
-| LM Studio version and model tested | LM Studio 0.4.17 (Build 4), model `gemma-4-e4b` (the identifier LM Studio lists carries a vendor prefix), loaded with a context length of 8192 (reported by Joe P after the run) |
-| Is the loaded context length exposed by the model listing, or must config supply it? | not recorded (the adapter reads `context_tokens` from config; the test config supplied it). The model was loaded with 8192; the context value passed to the tests was not reported |
+| LM Studio version and model tested | LM Studio 0.4.17 (Build 4), model `gemma-4-e4b` (the identifier LM Studio lists carries a vendor prefix), loaded with a context length of 8192, the same value passed to the tests as `CYPRESS_CREEK_LMSTUDIO_CONTEXT` (reported by Joe P after the run) |
+| Is the loaded context length exposed by the model listing, or must config supply it? | not recorded (the adapter reads `context_tokens` from config; the test config supplied it). The model was loaded with 8192 and both the load and the tests used 8192 |
 | Is `response_format` `json_schema` honored for the model? | not established: a conforming reply passes either way because every reply is validated against the schema; `strict_schema` stays false |
 | How is a prompt over the loaded context reported? | A prompt far over the loaded context was detected and raised `ContextTruncated` (test passed). Which signal fired, the reported prompt count or the text of a 400 body, was not recorded, so `CONTEXT_ERROR_MARKERS` is still unconfirmed |
 
