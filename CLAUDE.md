@@ -58,7 +58,7 @@ No auto apply. Ever. A human reviews every draft.
 - Infrastructure keeps its defaults (Ollama 11434, and so on).
 
 ## Do not
-- Mention any specific employer or industry in the repo, README or fact bank.
+- Mention any specific employer or industry in the repo, README or fact bank. The rule exists to keep information that identifies Joe P out of the repo and to keep the project untailored to any target company. Public third party postings used as eval fixtures are exempt: they name the company that published them, and each one is listed in NOTICE with its source and takedown contact.
 - Add auto apply, auto send or any outward posting behavior.
 - Write implementation before the matching failing test exists.
 
