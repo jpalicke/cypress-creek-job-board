@@ -62,6 +62,7 @@ Each command is copy and paste, and lives with its documentation:
 | Add a company to the watchlist and see a denied one refused | [docs/data-model.md](docs/data-model.md#try-the-discovery-tables) |
 | Dedupe listings, filter them and close the ones that left a board, with no network | [docs/pipeline.md](docs/pipeline.md#try-dedupe-filters-and-states) |
 | Run discovery scoring with a cap and a score cache, and see the cache serve a second run, with no network or model | [docs/pipeline.md](docs/pipeline.md#try-a-discovery-run) |
+| Add a company to the watchlist through the API with a human approval marker, and see a blacklisted one refused | [docs/setup.md](docs/setup.md#start-the-api-server) |
 | Block a company, board slug or domain and see a lookalike filtered | [docs/data-model.md](docs/data-model.md#try-the-blacklist) |
 | Fetch a large public Greenhouse board and print its normalized listings | [docs/setup.md](docs/setup.md#fetch-a-greenhouse-board) |
 | Fetch a large public Lever board, page by page, and print its normalized listings | [docs/setup.md](docs/setup.md#fetch-a-lever-board) |
