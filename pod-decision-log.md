@@ -360,3 +360,8 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 - 2026-10-30, Joe P.
 - Senior A (agent id a66bc9c84628b82fb) is called Andrew. Joe P thanked Andrew for his help; Andrew has finished and stopped. His handover is docs/pod/handover-senior-a.md (PR #159). Earlier entries that say "senior A" or "A" mean Andrew.
 - Hand-over from Andrew: #154 (H7b) goes to Barry (a live test failed on the slow runner and needs root-causing); #157 (strict schema rewriter, closes #134) and #159 (handover docs) are for the manager to review; E8, the slug/ats allowlist note and H8 move to Barry.
+
+## D69. Merges by the manager after Andrew stopped (2026-10-30 about 04:30 UTC)
+- Manager reviewed and merged: #149 (G1 review note), #148 (#140 runner wiring, read the diff: labels checked as committed before any case or provider exists, case id = fixture id, posting text unchanged, header records the fixture set hash), #158 (employer rule clarified, Joe P's decision), #155 (OpenAI and LM Studio results, model pick, temperature limit; closes #130), #157 (strict schema rewriter, closes #134; faithful refactor, keyword sets per provider identical to the old ones), #159 (Andrew's handover doc).
+- Independence note: #155 and #158 were written by the manager and reviewed by the manager (the content was decided by Joe P); #157 and #159 were written by Andrew and reviewed only by the manager. Joe P's Opus pass covers these.
+- Open: #154 (H7b; the live Ollama job failed one older H7a test on the slow runner; Barry root-causes it).
