@@ -39,7 +39,8 @@ CHARS_PER_TOKEN = 3
 ERROR_BODY_LIMIT = 200
 
 # Phrases that mark a 400 as a context length problem, matched on lower case text. The first is
-# OpenAI's documented error code. The rest are guesses at server wording, none of them verified
+# OpenAI's documented error code. "context length" is in a recorded LM Studio 0.4.17 overflow
+# reply (see the component test). The rest are guesses at server wording, none of them verified
 # against a real server. A false match turns an ordinary 400 into ContextTruncated, which fails
 # closed.
 CONTEXT_ERROR_MARKERS = (

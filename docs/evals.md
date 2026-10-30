@@ -299,6 +299,7 @@ A backend with no run says `not run` in every cell, never 0. The page and the RE
 The first published run (card E8) is not started, and the design is only recorded here so Joe P can trigger it after his label review. It needs no key and no spend for the local backends:
 - **Before the run:** the labels must be reviewed and committed (the method rule is labels frozen before the runs), and the fixtures must be runnable by the runner (card #140). The scorer refuses labels that are not committed.
 - **A dispatched workflow** (a new `eval-run.yml`, manual only, like `live.yml`) would: install Ollama and cache `~/.ollama/models` as `live.yml` does; pull `qwen3.5:4b` (and `qwen3.5:9b` if the runner has the disk and time for it; a GitHub runner has no GPU, so budget an hour or more per model and set `timeout-minutes` to match); run the fixture runner with 3 repeats at temperature 0 for each model; score each export with `score.py`; and upload the exports and metrics JSON as an artifact.
+- **Hosted rows are not temperature pinned.** The method rule asks for temperature 0, but `gpt-6-luna` accepts only its default of 1 (ADR 0027), so an OpenAI row would vary between repeats by design and must be labelled that way. E8 itself runs local models only.
 - **After the run:** a human copies the artifact files into `evals/results/`, runs `python -m evals.harness.table`, reviews the diff and commits. Hosted rows stay `not run` unless Joe P provides keys and approves the dry run estimate.
 
 ## Posting fixtures and hand labels
