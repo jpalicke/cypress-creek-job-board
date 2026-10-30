@@ -53,7 +53,7 @@ We are coworkers. JP makes the final call. Be direct, challenge assumptions with
 
 ## Documentation
 - Update documentation affected by the change in the same PR. Installation, setup, configuration, commands, user-visible behavior, and architecture must remain accurate and runnable from `README.md` and `docs/`.
-- Audit only documents plausibly affected by the change; do not reread and execute every documentation command for an unrelated edit. Run new or changed commands, and verify critical existing commands when the change could affect them.
+- Find stale docs by grepping `README.md`, `docs/`, and `gotchas.md` for the names, commands, flags, and paths the change touched, then read and edit only the matching sections. Never read a whole document to audit it, and do not execute every documentation command for an unrelated edit. Run new or changed commands, and verify critical existing commands when the change could affect them.
 - Document significant design decisions in an ADR when warranted. Do not create process documents or ADRs for trivial implementation details.
 - If a card must be split, each PR includes the documentation necessary for its own delivered behavior.
 
