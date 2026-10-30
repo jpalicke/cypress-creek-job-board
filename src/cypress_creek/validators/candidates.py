@@ -8,18 +8,80 @@ from pydantic import BaseModel, ConfigDict
 
 from cypress_creek.scoring.aliases import AliasTable, load_aliases
 from cypress_creek.terms import normalize_term
-from cypress_creek.validators.claim_words import quantity_words
+from cypress_creek.validators.claim_words import negation_words, quantity_words
 from cypress_creek.validators.consistency import month_of
 from cypress_creek.validators.verdict import Verdict, fail, ok
 
 VALIDATOR_ID = "V15"
 VERSION = 1
-_NUMBER = re.compile(r"\d[\d,.]*\d|\d")
+_NUMBER = re.compile(r"\d[\d,.]*\d[a-z%]*|\d[a-z%]*", re.IGNORECASE)
 _WORD = re.compile(r"[^\W\d_][\w'’+#./-]*")
 _MONTH_WORD = re.compile(r"\b[A-Z][a-z]{2,8}\b")
 _SPACES = re.compile(r"\s+")
 # Capitalised words that are not names: the pronoun a person writes about themselves.
 _NOT_NAMES = frozenset({"i"})
+# Words a claim may use without the span saying them: they carry no fact about the person.
+_FUNCTION_WORDS = frozenset(
+    [
+        "a",
+        "an",
+        "the",
+        "and",
+        "or",
+        "of",
+        "at",
+        "in",
+        "on",
+        "for",
+        "to",
+        "with",
+        "by",
+        "from",
+        "as",
+        "where",
+        "which",
+        "that",
+        "who",
+        "whom",
+        "is",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "i",
+        "my",
+        "me",
+        "we",
+        "our",
+        "it",
+        "its",
+        "this",
+        "these",
+        "those",
+        "while",
+        "during",
+        "across",
+        "into",
+        "over",
+        "under",
+        "using",
+        "via",
+        "also",
+        "then",
+        "than",
+        "their",
+        "they",
+        "he",
+        "she",
+        "his",
+        "her",
+        "has",
+        "had",
+        "have",
+    ]
+)
+_SUFFIXES = ("ing", "ed", "es", "s", "d")
 
 
 class ProposedFact(BaseModel):
@@ -42,7 +104,7 @@ def collapse(text: str) -> str:
 
 
 def _numbers(text: str) -> set[str]:
-    return {token.rstrip(".,") for token in _NUMBER.findall(text)}
+    return {token.rstrip(".,").casefold() for token in _NUMBER.findall(text)}
 
 
 def _months(text: str) -> set[int]:
@@ -54,6 +116,18 @@ def _mentions(text: str, term: str) -> bool:
     return re.search(rf"(?<![\w+#]){re.escape(term)}(?![\w+#])", text) is not None
 
 
+def _forms(word: str) -> set[str]:
+    """A word and what it becomes without a possessive or one common ending, so service
+    matches services and manage matches managed."""
+    for ending in ("'s", "’s"):
+        word = word.removesuffix(ending)
+    return {word} | {
+        word[: -len(suffix)]
+        for suffix in _SUFFIXES
+        if word.endswith(suffix) and len(word) - len(suffix) >= 3
+    }
+
+
 def _folded_words(text: str) -> set[str]:
     return {word.strip(".,;:'’").casefold() for word in _WORD.findall(collapse(text))}
 
@@ -62,8 +136,8 @@ def check_candidate_grounded(resume: str, fact: ProposedFact) -> Verdict:
     """Pass only if the span is in the resume and the claim and tags say nothing beyond it.
 
     Checked in order: the span, invisible characters, numbers, quantity words, months,
-    capitalised names, tags. The first failure is the verdict; the offending text is for logs
-    and is never sent to a caller."""
+    capitalised names, every other claim word, a dropped negation, tags. The first failure is
+    the verdict; the offending text is for logs and is never sent to a caller."""
     source = collapse(fact.source)
     if not source or source not in collapse(resume):
         return fail(VALIDATOR_ID, "source_not_in_resume")
@@ -81,6 +155,12 @@ def check_candidate_grounded(resume: str, fact: ProposedFact) -> Verdict:
         bare = word.strip(".,;:'’")
         if bare[:1].isupper() and bare.casefold() not in known | _NOT_NAMES:
             return fail(VALIDATOR_ID, "name_not_in_source", bare)
+    source_forms = set().union(*(_forms(word) for word in known))
+    for word in sorted(_folded_words(claim) - _FUNCTION_WORDS):
+        if not _forms(word) & source_forms:
+            return fail(VALIDATOR_ID, "word_not_in_source", word)
+    if negation_words(source) - negation_words(claim):
+        return fail(VALIDATOR_ID, "negation_dropped")
     lowered = unicodedata.normalize("NFKC", source).casefold()
     for tag in fact.tags:
         if not any(

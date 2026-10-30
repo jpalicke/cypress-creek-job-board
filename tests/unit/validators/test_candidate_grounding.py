@@ -181,3 +181,32 @@ def test_an_invisible_character_in_the_claim_fails(invisible: str) -> None:
     )
 
     assert verdict.reason == "invisible_character_in_claim"
+
+
+@pytest.mark.parametrize(
+    ("source", "claim", "reason"),
+    [
+        (
+            "Built data pipelines.",
+            "built data pipelines with terraform and kafka",
+            "word_not_in_source",
+        ),
+        ("Worked 5 months at Acme.", "Worked 5 years at Acme.", "word_not_in_source"),
+        ("Led engineers.", "Led five engineers.", "word_not_in_source"),
+        ("Saved 5k.", "Saved 5m.", "number_not_in_source"),
+        ("Never used Java.", "Used Java.", "negation_dropped"),
+    ],
+)
+def test_a_claim_may_not_add_words_units_or_drop_a_negation(
+    source: str, claim: str, reason: str
+) -> None:
+    verdict = check_candidate_grounded(source, fact(claim=claim, source=source, tags=[]))
+
+    assert verdict.reason == reason
+
+
+def test_inflected_words_and_function_words_are_grounded() -> None:
+    source = "Managed 4 engineers and shipped the billing services"
+    claim = "Managed 4 engineers and shipped the billing service."
+
+    assert check_candidate_grounded(source, fact(claim=claim, source=source, tags=[])).passed

@@ -13,6 +13,8 @@ from chat_server import Reply, chat_server, json_reply
 from cypress_creek.api.app import create_app
 from cypress_creek.config import ProviderSettings
 from cypress_creek.facts.loader import load_bank
+from cypress_creek.facts.models import Evidence, EvidenceType, Kind
+from cypress_creek.facts.store import BankStore, FactDraft
 from cypress_creek.pipeline.prompt import Stage, build_prompt
 from cypress_creek.pipeline.schemas import ResumeImportOutput
 from cypress_creek.providers.base import Capabilities, CostPerMtok
@@ -160,6 +162,30 @@ def test_a_bank_that_cannot_be_written_leaves_the_candidate_pending(tmp_path: Pa
     failed = send(client, "POST", f"/api/import/candidates/{candidate['id']}/approve")
 
     assert failed.status_code == 500 and failed.json()["error"]["code"] == "internal_error"
+    pending = client.get("/api/import/candidates").json()["candidates"]
+    assert [c["id"] for c in pending] == [candidate["id"]]
+
+
+def test_a_claim_that_reached_the_bank_after_the_import_is_not_approved_twice(
+    tmp_path: Path,
+) -> None:
+    with chat_server(reply(GOOD)) as (base_url, _):
+        client = make(tmp_path, base_url)
+        candidate = run(client).json()["candidates"][0]
+    BankStore(tmp_path / "private" / "bank.yaml").add(
+        FactDraft(
+            claim="built python services",
+            kind=Kind.EMPLOYMENT,
+            tags=[],
+            evidence=Evidence(type=EvidenceType.SELF_ATTESTED, pointer="typed by hand"),
+        )
+    )
+
+    refused = send(client, "POST", f"/api/import/candidates/{candidate['id']}/approve")
+
+    assert refused.status_code == 409
+    assert refused.json()["error"]["code"] == "claim_already_in_bank"
+    assert len(load_bank(tmp_path / "private" / "bank.yaml").facts) == 1
     pending = client.get("/api/import/candidates").json()["candidates"]
     assert [c["id"] for c in pending] == [candidate["id"]]
 

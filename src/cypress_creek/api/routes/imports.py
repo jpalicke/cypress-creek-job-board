@@ -23,7 +23,7 @@ from cypress_creek.ingest.errors import EmptyPosting, PostingTooLong
 from cypress_creek.ingest.hashing import text_hash
 from cypress_creek.ingest.normalize import normalize
 from cypress_creek.ingest.pdf_text import PdfError, extract_pdf_text
-from cypress_creek.pipeline.resume_import import propose_candidates
+from cypress_creek.pipeline.resume_import import claim_key, propose_candidates
 from cypress_creek.pipeline.trace import PipelineTrace
 from cypress_creek.providers import BudgetExceeded
 from cypress_creek.providers.budget import BudgetedProvider, BudgetTracker, budget_from_settings
@@ -221,6 +221,9 @@ def approve_candidate(
     candidate = store.get(candidate_id)
     if candidate is None:
         raise ApiError(404, ErrorCode.NOT_FOUND)
+    banked = {claim_key(fact.claim) for fact in BankStore(bank_path).facts()}
+    if candidate.state == "pending" and claim_key(candidate.claim) in banked:
+        raise ApiError(409, ErrorCode.CLAIM_ALREADY_IN_BANK)
     try:
         store.decide(candidate_id, "approved")
     except CandidateNotPending:
