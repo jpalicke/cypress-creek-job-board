@@ -117,7 +117,7 @@ src/cypress_creek/       The library
 evals/
   bank/                  The fictional sample fact bank, its unverified lure file and PLANTED_GAPS.md (see evals.md)
   cases/                 Dated fictional postings; technical-smoke.json is the CLI smoke case
-  harness/run.py         Dry-run planner and resumable real-provider CLI
+  harness/run.py         Dry-run planner and resumable real-provider CLI over a manifest or the labeled fixtures
   harness/labels.py      Hand label schema, validate_labels, planted_gap_support, require_committed_labels
   harness/fixtures.py    Fixture loading, the meta schema and fixture_set_hash
   harness/check_labels.py  Command line check of every posting fixture

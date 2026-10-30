@@ -121,9 +121,9 @@ uv run python -m evals.harness.score --run evals/scratch/run.jsonl --out evals/s
   hand edit made during the merge is still refused. It refuses a run made with a different
   bank (header `bank_hash`), a case with no fixture, and a posting that differs from its fixture.
 
-**What a run needs.** The runner `evals.harness.run` still reads JSON case manifests and does not
-run the labeled fixtures, so no CLI produces a scorable run yet; the card that wires fixtures into
-the runner closes that gap. Until then the tests build runs from the labels, and the live test
+**What a run needs.** `evals.harness.run --fixtures` runs the committed labeled fixtures (see
+[Running the labeled fixtures](#running-the-labeled-fixtures)), and its export is what this scorer
+reads. The tests also build runs from the labels, and the live test
 `tests/integration/test_score_live.py` runs a real Ollama over two fixtures and scores the result.
 To see the scorer on a synthetic, label-perfect run (not benchmark evidence), build one from the
 test helpers:
