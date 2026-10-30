@@ -252,11 +252,39 @@ def _git(directory: Path, *args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
+def _holds(directory: Path, *args: str) -> bool:
+    return _git(directory, *args).returncode == 0
+
+
+def _merge_in_progress(directory: Path) -> bool:
+    return _holds(directory, "rev-parse", "-q", "--verify", "MERGE_HEAD")
+
+
+def _is_merge_result(directory: Path) -> bool:
+    """While a merge is under way, the merged file is the one in the index when nobody edited it.
+
+    The index copy must equal the file on either side of the merge and the working copy must
+    equal the index, so an edit made during the merge is still refused."""
+    if not _merge_in_progress(directory):
+        return False
+    if not _holds(directory, "diff", "--quiet", "--", "labels.yaml"):
+        return False
+    return any(
+        _holds(directory, "diff", "--cached", "--quiet", side, "--", "labels.yaml")
+        for side in ("HEAD", "MERGE_HEAD")
+        if _holds(directory, "cat-file", "-e", f"{side}:./labels.yaml")
+    )
+
+
 def require_committed_labels(fixture_dir: Path) -> None:
-    """Refuse a case whose labels.yaml is not tracked and identical to the committed file."""
+    """Refuse a case whose labels.yaml is not tracked and identical to the committed file.
+
+    During a merge in progress the file the merge brought in counts as committed."""
     tracked = _git(fixture_dir, "ls-files", "--error-unmatch", "labels.yaml")
     if tracked.returncode != 0:
         raise LabelsNotCommitted(f"{fixture_dir.name}: labels.yaml is not tracked by git")
+    if _is_merge_result(fixture_dir):
+        return
     head = _git(fixture_dir, "cat-file", "-e", "HEAD:./labels.yaml")
     if head.returncode != 0:
         raise LabelsNotCommitted(f"{fixture_dir.name}: labels.yaml is not committed yet")
