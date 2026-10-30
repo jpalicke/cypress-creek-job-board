@@ -59,6 +59,7 @@ entries = blacklist.entries()
 candidates = [
     Candidate("Acme Corp", None, None),
     Candidate("Аcme Corp", None, None),
+    Candidate("\u0410\u0421\u041c\u0415 Corp", None, None),
     Candidate("Ac‍me Corp", None, None),
     Candidate("ACME, Inc.", None, None),
     Candidate("Other", " GLOBEX ", None),
@@ -108,6 +109,7 @@ BASE_RESULTS = [
     "company_key",
     "company_key",
     "company_key",
+    "company_key",
     "slug",
     "domain",
     None,
@@ -123,11 +125,11 @@ def test_variants_are_blocked_in_a_child_process_with_no_socket_attempt(database
 
 def test_a_second_process_reopening_the_database_still_blocks(database: Path) -> None:
     first = _run_child(database, "add")
-    assert first["results"] == [*BASE_RESULTS[:6], "company_key", None]
+    assert first["results"] == [*BASE_RESULTS[:7], "company_key", None]
     assert first["attempts"] == []
 
     second = _run_child(database, "read")
-    assert second["results"] == [*BASE_RESULTS[:6], "company_key", None]
+    assert second["results"] == [*BASE_RESULTS[:7], "company_key", None]
     assert second["attempts"] == []
 
     reopened = sqlite3.connect(database)

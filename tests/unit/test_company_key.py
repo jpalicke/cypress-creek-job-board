@@ -1,10 +1,17 @@
 # ABOUTME: Tests company_key, the one normalizer every company comparison goes through.
 # ABOUTME: Covers suffix, spacing and homoglyph variants, hostile names and Hypothesis properties.
+import unicodedata
+
 import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from cypress_creek.storage.company_key import LEGAL_SUFFIXES, CompanyNameError, company_key
+from cypress_creek.storage.company_key import (
+    LEGAL_SUFFIXES,
+    CompanyNameError,
+    company_key,
+    load_confusables,
+)
 
 # Latin "Acme" with Cyrillic a (U+0430), c (U+0441) and e (U+0435) in place of the Latin letters.
 CYRILLIC_ACME = "асmе"
@@ -60,6 +67,24 @@ def test_variants_of_one_company_produce_one_key(variant: str) -> None:
 )
 def test_lookalike_spellings_produce_one_key(name: str, same_company: str) -> None:
     assert company_key(name) == company_key(same_company)
+
+
+def test_cyrillic_capitals_fold_to_the_latin_name() -> None:
+    # U+041C maps to Latin M in the data, while its small form (U+043C) maps to a turned w,
+    # so the table must be read before case is folded.
+    assert company_key("\u0410\u0421\u041c\u0415") == company_key("ACME")
+    assert company_key("\u0410\u0421\u041c\u0415 Corp") == company_key("Acme Corp")
+
+
+def test_every_capital_in_the_table_folds_as_the_table_says() -> None:
+    table = load_confusables()
+    for char, target in table.items():
+        if (
+            char.isupper()
+            and char.casefold() != char
+            and unicodedata.normalize("NFKD", char) == char
+        ):
+            assert company_key("X" + char) == company_key("X" + target), hex(ord(char))
 
 
 @pytest.mark.parametrize("suffix", sorted(LEGAL_SUFFIXES))
