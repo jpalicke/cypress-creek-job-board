@@ -49,15 +49,24 @@ def test_a_new_fact_is_unverified_and_local_only_with_a_server_assigned_id(
     assert [f.id for f in store.facts()] == ["F-0001"]
 
 
-def test_the_file_is_written_private_and_loads_with_the_normal_loader(store: BankStore) -> None:
+def test_the_file_loads_with_the_normal_loader(store: BankStore) -> None:
     store.add(draft())
     store.add(draft(claim="Ran the nightly batch."))
 
-    assert stat.S_IMODE(os.stat(store.path).st_mode) == 0o600
     assert [f.claim for f in load_bank(store.path).facts] == [
         "Built a reporting service in Python.",
         "Ran the nightly batch.",
     ]
+
+
+def test_the_file_is_written_owner_only_where_the_platform_has_file_modes(
+    store: BankStore,
+) -> None:
+    store.add(draft())
+
+    # Windows has no POSIX file modes, so there the bank gets its folder's access list instead.
+    expected = 0o600 if os.name == "posix" else 0o666
+    assert stat.S_IMODE(os.stat(store.path).st_mode) == expected
 
 
 def test_an_id_is_never_reused_after_a_delete(store: BankStore) -> None:
