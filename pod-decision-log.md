@@ -346,3 +346,8 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 ## D65. One senior plus the manager reviewing PRs
 - 2026-10-30, Joe P.
 - Senior A (a66bc9c84628b82fb) wraps up, hands over its open work and shuts down. Senior B (ab6bba535d773e2bb) is the only agent writing code; the manager reviews every PR (reads the diff, checks CI, scope, footers, em dashes and rules) and merges. B no longer cross-reviews. Reason: usage-window pressure and fewer moving parts. Trade-off: no independent second reviewer between the author and main apart from the manager; Joe P's Opus pass at the end is the backstop.
+
+## D66. Gap recall stays extracted-only (decision on D47)
+- 2026-10-30, Joe P ("option 1, keep it").
+- Gap recall is computed over the planted gaps that were extracted, with `planted_not_extracted` published beside it (ADR 0032). Alternatives not chosen: all planted gaps as the denominator (double counts extraction misses, blurs which stage failed) or publishing both as named headline numbers.
+- Follow-up found while checking: the E7 comparison table (merged) shows E1 recall but neither gap_recall nor planted_not_extracted, so the headline honesty pair is not in the table yet. Issue filed (title: Comparison table: show gap_recall with planted_not_extracted, and fix the OpenAI row label); to be done by senior B before the first published run (E8). The same issue fixes the OpenAI row label, which still says "pending confirmation".
