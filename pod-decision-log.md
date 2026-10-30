@@ -384,3 +384,10 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 - Things that change for a hosted multi-user product, listed for the final report and not built: authentication and per-user data isolation (the fact bank and resumes become other people's personal data), a hosted-model key and its cost per user, rate limits and abuse controls, a shared discovery cache so many users do not each fetch the same boards (the polite-client rules matter more at scale), SQLite replaced by a server database, privacy policy and data deletion, and the validators and the one rule staying the product's core claim.
 - Alternatives not chosen: starting multi-user work now (large, unproven, delays the proof) or ignoring the idea (risks cheap-to-avoid lock-in).
 - Reverse by telling the manager to start auth and hosting cards.
+
+## D73. Future product ideas from Joe P (not built, for the final report)
+- 2026-10-30, Joe P, on a possible hosted version: different classes of users (job seekers, recruiters and others), and a way to try a resume against an ATS-like check to see what would pass or fail.
+- Not built and no cards filed (see D72). Notes for whoever decides later:
+  - An ATS-like check fits the existing design if it stays deterministic: parse the resume the way common systems do, match required terms against the posting, and report what a parser could not read. It must say it approximates; real systems differ and mostly do not publish their rules, so it cannot claim a pass or fail guarantee.
+  - Recruiter accounts change the trust model: a recruiter would see job seekers' data, which needs the job seeker's consent and a clear sharing rule. The fact bank's shareable flag is a starting point.
+  - Screening candidates by automated score is regulated in some places (for example New York City Local Law 144 and the EU AI Act's rules for employment tools). The current triage-only score is a job seeker aid; a recruiter-facing score needs legal review before it is built.
