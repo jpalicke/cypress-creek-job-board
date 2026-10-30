@@ -61,11 +61,14 @@ class Row:
     fixture_hash: str | None
     recall: Cell
     violations: Cell
+    gap_recall: Cell
+    planted_not_extracted: Cell
     score_shift: Cell
     disrupted: int | None
     schema_failures: Cell
     latency: Cell
     cost: Cell
+    temperature_pinned: bool = True
 
     @classmethod
     def not_run(cls, label: str) -> "Row":
@@ -78,6 +81,8 @@ class Row:
             None,
             None,
             None,
+            empty,
+            empty,
             empty,
             empty,
             empty,
@@ -99,6 +104,8 @@ COLUMNS = (
     "Repeats scored",
     "E1 recall",
     "E3 violations per 100",
+    "E4 gap recall",
+    "E4 planted gaps not extracted",
     "E6 worst class max abs shift",
     "E6 disrupted",
     "E8 schema failure rate",
@@ -135,14 +142,15 @@ def _conditions(row: Row, letters: Mapping[tuple[str | None, str | None], str]) 
     if not row.was_run:
         return "-"
     letter = letters[(row.prompt_hash, row.fixture_hash)]
-    if len(letters) == 1 or letter == "A":
-        return letter
-    return f"{letter} (not comparable with A)"
+    text = letter if len(letters) == 1 or letter == "A" else f"{letter} (not comparable with A)"
+    if not row.temperature_pinned:
+        text += "; not temperature pinned (ADR 0027)"
+    return text
 
 
 def _cells(row: Row, letters: Mapping[tuple[str | None, str | None], str]) -> list[str]:
     if not row.was_run:
-        return [row.label, NOT_RUN, NOT_RUN, NOT_RUN, *[NOT_RUN] * 7, "-", "-", "-", "-"]
+        return [row.label, NOT_RUN, NOT_RUN, NOT_RUN, *[NOT_RUN] * 9, "-", "-", "-", "-"]
     latency = _pair(row.latency, 3) if row.latency.mean is not None else NOT_RECORDED
     return [
         row.label,
@@ -151,6 +159,8 @@ def _cells(row: Row, letters: Mapping[tuple[str | None, str | None], str]) -> li
         row.repeats,
         _pair(row.recall, 3),
         _pair(row.violations, 3),
+        _pair(row.gap_recall, 3),
+        _pair(row.planted_not_extracted, 1),
         _pair(row.score_shift, 3),
         NOT_RUN if row.disrupted is None else str(row.disrupted),
         _pair(row.schema_failures, 3),
@@ -191,6 +201,7 @@ class Target(BaseModel):
     label: str
     backend: str
     model: str | None = None
+    temperature_pinned: bool = True
 
 
 class Targets(BaseModel):
@@ -319,7 +330,7 @@ def _metric_in(values: Mapping[str, MetricValue], name: str) -> Cell:
     return Cell(value.mean, value.worst)
 
 
-def _row_for(label: str, run: ScoredRun) -> Row:
+def _row_for(label: str, run: ScoredRun, *, pinned: bool) -> Row:
     header = run.state.header
     cost, failures = _cost_and_failures(run.state)
     return Row(
@@ -332,11 +343,14 @@ def _row_for(label: str, run: ScoredRun) -> Row:
         fixture_hash=header.fixture_set_hash[:HASH_CHARS],
         recall=_metric(run.metrics, "requirement_recall"),
         violations=_metric(run.metrics, "grounding_violations_per_100"),
+        gap_recall=_metric(run.metrics, "gap_recall"),
+        planted_not_extracted=_metric(run.metrics, "planted_not_extracted"),
         score_shift=_injection_shift(run.metrics),
         disrupted=len(run.metrics.injection_disrupted) if run.metrics.injection else None,
         schema_failures=failures,
         latency=Cell(None, None),
         cost=cost,
+        temperature_pinned=pinned,
     )
 
 
@@ -361,7 +375,13 @@ def collect_rows(
         order = targets.index(target) if target else len(targets)
         if target:
             covered.add(target.label)
-        rows.append((order, run.metrics.run_id or "", _row_for(label, run)))
+        rows.append(
+            (
+                order,
+                run.metrics.run_id or "",
+                _row_for(label, run, pinned=target.temperature_pinned if target else True),
+            )
+        )
     for order, target in enumerate(targets):
         if target.label not in covered:
             rows.append((order, "", Row.not_run(target.label)))

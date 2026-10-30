@@ -80,13 +80,13 @@ Each command is copy and paste, and lives with its documentation:
 No backend has been evaluated and published yet, so every row below says `not run` (never 0). The table is generated from the committed run files by `uv run python -m evals.harness.table` and checked by CI, so it cannot drift from the data. How to read it, and its limits (one author's labels, a small fictional bank), are in [docs/evals.md](docs/evals.md#the-comparison-table). The full page is [docs/evals-results.md](docs/evals-results.md).
 
 <!-- evals-results:start -->
-| Target | Model | Status | Repeats scored | E1 recall | E3 violations per 100 | E6 worst class max abs shift | E6 disrupted | E8 schema failure rate | Median latency | Cost per run, USD | Commit | Prompt hash | Fixture hash | Conditions |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Ollama qwen3.5:4b | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | - | - | - | - |
-| Ollama qwen3.5:9b | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | - | - | - | - |
-| LM Studio (the loaded model) | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | - | - | - | - |
-| OpenAI (the C4 pick, pending confirmation) | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | - | - | - | - |
-| Anthropic claude-sonnet-5-5 | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | - | - | - | - |
+| Target | Model | Status | Repeats scored | E1 recall | E3 violations per 100 | E4 gap recall | E4 planted gaps not extracted | E6 worst class max abs shift | E6 disrupted | E8 schema failure rate | Median latency | Cost per run, USD | Commit | Prompt hash | Fixture hash | Conditions |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Ollama qwen3.5:4b | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | - | - | - | - |
+| Ollama qwen3.5:9b | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | - | - | - | - |
+| LM Studio (the loaded model) | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | - | - | - | - |
+| OpenAI gpt-6-luna | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | - | - | - | - |
+| Anthropic claude-sonnet-5-5 | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | - | - | - | - |
 
 No backend has been run yet, so every row is not run.
 <!-- evals-results:end -->

@@ -271,6 +271,31 @@ def test_only_schema_violations_count_as_schema_failures(workspace: dict[str, Pa
     assert row.schema_failures.worst == pytest.approx(0.0)
 
 
+def test_gap_recall_and_planted_not_extracted_come_from_the_scorer_metrics(
+    workspace: dict[str, Path],
+) -> None:
+    metrics = publish(workspace["results"], header(), drop_label_in_repeat=2)
+
+    (row,) = [r for r in collect_rows(workspace["results"], targets(workspace)) if r.was_run]
+
+    gap = metrics.metrics["gap_recall"]
+    planted = metrics.metrics["planted_not_extracted"]
+    assert (row.gap_recall.mean, row.gap_recall.worst) == (gap.mean, gap.worst)
+    assert (row.planted_not_extracted.mean, row.planted_not_extracted.worst) == (
+        planted.mean,
+        planted.worst,
+    )
+
+
+def test_the_hosted_targets_are_not_temperature_pinned_and_the_local_ones_are() -> None:
+    by_label = {t.label: t for t in load_targets(ROOT / "evals" / "backends.yaml")}
+
+    assert by_label["Ollama qwen3.5:4b"].temperature_pinned
+    assert not by_label["OpenAI gpt-6-luna"].temperature_pinned
+    assert not by_label["Anthropic claude-sonnet-5-5"].temperature_pinned
+    assert not any("pending" in label for label in by_label)
+
+
 def test_a_metrics_file_that_was_edited_after_scoring_is_refused(
     workspace: dict[str, Path], capsys: pytest.CaptureFixture[str]
 ) -> None:

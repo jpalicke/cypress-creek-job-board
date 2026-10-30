@@ -1,6 +1,7 @@
 # The backends the comparison table must list, in this order. A backend with no run file shows as
 # "not run". `model` is the exact model of a run, or null for any model of that backend (LM Studio
-# runs whatever model its user loads, and the run records which). Edit freely, it is data.
+# runs whatever model its user loads, and the run records which). `temperature_pinned: false` marks a hosted
+# backend whose requests send no temperature (ADR 0027). Edit freely, it is data.
 targets:
   - label: Ollama qwen3.5:4b
     backend: ollama
@@ -11,9 +12,11 @@ targets:
   - label: LM Studio (the loaded model)
     backend: openai_compatible
     model: null
-  - label: OpenAI (the C4 pick, pending confirmation)
+  - label: OpenAI gpt-6-luna
     backend: openai_compatible
     model: gpt-6-luna
+    temperature_pinned: false
   - label: Anthropic claude-sonnet-5-5
     backend: anthropic
     model: claude-sonnet-5-5
+    temperature_pinned: false
