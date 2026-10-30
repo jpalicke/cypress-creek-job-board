@@ -306,3 +306,7 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 - 2026-10-30, Joe P ("pypdf is fine"), manager executed.
 - Earlier the pod's `uv add pypdf` was denied by the permission classifier (D48) and nobody worked around it. After Joe P's approval the manager ran `uv add pypdf` in a scratch clone: pypdf 6.21.4, licence BSD-3-Clause (allowed list), `pip-audit` on the exported lock reports no known vulnerabilities, check_licenses passes. The dependency change (pyproject.toml plus uv.lock, 55 lines) is saved at /home/user/pod/pypdf-dependency.patch for senior B to apply in the E6/F4 PRs; ADR numbers 0042 (E6 fixtures) and 0043 (library choice).
 - E6 (#28) then F4 (#34) go to senior B after #140 and G3. A PDF parser reading hostile files is the riskiest code left; Joe P's Opus pass should look at it.
+
+## D57. E8 goes ahead after #140; senior A owns it
+- 2026-10-30, Joe P ("run E8 after 140 merges"), manager assigned.
+- Labels were reviewed (PR #147) so they are frozen. E8 runs only local Ollama models (qwen3.5:4b and 9b, 3 repeats at temperature 0, six fixtures) through a manual workflow; hosted rows stay "not run" because no keys or spend were approved. If a model cannot finish on the GitHub runner, what finishes is recorded and the rest is marked with the reason, never faked or silently truncated. The workflow does not push; the run files are committed in a normal PR and the comparison table regenerated. FOR JOE P: a first run on small models with Claude-written labels is a first look, not a benchmark.
