@@ -115,12 +115,15 @@ uv run python -m evals.harness.score --run evals/scratch/run.jsonl --out evals/s
 - `--out` is a directory. An existing metrics file is never overwritten.
 - `--diff` prints the mismatch view (below). `--bank` and `--fixtures` default to the committed ones.
 - The scorer calls `require_committed_labels` for every fixture a run names, so a label file that
-  is untracked or changed since the last commit is refused. It refuses a run made with a different
+  is untracked or changed since the last commit is refused. While a `git merge` is in progress, a
+  label file the merge brought in counts as committed when nobody edited it (the working copy equals
+  the index and the index equals one side of the merge), so the hooks can run on a merge commit; a
+  hand edit made during the merge is still refused. It refuses a run made with a different
   bank (header `bank_hash`), a case with no fixture, and a posting that differs from its fixture.
 
-**What a run needs.** The runner `evals.harness.run` still reads JSON case manifests and does not
-run the labeled fixtures, so no CLI produces a scorable run yet; the card that wires fixtures into
-the runner closes that gap. Until then the tests build runs from the labels, and the live test
+**What a run needs.** `evals.harness.run --fixtures` runs the committed labeled fixtures (see
+[Running the labeled fixtures](#running-the-labeled-fixtures)), and its export is what this scorer
+reads. The tests also build runs from the labels, and the live test
 `tests/integration/test_score_live.py` runs a real Ollama over two fixtures and scores the result.
 To see the scorer on a synthetic, label-perfect run (not benchmark evidence), build one from the
 test helpers:
@@ -296,6 +299,7 @@ A backend with no run says `not run` in every cell, never 0. The page and the RE
 The first published run (card E8) is not started, and the design is only recorded here so Joe P can trigger it after his label review. It needs no key and no spend for the local backends:
 - **Before the run:** the labels must be reviewed and committed (the method rule is labels frozen before the runs), and the fixtures must be runnable by the runner (card #140). The scorer refuses labels that are not committed.
 - **A dispatched workflow** (a new `eval-run.yml`, manual only, like `live.yml`) would: install Ollama and cache `~/.ollama/models` as `live.yml` does; pull `qwen3.5:4b` (and `qwen3.5:9b` if the runner has the disk and time for it; a GitHub runner has no GPU, so budget an hour or more per model and set `timeout-minutes` to match); run the fixture runner with 3 repeats at temperature 0 for each model; score each export with `score.py`; and upload the exports and metrics JSON as an artifact.
+- **Hosted rows are not temperature pinned.** The method rule asks for temperature 0, but `gpt-6-luna` accepts only its default of 1 (ADR 0027), so an OpenAI row would vary between repeats by design and must be labelled that way. E8 itself runs local models only.
 - **After the run:** a human copies the artifact files into `evals/results/`, runs `python -m evals.harness.table`, reviews the diff and commits. Hosted rows stay `not run` unless Joe P provides keys and approves the dry run estimate.
 
 ## Posting fixtures and hand labels
@@ -342,7 +346,7 @@ uv run python -m evals.harness.check_labels
 It prints one `ok` line per fixture and the fixture set hash, and exits 1 with each problem on
 standard error when a fixture is unsound. The tests are:
 ```bash
-uv run pytest tests/unit/test_labels_unit.py tests/component/test_labels.py tests/component/test_fixtures.py tests/e2e/test_check_labels_process.py tests/integration/test_label_commit_guard.py -q --no-cov
+uv run pytest tests/unit/test_labels_unit.py tests/component/test_labels.py tests/component/test_fixtures.py tests/e2e/test_label_guard_merge_process.py tests/e2e/test_check_labels_process.py tests/integration/test_label_commit_guard.py -q --no-cov
 ```
 The last one needs the labels to be committed, so run it from a clean checkout.
 

@@ -32,6 +32,11 @@ Because the check runs before routing, a write without the token is refused with
 | `GET /api/reports/{id}` | A stored report: `{"report_id", "posting_id", "created_at", "report", "validator_verdicts": [{"stage", "subject", "validator", "passed", "reason"}]}`. The verdicts are those of V4, V5 and V9 over the finished report, without any offending text. |
 | `GET /api/facts` | The fact bank from the bank file (`CYPRESS_CREEK_BANK`, default `facts.private/bank.yaml`): `{"facts": [...], "unverified_ids": [...]}`. A missing file is `bank_not_found`. |
 | `POST /api/facts/validate` | Body `{"yaml": "<bank file text>", "strict": false}`. Always 200: `{"valid", "fact_count", "unverified_ids", "problem"}` where `problem` is `null` or `{"fact_id", "field", "reason"}`. Strict mode also refuses an unverified fact. The YAML is never echoed. |
+| `GET /api/watchlist` | `{"entries": [{"company_key", "display_name", "ats", "slug", "identity_evidence", "approved_at", "region"}]}`, ordered by company key. `region` is `us`, `eu` or `null` (Lever only). |
+| `POST /api/watchlist` | Adds one approved company. Body `{"display_name", "ats", "slug", "identity_evidence": "strong" \| "weak" \| "none", "approval": "human_confirmed"}` and nothing else. The marker is required, and there is no field for a proposer, so a name a model suggested cannot arrive as if a person had approved it. The server stamps `approved_at`. Answers 201 with the entry. A blacklisted name or board is `blacklisted` (409), a denied one `tombstoned` (409), a repeat `already_watched` (409), and a name or board that cannot be keyed is `invalid_request`. |
+| `GET /api/blacklist` | `{"entries": [{"id", "match_kind", "value", "reason", "added_at"}]}`, oldest first. Values are shown normalized: a company key is the folded form (for example `lnltech` for Initech), a slug is trimmed and lower case, and a domain is the bare host. |
+| `POST /api/blacklist` | Body `{"match_kind": "company_key" \| "slug" \| "domain", "value", "reason"}`. The value is normalized exactly as the filter does, so `ACME Incorporated` is the same entry as `Acme Corp`. Answers 201 with the entry, `already_blacklisted` (409) for a repeat, `invalid_request` for a value that cannot be normalized. |
+| `DELETE /api/blacklist/{id}` | Removes one entry: `{"removed": true}`, or `not_found` (404). Removing it does not add anything to the watchlist. |
 
 The draft help route arrives later (G4 and D7).
 
@@ -73,6 +78,10 @@ Postings and reports live in the SQLite database (`CYPRESS_CREEK_DATA_DIR`, defa
 | `report_refused` | 422 | The report was refused because a claim could not be grounded. |
 | `bank_not_found` | 404 | The fact bank file is missing. |
 | `bank_invalid` | 422 | The fact bank file is not valid. `details` names the fact and field. |
+| `blacklisted` | 409 | The company, board slug or domain is on the blacklist, so it cannot be added to the watchlist. |
+| `tombstoned` | 409 | A person denied this company or board earlier. It stays off the watchlist until a person removes the denial. |
+| `already_watched` | 409 | The company or the board is already on the watchlist. |
+| `already_blacklisted` | 409 | The same normalized company key, slug or domain is already blocked. |
 | `http_error` | other | Any other HTTP failure, with a fixed message. |
 | `internal_error` | 500 | An unexpected failure. The cause is not in the answer. |
 

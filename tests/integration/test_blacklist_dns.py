@@ -64,12 +64,19 @@ def test_blacklist_decisions_make_no_dns_lookup_while_dns_is_available(
 
     results = [
         is_blacklisted(Candidate("Аcme Corp", None, None), loaded),
+        is_blacklisted(Candidate("\u0410\u0421\u041c\u0415 Corp", None, None), loaded),
         is_blacklisted(Candidate("Other", "GLOBEX", None), loaded),
         is_blacklisted(Candidate("Other", None, "https://www.example.com/jobs"), loaded),
         is_blacklisted(Candidate("Hooli", "hooli", "hooli.example"), loaded),
     ]
 
-    assert results == [BlockReason.COMPANY_KEY, BlockReason.SLUG, BlockReason.DOMAIN, None]
+    assert results == [
+        BlockReason.COMPANY_KEY,
+        BlockReason.COMPANY_KEY,
+        BlockReason.SLUG,
+        BlockReason.DOMAIN,
+        None,
+    ]
     assert lookups == []
     # The blocked domain is a real, resolvable host: the filter decided without resolving it.
     assert socket.getaddrinfo("example.com", 443)

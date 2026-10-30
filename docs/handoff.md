@@ -58,7 +58,7 @@ Stale docs are the most common failure here. For every new module, config file, 
 - Names are evergreen (never "new", "improved", "enhanced"). Do not remove comments unless provably false. Comments describe the code as it is, not its history.
 - Do not make changes unrelated to the card. File an issue instead.
 - No em dashes anywhere (code, comments, docs, commits, PRs, chat).
-- Do not mention any specific employer or industry in the repo.
+- Do not mention any specific employer or industry in the repo. The rule exists to keep information that identifies Joe P out of the repo and to keep the project untailored to any target company. Public third party postings used as eval fixtures are exempt: they name the company that published them, and each one is listed in NOTICE with its source and takedown contact.
 - Ports: API 5309, Vite dev server 5150. Infrastructure keeps its defaults.
 - Windows notes: git prints harmless CRLF warnings. Keep generated scratch files in a short directory such as `C:/Temp/ccb`, and write files containing backslash escapes with an editor tool, not a shell heredoc.
 

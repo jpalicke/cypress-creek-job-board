@@ -88,10 +88,10 @@ Blacklists, the denied list and the watchlist all compare companies on one key f
 
 Steps, in order:
 1. Reject names over 1,000 characters (`CompanyNameError`).
-2. NFKD, which splits accents off and turns full-width and styled letters into plain ones, then casefold.
-3. Fold confusables with the Unicode confusables data in `config/confusables.txt` (the UTS #39 skeleton table, about 6,700 entries). Examples: Cyrillic `а` becomes `a`, `0` becomes `o`, `1` becomes `l`, `m` becomes `rn`. The table is applied several times because a target can itself be confusable (`%` becomes `0`, which becomes `o`).
+2. NFKD, which splits accents off and turns full-width and styled letters into plain ones.
+3. Fold confusables with the Unicode confusables data in `config/confusables.txt` (the UTS #39 skeleton table, about 6,700 entries). Examples: Cyrillic `а` becomes `a`, `0` becomes `o`, `1` becomes `l`, `m` becomes `rn`. Each pass reads the table first and casefolds after, because a capital and its small form can map differently (Cyrillic capital `М` is Latin `M`, its small form is not). The table is applied several times because a target can itself be confusable (`%` becomes `0`, which becomes `o`).
 4. Accent marks and zero-width and other format characters are dropped. Periods and apostrophes are dropped without splitting a word (`L.L.C.` becomes `llc`, `O'Reilly` becomes `oreilly`). Any other non letter, non digit character separates words.
-5. `i` becomes `l`. Casefolding turns a capital `I` into `i` before the table can map it to `l`, so without this `IBM` and `lBM` would differ.
+5. `i` becomes `l`. The table maps a capital `I` to `l` but not a small `i`, so without this `IBM` and `ibm` would differ.
 6. Trailing legal suffixes are stripped repeatedly: `inc`, `incorporated`, `llc`, `llp`, `ltd`, `limited`, `corp`, `corporation`, `gmbh`, `plc` (compared in folded form). A suffix in the middle of a name stays, and a name that is only a suffix keeps it. Every addition to `LEGAL_SUFFIXES` needs a test row.
 7. Words are joined with no spaces, so `Ac me` and `Acme` match. A name with no letters or digits raises `CompanyNameError`.
 

@@ -83,6 +83,24 @@ def test_a_400_naming_the_context_length_is_context_truncated() -> None:
     assert "truncation signature" not in str(caught.value)
 
 
+def test_the_recorded_lm_studio_overflow_reply_is_context_truncated() -> None:
+    # The error body LM Studio 0.4.17 returned for a prompt longer than the loaded context
+    # (8192), recorded by Joe P on 2026-10-30. The error is a plain string, not an object.
+    body = {
+        "error": (
+            "The number of tokens to keep from the initial prompt is greater than the context "
+            "length (n_keep: 20015>= n_ctx: 8192). Try to load the model with a larger context "
+            "length, or provide a shorter input."
+        )
+    }
+    with (
+        chat_server(json_reply(body, status=400)) as (base_url, _),
+        pytest.raises(ContextTruncated) as caught,
+    ):
+        _provider(base_url).complete_structured("s", "d", Answer, 10)
+    assert caught.value.context_tokens == 4096
+
+
 def test_another_status_is_provider_unavailable_and_never_shows_the_key() -> None:
     reply = Reply(401, f"bad key {KEY}".encode())
     with chat_server(reply) as (base_url, _), pytest.raises(ProviderUnavailable) as caught:
