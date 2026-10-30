@@ -1,6 +1,6 @@
 # E3 label decisions
 
-Joe P delegated the E3 hand labels to the pod. This page explains every judgment call so he can review the labels and order changes. A changed label is not a mistake, it is the product call. The labels were written by Claude, and each `labels.yaml` says `review: pending` until Joe P signs off. When he does, change that field to `reviewed`.
+Joe P delegated the E3 hand labels to the pod. This page explains every judgment call so he can review the labels and order changes. A changed label is not a mistake, it is the product call. The labels were written by Claude. Joe P reviewed them on 2026-10-30 (in chat, after reading this page and a sample fixture, and after the explanation that the sample bank is a fictional candidate whose gaps, Java among them, are deliberate) and said they look fine; each `labels.yaml` now says `review: reviewed`. He can still order any change.
 
 ## How the labels were made
 - Each posting was read as plain text, and each label was written from that text and from `evals/bank/sample_bank.yaml` and `PLANTED_GAPS.md` alone.

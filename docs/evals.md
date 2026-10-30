@@ -286,7 +286,7 @@ in its `meta.yaml`. The details are in [e3-label-decisions.md](e3-label-decision
 (`strong`, `partial` or `none`), the `expected_status` (`gap` unless strong), the `fact_ids` that
 justify it, an optional `planted_gap` row and an optional `note`. It also lists the cue
 sentences that the V13 check must cover. The labels carry a `provenance` block: who labeled them,
-`review: pending` until Joe P signs off, the date, and `model_output_used: false`. Joe P
+`review` (`pending` until Joe P signs off, `reviewed` after; all six are `reviewed` as of 2026-10-30), the date, and `model_output_used: false`. Joe P
 delegated the labeling to the pod and reviews the result; every judgment call is explained in
 [e3-label-decisions.md](e3-label-decisions.md) and is his to change. Labels are written before any
 model runs and are never adjusted to fit a backend. A change after a run is a new label version,
