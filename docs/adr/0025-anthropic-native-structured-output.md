@@ -19,7 +19,7 @@ Native structured output constrains the answer to the schema without a tool roun
 
 ## Limits
 
-- **The real structured call has not yet been accepted by the live API.** As of this card, only the wrong-key path has run against it (a real 401, which proves the endpoint, the version header and the auth path). Joe P runs `uv run pytest tests/integration/test_anthropic_live.py -q` once with a real key to close this, tracked in [issue #129](https://github.com/jpalicke/cypress-creek-job-board/issues/129).
+- **The real structured call was accepted by the live API on 2026-10-30.** Joe P ran `uv run pytest tests/integration/test_anthropic_live.py -q` once with a real key and both tests passed (the wrong-key 401, which proves the endpoint, the version header and the auth path, and the real structured call). Tracked in [issue #129](https://github.com/jpalicke/cypress-creek-job-board/issues/129).
 - Refusal fallbacks to another model are not used, on purpose: an eval needs the model identity to stay fixed.
 - The `anthropic-version` header is `2023-06-01`. The body sends no sampling fields, so moving to a newer API version later is a header change, to be done deliberately.
 - 529 (overloaded) maps to `RateLimited` and uses the retry layer's default backoff when no `retry-after` is sent.
