@@ -115,7 +115,10 @@ uv run python -m evals.harness.score --run evals/scratch/run.jsonl --out evals/s
 - `--out` is a directory. An existing metrics file is never overwritten.
 - `--diff` prints the mismatch view (below). `--bank` and `--fixtures` default to the committed ones.
 - The scorer calls `require_committed_labels` for every fixture a run names, so a label file that
-  is untracked or changed since the last commit is refused. It refuses a run made with a different
+  is untracked or changed since the last commit is refused. While a `git merge` is in progress, a
+  label file the merge brought in counts as committed when nobody edited it (the working copy equals
+  the index and the index equals one side of the merge), so the hooks can run on a merge commit; a
+  hand edit made during the merge is still refused. It refuses a run made with a different
   bank (header `bank_hash`), a case with no fixture, and a posting that differs from its fixture.
 
 **What a run needs.** The runner `evals.harness.run` still reads JSON case manifests and does not
@@ -342,7 +345,7 @@ uv run python -m evals.harness.check_labels
 It prints one `ok` line per fixture and the fixture set hash, and exits 1 with each problem on
 standard error when a fixture is unsound. The tests are:
 ```bash
-uv run pytest tests/unit/test_labels_unit.py tests/component/test_labels.py tests/component/test_fixtures.py tests/e2e/test_check_labels_process.py tests/integration/test_label_commit_guard.py -q --no-cov
+uv run pytest tests/unit/test_labels_unit.py tests/component/test_labels.py tests/component/test_fixtures.py tests/e2e/test_label_guard_merge_process.py tests/e2e/test_check_labels_process.py tests/integration/test_label_commit_guard.py -q --no-cov
 ```
 The last one needs the labels to be committed, so run it from a clean checkout.
 

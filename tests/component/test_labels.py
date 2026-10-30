@@ -278,3 +278,78 @@ def test_labels_must_be_committed_before_a_case_may_run(tmp_path: Path) -> None:
     labels.write_text(yaml.safe_dump(GOOD) + "# edited\n", encoding="utf-8")
     with pytest.raises(LabelsNotCommitted):
         require_committed_labels(fixture)
+
+
+def _repo_with_a_side_branch_that_changes_labels(tmp_path: Path) -> tuple[Path, Path]:
+    """A repository whose side branch committed a different labels.yaml than main."""
+    git(tmp_path, "init", "-q", "-b", "main")
+    fixture = tmp_path / "fixture"
+    fixture.mkdir()
+    labels = fixture / "labels.yaml"
+    labels.write_text(yaml.safe_dump(GOOD), encoding="utf-8")
+    git(tmp_path, "add", "-A")
+    git(tmp_path, "commit", "-q", "-m", "labels")
+    git(tmp_path, "checkout", "-q", "-b", "side")
+    labels.write_text(yaml.safe_dump(GOOD) + "# reviewed\n", encoding="utf-8")
+    other = fixture / "other.txt"
+    other.write_text("x", encoding="utf-8")
+    git(tmp_path, "commit", "-q", "-am", "side labels")
+    git(tmp_path, "checkout", "-q", "main")
+    (tmp_path / "unrelated.txt").write_text("y", encoding="utf-8")
+    git(tmp_path, "add", "-A")
+    git(tmp_path, "commit", "-q", "-m", "main moves on")
+    return fixture, labels
+
+
+def test_labels_brought_in_by_a_merge_in_progress_are_accepted(tmp_path: Path) -> None:
+    fixture, labels = _repo_with_a_side_branch_that_changes_labels(tmp_path)
+
+    git(tmp_path, "merge", "-q", "--no-commit", "--no-ff", "side")
+
+    assert "# reviewed" in labels.read_text(encoding="utf-8")
+    require_committed_labels(fixture)
+
+
+def test_a_labels_file_that_is_new_in_a_merge_in_progress_is_accepted(tmp_path: Path) -> None:
+    git(tmp_path, "init", "-q", "-b", "main")
+    (tmp_path / "a.txt").write_text("a", encoding="utf-8")
+    git(tmp_path, "add", "-A")
+    git(tmp_path, "commit", "-q", "-m", "first")
+    git(tmp_path, "checkout", "-q", "-b", "side")
+    fixture = tmp_path / "fixture"
+    fixture.mkdir()
+    (fixture / "labels.yaml").write_text(yaml.safe_dump(GOOD), encoding="utf-8")
+    git(tmp_path, "add", "-A")
+    git(tmp_path, "commit", "-q", "-m", "fixture")
+    git(tmp_path, "checkout", "-q", "main")
+    (tmp_path / "b.txt").write_text("b", encoding="utf-8")
+    git(tmp_path, "add", "-A")
+    git(tmp_path, "commit", "-q", "-m", "main moves on")
+
+    git(tmp_path, "merge", "-q", "--no-commit", "--no-ff", "side")
+
+    require_committed_labels(fixture)
+
+
+def test_an_edit_made_during_a_merge_in_progress_is_still_refused(tmp_path: Path) -> None:
+    fixture, labels = _repo_with_a_side_branch_that_changes_labels(tmp_path)
+    git(tmp_path, "merge", "-q", "--no-commit", "--no-ff", "side")
+
+    labels.write_text(labels.read_text(encoding="utf-8") + "# edited by hand\n", encoding="utf-8")
+    with pytest.raises(LabelsNotCommitted):
+        require_committed_labels(fixture)
+
+    git(tmp_path, "add", "fixture/labels.yaml")
+    with pytest.raises(LabelsNotCommitted):
+        require_committed_labels(fixture)
+
+
+def test_the_merge_allowance_ends_when_the_merge_is_committed(tmp_path: Path) -> None:
+    fixture, labels = _repo_with_a_side_branch_that_changes_labels(tmp_path)
+    git(tmp_path, "merge", "-q", "--no-commit", "--no-ff", "side")
+    git(tmp_path, "commit", "-q", "-m", "merge")
+    require_committed_labels(fixture)
+
+    labels.write_text(labels.read_text(encoding="utf-8") + "# later\n", encoding="utf-8")
+    with pytest.raises(LabelsNotCommitted):
+        require_committed_labels(fixture)
