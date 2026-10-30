@@ -1,119 +1,68 @@
-# Pod report: what was done, and what is left
+# Pod final report: what was done, and what is left
 
-Written 2026-10-30 about 02:30 UTC by the manager session. Companion to `pod-decision-log.md` (decisions D1 to D53, same folder, same branch `claude/admiring-heisenberg-ybky39`).
+Written 2026-10-30 about 07:30 UTC by the manager session, at Joe P's request to wind up to a natural stopping point. Companion to `pod-decision-log.md` (decisions D1 to D74a, same folder, branch `claude/admiring-heisenberg-ybky39`). Copies of an earlier report and log are on main under `docs/pod/` (safe to delete).
 
-Facts here come from GitHub and the agents' reports. Things nobody could run in this environment (no Ollama, no API keys, no LM Studio, no public DNS in the sandbox) are marked **unverified**.
+Facts come from GitHub and the agents' reports. Anything not run is marked **unverified**.
 
-## 1. How the pod worked
+## 1. State of the app
 
-You asked for up to five agents working the repo as an autonomous pod, with one senior engineer reviewing and approving PRs and me (the manager) merging after approval.
+Main now runs end to end as a local app with a browser UI (`docs/setup.md` has the run steps):
+- Analyze a posting (paste, link, or PDF) and read the gap report (G3).
+- Draft help with a review gate (G4): Copy is disabled until each bullet is reviewed.
+- Fact bank screen (G9): add, edit, share, delete, and verify one fact at a time.
+- Hostile PDF handling in a limited child process, with 14 hostile fixtures (F4, E6). CI also runs it on Windows.
+- Discovery routes (H7b): refresh and ranked listings. No screen for them yet.
+- Providers: Ollama, OpenAI-compatible (OpenAI and LM Studio), Anthropic. Live checks done by Joe P for Anthropic, OpenAI and LM Studio.
+- Eval harness, labeled fixtures, scorer, injection corpus and comparison table are on main. The first published run (E8) has not been done.
 
-| Role | Model | Did |
-|---|---|---|
-| Senior engineer | Opus until 2026-10-30, then Sonnet (D54) | Reviewed every PR, ran gates locally, probed attacks, posted `SENIOR REVIEW: APPROVED` or `CHANGES REQUESTED` |
-| Worker C | Sonnet | #116 fixes, C4, E4, E5, H8 (in progress) |
-| Worker E | Sonnet | E3 labels, G1, G2, E7 (in review), #140 (next) |
-| Worker G | Sonnet | #77, C5, D7, #128, #131, G3 (in progress), peer reviews |
-| Worker H | Sonnet | #121, H1d, CI chore, H6, H7a, H1c (built), H7b (next) |
+## 2. Merged this stretch (after the first report)
 
-Rules I set and the pod followed:
-- Each agent worked in its own `git clone` under `/home/user/pod/` (no worktrees, per CLAUDE.md).
-- You cannot approve your own PR in GitHub (one account), so the reviewer's verdict is a PR comment. I merged only when the reviewer's approval named the head sha I saw, CI was green, and the diff since approval was only a merge of main.
-- Large PRs allowed (you lifted the 20 file limit). Docs ship in the same PR.
-- Decisions: agents decided and reported `DECISION:` lines; I logged them. Anything involving credentials, a missing backend, or a denied permission was not worked around.
-- Idle workers pre-reviewed other workers' PRs (`PEER REVIEW (not an approval)`); this found a real CSRF gap in G1.
-- ADR numbers were pre-assigned (D32), migrations are numbered in merge order (D46).
+#161 LM Studio loaded context and strict schema; #154 H7b discovery routes; #162 G3 UI; #169 F4 + E6 PDF extractor; #173 G4 draft help; #174 Windows fixes and `windows` CI job; #176 G9 fact bank; plus #160, #159, #158, #157, #155, #149, #148 and the earlier set listed in the decision log. Closed: #172 (superseded).
 
-## 2. Merged to main (20 PRs)
-
-| PR | What |
-|---|---|
-| #121 | Lockfile bump for virtualenv and filelock CVEs (audit job was red on main) |
-| #119 | Docs fixes for the old issue #77 (closed) |
-| #100 | actions/cache 4 to 6 (reviewer dispatched live.yml on the branch: 12 live tests passed) |
-| #122 | E3: six real posting fixtures with hand labels (Claude on your delegation, review pending), label validator, NOTICE, ADR 0024 |
-| #116 | D6: cue sentence coverage check (V13) |
-| #118, #117, #113, #112 | Dependabot: ruff 0.17.1, hypothesis, pydantic 2.14.1, pre-commit 4.7.0 |
-| #123 | C5: Anthropic adapter (ADR 0025) |
-| #127 | CI: offline e2e job on every PR, `network.yml` (weekly and manual), `permissions: contents: read` on all workflows |
-| #126 | D7: draft help with checks V4 to V10 per sentence (ADR 0026) |
-| #124 | C4: `openai_compatible` adapter (ADR 0027), separate markers `live_openai` and `live_lmstudio` |
-| #133 | live.yml also runs live e2e tests (closes #128) |
-| #125 | G1: API security layer (Host allow-list, CSRF middleware, no CORS, loopback bind; ADR 0028) |
-| #120 | H1d: Lever region persisted on the watchlist (migration 0005, ADR 0029) |
-| #135 | E4: scorer and E1 to E4 metrics (ADR 0032) |
-| #141 | E5: injection corpus and per-class metrics (ADR 0035) |
-| #132 | H6: dedupe and filters (ADR 0031) |
-| #139 | G2: posting, analyze, report and facts routes (migration 0006, ADR 0030) |
-
-Real bugs the review process caught before merge (each fixed test first):
-- **D7 (#126):** posting text whitelisted invented numbers, employers and skills, so a false draft sentence rendered clean. This breached the one rule.
-- **G1 (#125):** CSRF did not cover mounted sub-apps; lowercase and unknown methods skipped the check.
-- **G2 (#139):** the body limit trusted `Content-Length`; the PDF limit applied to any route.
-- **E4 (#135):** the gap recall metric could hide skipped planted gaps; strong rows were miscounted.
-- **E5 (#141):** metrics could hide attacks (an attack that breaks extraction, or +20 and -20 shifts cancelling).
-- **H7a (#138):** a failed extraction did not count against the cap; the cache key ignored validator versions.
-- **CI:** selectors would have run key-gated tests every week; e2e and network tests had no CI at all until #127.
+Real defects found by review or by Joe P's machine before or after merge:
+- PDF child was killed after a good answer (exit 1 on Windows, -9 on Linux): fixed in #174, proven by a Linux red test.
+- Committed PDFs checked out with CRLF on Windows: `.gitattributes` fix in #174.
+- Invisible PDF text (`3 Tr`, `7 Tr`) was extracted: fixed in #169 after review.
+- PDF output cap was checked after reading everything: fixed in #169.
+- Earlier: draft validator whitelist breach (#126), CSRF gaps (#125), body limit trust (#139), metric holes (#135, #141).
 
 ## 3. Open work
 
-Open PRs:
+| PR | State |
+|---|---|
+| #175 | H7a live test timeout (test only). Its Ollama live job FAILED; not merged. Needs a look, the test is flaky on slow runners. |
+| #177 DRAFT | F5 resume import (#170), head 3ee31b0. No green live run yet. Needs an independent review of V15 (`validators/candidates.py`) and the approve route. |
+| #178 DRAFT | G10 resume screen (#171), base is the F5 branch. Retarget to main after #177. |
+| #179 DRAFT | H8 company suggestion (#47), earlier worker's 5 commits, main NOT merged in. Needs main merged, migration renumbered, gates, live and network runs, review. |
 
-| PR | State | Next step |
-|---|---|---|
-| #136 | Approved at 7895b2f; I merged main (docs rows only) and pushed f533638 | Wait for green CI, then merge |
-| #138 (H7a) | Approved at f000486; head 6bf7065 | Merge main (migration 0006 is taken by G2, so it renumbers to 0007), CI green, merge |
-| #143 (E7) | Changes requested: re-score run files, wire the E6 column to `injection`, resolve conflicts | Worker E |
+Open issues (9): #171 G10, #170 F5, #167 G8, #166 G7, #165 G6, #144 latency, #47 H8, #39 G5, #30 E8.
 
-Built, not yet a PR:
-- **H1c** (`h1c-watchlist-routes`, ADR 0036): watchlist and blacklist routes. Opens now that G2 is on main.
-- **H8** (`h8-company-suggestion`, ADR 0041): Worker C, stacked on #138.
-- **G3** (ADR 0038): Svelte shell, API types generator, CSP, vitest, 12 Playwright tests; Worker G is finishing docs and CI wiring.
+## 4. Plan for what is left (in order)
 
-Open cards and issues:
+1. #175: root-cause the failing H7a live test, then merge.
+2. F5 (#177): dispatch `live.yml` on the branch, independent review of V15 and the approve route, merge. Then G10 (#178).
+3. H8 (#179): merge main, renumber the migration (0008 is taken by F5 if it merges first), gates, live and network runs, review, merge.
+4. G6 (#165) watchlist screen, G7 (#166) discovery screen, G8 (#167) suggestions screen (after H8). Routes exist; copy the FactBank screen pattern.
+5. E8 (#30): first published run on local qwen3.5 4b and 9b (3 repeats, temperature 0, labels frozen). Then G5 (#39).
+6. #144 latency per provider call.
+7. Optional: slug and ats charset allowlist (a zero-width or fullwidth slug bypasses a slug blacklist; noted on #165).
 
-| Issue | What | Status |
-|---|---|---|
-| #37 G3 | Svelte shell, Analyze and Gap report screens | In progress |
-| #38 G4 | Draft help screen | Needs G3 |
-| #39 G5 | Eval results screen | Needs G3 and E8 |
-| #40 H1 | Listing, watchlist, blacklist | H1a, H1b merged earlier; H1c built |
-| #46 H7a | Scoring run with caps and cache | #138 approved |
-| #137 H7b | Discovery routes | Needs #138 |
-| #47 H8 | Company suggestion | In progress |
-| #29 E7 | Comparison table | #143 in review |
-| #140 | Wire labeled fixtures into the eval runner | Worker E next |
-| #30 E8 | First published run on local backends | Blocked on your label review |
-| #28 E6 and #34 F4 | Hostile PDFs and PDF extraction | Blocked on a PDF library decision |
-| #131 | Draft validator gaps | Fixed by #136 (closes on merge) |
-| #134 | `strict_schema` per-provider keywords | Open follow-up |
-| #142 | `company_key`: Cyrillic capital EM does not fold to Latin M | Open bug found during H8/H7 work; fix card |
-| #144 | Record latency per provider call (for the E7 column) | Open follow-up |
-| #129, #130 | Your sign-off runs (Anthropic key; OpenAI secret, LM Studio, model pick) | Yours |
+## 5. What I need from Joe P
 
-## 4. Plan for what is left
+1. **Windows re-run** on current main: `uv run pytest tests/component/test_pdf_worker.py tests/integration/test_pdf_hostile.py -q --no-cov`. The CI Windows job is green; your machine failed before the kill fix and has not been re-checked.
+2. **Decisions** (in the log): ADR 0044 for resume import (model proposes no levels or dates; a tag is accepted only if it or an alias is in the source span; approved imports get the lowest level); any substantive fact edit unverifies it (stricter than claim-only); saving from the browser drops YAML comments in a hand-edited bank (back it up first).
+3. Your own Opus review pass, and deleting `docs/pod/` when you like.
+4. Building your real fact bank together (after the UI items you wanted are merged).
 
-1. **Finish the merge queue** (docs-index conflicts keep re-appearing, so one at a time): #136, #138, #143, then the H1c, G3 and H8 PRs.
-2. **After G3:** G4 (#38) and then G5 (#39, needs E8).
-3. **Discovery:** H7b (#137), then H8 (#47). Close #40 when H1c merges.
-4. **Evals:** #140 (runner wiring), then E8 (#30) once you have reviewed the E3 labels. The E8 workflow is designed but not run (docs/evals.md).
-5. **Small follow-ups:** #142 (fix), #144 (latency), #134 (`strict_schema`), and the optional reviewer notes on #122.
-6. **Blocked until you act:** F4 and E6 (PDF library), E8 (labels), C4 and C5 live verification (secrets and runs), G5 (E8).
+## 6. Known risks and limits
 
-If agents stay productive, the realistic end state before the Nov 5 expiry is: everything above merged except the items blocked on you.
+- V15 does not check lower-case words; a person reads every candidate.
+- Hidden PDF text is judged from the content stream only (no background or clip detection).
+- No memory limit on Windows; the decoded-size cap and the timeout apply.
+- Live runs on the shared Ollama runner are slow (13 to 25 minutes); several timeouts were runner speed, not defects.
+- Migration number collision between F5 and H8 is possible; the gapless test will show it.
+- The harness re-adds a "Generated by Claude Code" footer to PR bodies on create; CLAUDE.md forbids it. Check after any create or edit.
 
-## 5. What I need from you
+## 7. Notes for whoever picks this up
 
-1. **Review the E3 labels** (`docs/e3-label-decisions.md`, 10 judgement calls; labels carry `review: pending`). E8 waits for this.
-2. **Second human review of G1's Host and CSRF logic** (card requirement). Files: `security.py`, `app.py`, `session.py`, `server.py`, `errors.py`. G1 is already merged (D41); revert or order changes if you find something.
-3. **Sign-offs:** #129 (one keyed Anthropic call), #130 (OpenAI secret, LM Studio run, model pick `gpt-6-luna`, temperature question).
-4. **PDF library for F4** (the install was denied by the permission classifier; D48).
-5. **Product calls logged for you:** closed vocabulary for drafts and its 45 percent false-positive rate (D44, D50, D51); gap recall denominator (D47); employer names in the E3 fixtures versus the CLAUDE.md ban (D24); G1 merged before your review (D41).
-
-## 6. Things that went wrong or that you should know
-
-- **Harness footers:** the GitHub tools append "Generated by Claude Code" to every PR comment (cannot be removed) and sometimes to PR bodies (agents strip bodies). CLAUDE.md forbids attribution lines in PR text. The tools also rewrite `@dependabot` mentions, so Dependabot commands never arrive (D25).
-- **`--no-verify` slips:** two workers typed a commit with `--no-verify` once out of habit. The permission layer denied it and nothing was committed that way (D43).
-- **Rate limits:** the pod hit your account's 5-hour usage limit twice (resets 23:10 and 04:10 UTC). Agents lose no work; I resume them. A check-in is scheduled for 03:13 UTC and the wind-up for 2026-11-05 06:59 UTC.
-- **Unverified in this environment:** the live OpenAI, Anthropic and LM Studio calls; anything needing Ollama locally (CI covers it via `live.yml`); public-DNS link tests in the sandbox (CI `network.yml` covers them).
-- **The decision log is untracked by CI:** `pod-decision-log.md` and this file live on the session branch only. Say if you want them merged to main.
+Start with `CLAUDE.md`, `docs/handoff.md`, `gotchas.md`. Joe P's directives for this pod: the manager merges after review, and the roughly 20 file PR limit is lifted (D74a). Traps: `web/` is tracked, so switching branches can delete it; delete `web/dist` before Python tests; run `cd web && npm ci` for the pre-commit hook; docs index and README conflicts recur after every merge; regenerate API types after any merge with `uv run python scripts/gen_api_types.py`; never run `playwright install`. Branches: `f5-resume-import` (F5, with G10 on top), `h8-company-suggestion` (H8). Barry Barrington's full hand-over notes are in his final report, summarised above.
