@@ -518,6 +518,106 @@ StateChanges(added=0, seen=0, closed=1)
 
 The Greenhouse and Lever copies of `Platform Engineer` merged (two URLs), the Ashby `Staff Platform Engineer` stayed separate, the seniority filter removed it, and an empty successful fetch closed the stored listing.
 
+## Discovery: scoring under a cap, with a cache
+
+`discovery/run.py` ties discovery together. It does no scoring itself: each surviving listing is handed to an analyzer, which in production is `pipeline.run.analyze` over the listing text treated as a posting, exactly as a pasted posting would be. The score comes from the requirement to fact mapping in code, never from a model. The choices are in [ADR 0034](adr/0034-discovery-run-cap-cache-and-stops.md).
+
+`run_discovery(conn, adapters, blacklist, filters, analyzer, identity, cap=30, today=..., now=...)` does, in order:
+1. **Blacklist first.** A watched company that `is_blacklisted` is skipped before any request, and is counted in `blocked_boards`.
+2. **Fetch.** Each remaining board is refreshed through its adapter and stored with `Listings.apply_fetch`. A board that fails is listed in `errors` (the error type only) and the other boards still run.
+3. **Dedupe and filter** the open listings of the watched, non-blacklisted boards (see the section above). Counts per filter are in `filtered_out`.
+4. **Score, most recent first, under the cap.** A listing whose score is already stored is a cache hit and costs nothing. Otherwise the analyzer is called, until `cap` calls (default 30) have been made. Every call counts, including one that fails to extract, so a model that fails every extraction is still called at most `cap` times. The next listing past the cap ends scoring with `stopped_by="cap"`, and the rest are reported as unscored, never dropped.
+5. **Rank** (`rank`): scored rows by score then recency, then rows with no score (no requirements were extracted), then unscored rows.
+
+The cache key is the run id, which covers the listing text, the bank, the backend and the model (`pipeline.run.run_id`), plus the pipeline version (`pipeline.version.pipeline_version`): a digest of the stages, prompts, validators, scoring code and the config files. Reports are stored in the `discovery_report` table under both. So an unchanged listing is never scored again, and a changed description, bank, model, prompt, validator, scoring rule or config is. A code change that does not touch those folders keeps the cache. Only a complete report is reused; an incomplete one (for example the model could not answer an entailment call) is shown with `incomplete=True` and tried again on the next run.
+
+Scoring stops early, and the rest stay unscored, when the backend cannot answer (`stopped_by="backend"`: provider unavailable or rate limited) or the budget is spent (`stopped_by="budget"`). Scores already stored are kept. A listing whose extraction fails for another reason is left unscored and the run goes on.
+
+`ranked_listings(conn, boards, filters, identity, today)` rebuilds the ranked list from storage with no fetch and no model call. Every row carries its `run_id`, which is the key of the stored gap report. The score is for triage only, not a probability. There is no apply or send action anywhere in discovery.
+
+### Try a discovery run
+No network and no model: the board is not fetched (no adapters are passed, so the run reports a `NoAdapter` error and scores what is stored), and the analyzer is the real pipeline after extraction over one hand written requirement. From the repository root, in a bash shell:
+
+```bash
+export CYPRESS_CREEK_DATA_DIR="$(mktemp -d)"
+uv run python - <<'PY'
+from datetime import UTC, date, datetime
+from pathlib import Path
+
+from cypress_creek.config import parse_settings
+from cypress_creek.discovery.adapters.base import BoardFetch, Listing
+from cypress_creek.discovery.filters import ListingFilters
+from cypress_creek.discovery.listings import Listings
+from cypress_creek.discovery.run import RunIdentity, run_discovery
+from cypress_creek.discovery.watchlist import IdentityEvidence, Watchlist, WatchlistEntry
+from cypress_creek.facts import load_bank
+from cypress_creek.facts.hashing import bank_hash
+from cypress_creek.ingest.models import Importance, Requirement, RequirementKind
+from cypress_creek.pipeline.extract import ExtractionResult, ExtractionStatus
+from cypress_creek.pipeline.run import assess
+from cypress_creek.providers import OllamaProvider
+from cypress_creek.providers.base import Usage
+from cypress_creek.storage.db import connect, database_path, migrate
+
+now = datetime(2026, 3, 31, 12, tzinfo=UTC)
+today = date(2026, 3, 31)
+conn = connect(database_path())
+migrate(conn)
+Watchlist(conn).add(WatchlistEntry("Example Co", "lever", "exampleco", IdentityEvidence.WEAK, now))
+stored = [
+    Listing(
+        id=f"lever:exampleco:{n}", ats="lever", slug="exampleco", title=f"Engineer {n}",
+        location="Austin", url=f"https://jobs.example.test/{n}", posted_at=now,
+        fetched_at=now, content_text=f"Build things, unit {n}.", content_hash=f"{n:064d}",
+    )
+    for n in range(5)
+]
+Listings(conn).apply_fetch("lever", "exampleco", BoardFetch(tuple(stored), ()))
+
+bank = load_bank(Path("evals/bank/sample_bank.yaml"))
+requirement = Requirement(
+    id="R-1", text="Needs a thing.", span=(0, 10), kind=RequirementKind.SKILL,
+    term="zzz-no-such-skill", importance=Importance.REQUIRED,
+)
+extraction = ExtractionResult(
+    status=ExtractionStatus.OK, requirements=[requirement], dropped=[], not_assessed_count=0,
+    failure=None, usage=Usage(input_tokens=1, output_tokens=1), prompt_hash="a" * 64,
+    schema_version=1,
+)
+provider = OllamaProvider(
+    parse_settings({"provider": "ollama", "model": "m", "base_url": "http://127.0.0.1:9"})
+)
+calls = []
+
+
+def analyzer(posting):
+    calls.append(posting.id)
+    return assess(posting, extraction, bank, provider, backend="ollama", model="m", today=today)
+
+
+identity = RunIdentity(bank_hash(bank), "ollama", "m")
+for label, cap in (("first run, cap 3", 3), ("second run, cap 3", 3), ("third run, cap 3", 3)):
+    result = run_discovery(
+        conn, {}, [], ListingFilters(), analyzer, identity, cap=cap, today=today, now=now
+    )
+    s = result.summary
+    print(f"{label}: scored={s.scored} cache_hits={s.cache_hits} unscored={s.unscored} stopped_by={s.stopped_by}")
+print(f"analyzer calls: {len(calls)}")
+PY
+unset CYPRESS_CREEK_DATA_DIR
+```
+
+Expected output:
+
+```text
+first run, cap 3: scored=3 cache_hits=0 unscored=2 stopped_by=cap
+second run, cap 3: scored=2 cache_hits=3 unscored=0 stopped_by=None
+third run, cap 3: scored=0 cache_hits=5 unscored=0 stopped_by=None
+analyzer calls: 5
+```
+
+The first run stops at the cap and leaves two unscored, the second finds three stored scores and scores the remaining two, and the third makes no analyzer call at all.
+
 ## Try it locally
 ```bash
 uv run python -c "
