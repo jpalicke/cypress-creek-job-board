@@ -10,6 +10,7 @@ from cypress_creek.api.routes.facts import RemovedResponse, ShareRequest
 from cypress_creek.api.routes.health import HealthResponse
 from cypress_creek.api.routes.providers import ProvidersResponse
 from cypress_creek.api.routes.session import SessionResponse
+from cypress_creek.api.routes.suggestions import SuggestionRequest, SuggestionResponse
 from cypress_creek.api.schemas import (
     AnalyzeRequest,
     AnalyzeResponse,
@@ -32,6 +33,8 @@ API_MODELS: list[type[BaseModel]] = [
     AnalyzeRequest,
     AnalyzeResponse,
     ReportResponse,
+    SuggestionRequest,
+    SuggestionResponse,
     FactsResponse,
     FactDraft,
     ShareRequest,

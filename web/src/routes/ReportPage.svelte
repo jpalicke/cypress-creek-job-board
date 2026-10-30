@@ -3,15 +3,23 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { api, ApiError, type ApiClient } from "../lib/api";
-  import type { ReportResponse } from "../lib/types";
+  import type { ProviderInfo, ReportResponse } from "../lib/types";
   import GapReport from "./GapReport.svelte";
 
   let { reportId, client = api }: { reportId: string; client?: ApiClient } = $props();
 
   let stored = $state<ReportResponse | null>(null);
   let error = $state<ApiError | null>(null);
+  let providers = $state<ProviderInfo[]>([]);
 
   onMount(() => {
+    // Without the backend list there is no Draft help button; the report itself still shows.
+    client.providers().then(
+      (answer) => {
+        providers = answer.providers;
+      },
+      () => undefined,
+    );
     client.report(reportId).then(
       (answer) => {
         stored = answer;
@@ -26,7 +34,7 @@
 {#if error}
   <p role="alert" class="banner error">{error.code}: {error.message}</p>
 {:else if stored}
-  <GapReport report={stored.report} />
+  <GapReport report={stored.report} {reportId} {providers} {client} />
 {:else}
   <p class="muted" aria-live="polite">Loading the report...</p>
 {/if}
