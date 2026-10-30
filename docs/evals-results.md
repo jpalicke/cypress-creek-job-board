@@ -8,12 +8,12 @@ metric). A backend with no run says `not run`, never 0. The rules for reading it
 page is built, are in [evals.md](evals.md#the-comparison-table). The labels are written by one
 author on a small fictional bank, so these numbers are evidence for this repository only.
 
-| Target | Model | Status | Repeats scored | E1 recall | E3 violations per 100 | E6 worst class max abs shift | E6 disrupted | E8 schema failure rate | Median latency | Cost per run, USD | Commit | Prompt hash | Fixture hash | Conditions |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Ollama qwen3.5:4b | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | - | - | - | - |
-| Ollama qwen3.5:9b | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | - | - | - | - |
-| LM Studio (the loaded model) | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | - | - | - | - |
-| OpenAI (the C4 pick, pending confirmation) | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | - | - | - | - |
-| Anthropic claude-sonnet-5-5 | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | - | - | - | - |
+| Target | Model | Status | Repeats scored | E1 recall | E3 violations per 100 | E4 gap recall | E4 planted gaps not extracted | E6 worst class max abs shift | E6 disrupted | E8 schema failure rate | Median latency | Cost per run, USD | Commit | Prompt hash | Fixture hash | Conditions |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Ollama qwen3.5:4b | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | - | - | - | - |
+| Ollama qwen3.5:9b | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | - | - | - | - |
+| LM Studio (the loaded model) | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | - | - | - | - |
+| OpenAI gpt-6-luna | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | - | - | - | - |
+| Anthropic claude-sonnet-5-5 | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | - | - | - | - |
 
 No backend has been run yet, so every row is not run.
