@@ -1,5 +1,5 @@
 # ABOUTME: One hostile model output per validator, each of which must be rejected.
-# ABOUTME: Cases are added as each validator group lands, the full table covers V1 to V14.
+# ABOUTME: Cases are added as each validator group lands, the full table covers V1 to V15.
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date
@@ -10,6 +10,7 @@ from builders import POSTING, bank, fact, requirement
 from cypress_creek.facts.models import Share
 from cypress_creek.ingest.models import Importance, Requirement
 from cypress_creek.validators import REGISTRY
+from cypress_creek.validators.candidates import ProposedFact
 from cypress_creek.validators.verdict import Verdict
 
 Case = tuple[str, Callable[[], Verdict]]
@@ -88,6 +89,12 @@ def _v14() -> Verdict:
     return REGISTRY["V14"].check("https://evil.example/apply?token=1")
 
 
+def _v15() -> Verdict:
+    return REGISTRY["V15"].check(
+        "Led 400 engineers at Initech.", ProposedFact(claim="Led 400 engineers.", source="Led 4")
+    )
+
+
 CASES: list[Case] = [
     ("V1", _v1),
     ("V2", _v2),
@@ -103,6 +110,7 @@ CASES: list[Case] = [
     ("V12", _v12),
     ("V13", _v13),
     ("V14", _v14),
+    ("V15", _v15),
 ]
 
 

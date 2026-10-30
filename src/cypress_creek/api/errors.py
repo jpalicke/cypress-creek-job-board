@@ -45,6 +45,8 @@ class ErrorCode(StrEnum):
     REPORT_REFUSED = "report_refused"
     BANK_NOT_FOUND = "bank_not_found"
     BANK_INVALID = "bank_invalid"
+    CANDIDATE_NOT_PENDING = "candidate_not_pending"
+    CLAIM_ALREADY_IN_BANK = "claim_already_in_bank"
     BLACKLISTED = "blacklisted"
     TOMBSTONED = "tombstoned"
     ALREADY_WATCHED = "already_watched"
@@ -84,6 +86,8 @@ MESSAGES = {
     ErrorCode.REPORT_REFUSED: "The report was refused because a claim could not be grounded.",
     ErrorCode.BANK_NOT_FOUND: "The fact bank file was not found.",
     ErrorCode.BANK_INVALID: "The fact bank is not valid.",
+    ErrorCode.CANDIDATE_NOT_PENDING: "That candidate was already approved or rejected.",
+    ErrorCode.CLAIM_ALREADY_IN_BANK: "The fact bank already holds that claim.",
     ErrorCode.BLACKLISTED: "That company, board or domain is on the blacklist.",
     ErrorCode.TOMBSTONED: "A person denied that company or board, so it stays off the watchlist.",
     ErrorCode.ALREADY_WATCHED: "That company or board is already on the watchlist.",

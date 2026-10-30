@@ -5,10 +5,14 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from cypress_creek.facts.models import Kind
 from cypress_creek.ingest.models import Importance, RequirementKind
 
 MAX_DRAFT_SENTENCES = 5
 MAX_DRAFT_SENTENCE_CHARS = 300
+MAX_CANDIDATES = 40
+MAX_CANDIDATE_TAGS = 8
+MAX_SOURCE_CHARS = 1000
 
 
 class ProposedRequirement(BaseModel):
@@ -64,3 +68,22 @@ class DraftOutput(BaseModel):
 
     schema_version: Literal[1]
     sentences: list[DraftSentenceOutput] = Field(max_length=MAX_DRAFT_SENTENCES)
+
+
+class ResumeCandidate(BaseModel):
+    """One fact the model proposes from a resume. It has no level, no dates and no employer
+    fields: those are judgements or details the person adds when they review the fact."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    claim: str = Field(max_length=300)
+    kind: Kind
+    tags: list[str] = Field(max_length=MAX_CANDIDATE_TAGS)
+    source: str = Field(max_length=MAX_SOURCE_CHARS)
+
+
+class ResumeImportOutput(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    schema_version: Literal[1]
+    candidates: list[ResumeCandidate] = Field(max_length=MAX_CANDIDATES)

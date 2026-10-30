@@ -33,6 +33,12 @@ _MONTHS = {
 }
 _MONTH_NAMES = "|".join(sorted(_MONTHS, key=len, reverse=True))
 
+
+def month_of(word: str) -> int | None:
+    """The month number of a month name or its common abbreviation, else None."""
+    return _MONTHS.get(word.casefold().rstrip("."))
+
+
 # A date token, tried in this order so "2019-03-01" is not read as a year and a month.
 _DATE = re.compile(
     rf"(?P<iso_day>\b(?:19|20)\d{{2}}-\d{{2}}-\d{{2}}\b)"

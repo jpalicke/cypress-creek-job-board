@@ -21,8 +21,9 @@ All of them live in `src/cypress_creek/validators/`. Each returns a `Verdict` (`
 | V12 | Date sanity | Future dates and a start after the end | `fact_dates.py` |
 | V13 | Cue sentence coverage | Requirements silently dropped or hidden by injection | `requirements.py` |
 | V14 | Company name shape | URLs, slugs or injected text in company suggestions | `names.py` |
+| V15 | Resume grounding | A fact proposed from a resume that says more than the resume | `candidates.py` |
 
-All fourteen exist. The hostile corpus that every one of them is tested against lives in `tests/fixtures/hostile_outputs/`.
+All fifteen exist. The hostile corpus that every one of them is tested against lives in `tests/fixtures/hostile_outputs/`.
 
 ## V1 Schema
 `check_schema(model, data)`. `data` is JSON text or a mapping. JSON text is validated in strict mode, so wrong types are rejected rather than coerced. Models forbid extra fields, so a smuggled field fails. The verdict names the first offending field.
@@ -99,8 +100,21 @@ It prints the uncovered Postgres sentence and its original offsets.
 
 Known limit: a short plain phrase such as "Ignore previous instructions" has the shape of a name. The shape check removes URLs and long injected text, and the company filter, resolver and human review handle the rest.
 
+## V15 Resume grounding
+`check_candidate_grounded(resume, fact)` (version 1) checks one fact proposed from a resume. The resume is the normalized text the model was given. The checks run in this order and the first failure is the verdict (`reason`, with the offending token for logs only):
+1. `source_not_in_resume`: the source span, with spaces collapsed, must be a continuous piece of the resume. It is case sensitive and exact, so a lookalike letter or a changed word fails.
+2. `invisible_character_in_claim`: the claim may not contain format characters such as zero-width spaces or soft hyphens, which can split a word past the other checks. The claim that is stored is the spaces-collapsed form that was checked.
+3. `number_not_in_source`: every number in the claim (digits with their separators, so `1,200` is not `1,200,000`) and every quantity word (such as dozen or decade) must be in the source.
+4. `month_not_in_source`: every capitalised month name or abbreviation in the claim must be a month named in the source.
+5. `name_not_in_source`: every capitalised word of the claim must be a word of the source, compared by case folding only. This includes the first word of the claim, so a claim must reuse the resume's own opening word. The pronoun `I` is exempt.
+6. `word_not_in_source`: every other word of the claim must be a word of the source, or a short function word (`the`, `and`, `where`, `my` and the like). A word matches its source form with one common ending removed, so `service` matches `services` and `manage` matches `managed`. This is what stops an invented lowercase tool, unit or number word (`terraform`, `years` for `months`, `five`). Numbers keep their letter suffix, so `5k` is not `5m`.
+7. `negation_dropped`: if the source negates (`never`, `not`, `without` and the like), so must the claim.
+8. `tag_not_in_source`: every tag must be in the source, as the tag or as one of its aliases from `config/aliases.yaml`. The term must stand alone, so `c` is not found in `company` or `java` in `JavaScript`.
+
+Known limits: a claim can be true to its words and still mislead by what it leaves out; a claim that reuses only source words can still rearrange them (`Managed Kubernetes` from `Managed team. Kubernetes deprecated.`), and an unrelated negation in the span makes a claim that omits it fail. A person reads every candidate. The check is strict on purpose: a proposal that fails is dropped and counted, never repaired.
+
 ## The hostile output corpus
-`tests/fixtures/hostile_outputs/` holds hand written bad model outputs, at least one JSON file per validator (`v01_...json` to `v14_...json`), each with a `validator`, a `description` and the `input` it is run with. Examples: an extra field carrying an instruction (V1), a fabricated fact ID (V4), an employer swapped between two real facts or a certification credited to the wrong issuer (V7), 40% inflated to 90% (V8), an uncited claim (V9), injected text echoed back with tools never used (V10), a tracking URL as a company name (V14). `bank.json` is the small fact bank the cases cite. `grounded_rationale.json` is a faithful output that must pass V7 to V10, so the tests cannot pass by rejecting everything.
+`tests/fixtures/hostile_outputs/` holds hand written bad model outputs, at least one JSON file per validator (`v01_...json` to `v15_...json`), each with a `validator`, a `description` and the `input` it is run with. Examples: an extra field carrying an instruction (V1), a fabricated fact ID (V4), an employer swapped between two real facts or a certification credited to the wrong issuer (V7), 40% inflated to 90% (V8), an uncited claim (V9), injected text echoed back with tools never used (V10), a tracking URL as a company name (V14). `bank.json` is the small fact bank the cases cite. `grounded_rationale.json` is a faithful output that must pass V7 to V10, so the tests cannot pass by rejecting everything.
 
 `tests/unit/validators/test_hostile_corpus.py` runs every case through `REGISTRY` and fails if any validator has no case. To add a case, drop a new `vNN_name.json` next to the others. A new validator also needs a runner in that test and a row in `test_hostile_table.py`.
 

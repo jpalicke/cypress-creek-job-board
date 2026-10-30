@@ -1,4 +1,4 @@
-# ABOUTME: Runs the hand written hostile outputs in fixtures/hostile_outputs through V1 to V14.
+# ABOUTME: Runs the hand written hostile outputs in fixtures/hostile_outputs through V1 to V15.
 # ABOUTME: Every validator needs a corpus case it rejects, and a faithful output must still pass.
 import json
 from collections.abc import Callable
@@ -13,6 +13,7 @@ from builders import requirement
 from cypress_creek.facts.models import Bank, Fact
 from cypress_creek.ingest.models import Importance, Requirement
 from cypress_creek.validators import REGISTRY
+from cypress_creek.validators.candidates import ProposedFact
 from cypress_creek.validators.verdict import Verdict
 
 CORPUS = Path(__file__).resolve().parents[2] / "fixtures" / "hostile_outputs"
@@ -103,6 +104,13 @@ def _run_v14(data: dict[str, Any]) -> Verdict:
     return REGISTRY["V14"].check(data["name"])
 
 
+def _run_v15(data: dict[str, Any]) -> Verdict:
+    return REGISTRY["V15"].check(
+        data["resume"],
+        ProposedFact(claim=data["claim"], source=data["source"], tags=data["tags"]),
+    )
+
+
 RUNNERS: dict[str, Callable[[dict[str, Any]], Verdict]] = {
     f"V{n}": runner
     for n, runner in enumerate(
@@ -121,6 +129,7 @@ RUNNERS: dict[str, Callable[[dict[str, Any]], Verdict]] = {
             _run_v12,
             _run_v13,
             _run_v14,
+            _run_v15,
         ],
         start=1,
     )

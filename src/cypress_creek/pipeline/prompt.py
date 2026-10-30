@@ -24,12 +24,14 @@ class Stage(StrEnum):
     EXTRACT = "extract"
     ENTAIL = "entail"
     DRAFT = "draft"
+    IMPORT = "import"
 
 
 TEMPLATES = {
     Stage.EXTRACT: "extract_v2.txt",
     Stage.ENTAIL: "entail_v1.txt",
     Stage.DRAFT: "draft_v1.txt",
+    Stage.IMPORT: "import_v1.txt",
 }
 STAGES_SHOWING_FACTS = {Stage.ENTAIL, Stage.DRAFT}
 

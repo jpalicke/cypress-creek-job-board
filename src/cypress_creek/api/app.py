@@ -13,6 +13,7 @@ from cypress_creek.api.routes import (
     discovery,
     facts,
     health,
+    imports,
     postings,
     providers,
     reports,
@@ -94,6 +95,7 @@ def create_app(
         watchlist,
         blacklist,
         discovery,
+        imports,
     ):
         app.include_router(module.router)
     if static_dir is not None and static_dir.is_dir():
