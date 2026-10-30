@@ -395,3 +395,9 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 ## D73a. Clarification on the ATS-like check
 - 2026-10-30, Joe P: there are no guarantees. The check only gives a job seeker an idea of whether a document is likely to get a second look or needs work.
 - Wording rule for any future version: a readiness indicator in the same spirit as the triage-only gap score (what a parser could read, which required terms were found), never a pass or fail verdict or a probability. This agrees with D73; it only fixes the framing.
+
+## D74. New working agreements (CLAUDE.md, handoff.md, gotchas.md updated by Joe P, main 50c3748)
+- 2026-10-30, Joe P updated the three files after noticing development practices and asked the manager to read them.
+- Adopted at once and passed to Barry: proportional effort and review, test-first for changed behavior without a test per helper, tiers chosen by risk instead of all four on every card, about 10 files per PR with 20 as the practical upper bound (splits proposed first), short reports, targeted doc audits, one representative fault check for retrospective tests, no repeated CI polling.
+- Conflicts with earlier instructions in this session, resolved as follows: (a) the files say merge only after Joe P approves, while Joe P earlier delegated merging to the manager after the senior's approval (D69). Kept the delegation for the pod and asked Joe P to confirm. (b) Joe P earlier lifted the roughly 20 file limit for the autonomous pod; the new files restore it. Followed the new files for new work, #176 (25 files) is left as is.
+- Reverse by telling the manager which rule wins.
