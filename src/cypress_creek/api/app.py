@@ -15,6 +15,7 @@ from cypress_creek.api.routes import (
     providers,
     reports,
     session,
+    suggestions,
     watchlist,
 )
 from cypress_creek.api.routes.providers import CostResponse, ProviderInfo
@@ -76,7 +77,17 @@ def create_app(
     app.state.database = Database(database_path or default_database_path())
     app.state.bank_path = bank_path or default_bank_path()
     install_error_handlers(app)
-    for module in (health, providers, session, postings, reports, facts, watchlist, blacklist):
+    for module in (
+        health,
+        providers,
+        session,
+        postings,
+        reports,
+        facts,
+        suggestions,
+        watchlist,
+        blacklist,
+    ):
         app.include_router(module.router)
     if static_dir is not None and static_dir.is_dir():
         app.mount("/", StaticFiles(directory=static_dir, html=True), name="web")

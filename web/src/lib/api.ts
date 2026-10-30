@@ -7,6 +7,7 @@ import type {
   ProvidersResponse,
   ReportResponse,
   SessionResponse,
+  SuggestionResponse,
 } from "./types";
 
 export class ApiError extends Error {
@@ -133,6 +134,20 @@ export class ApiClient {
   analyze(postingId: string, backend: string, confirmHosted: boolean): Promise<AnalyzeResponse> {
     const body = JSON.stringify({ backend, confirm_hosted: confirmHosted });
     return this.call("POST", `/api/postings/${encodeURIComponent(postingId)}/analyze`, body);
+  }
+
+  suggestions(
+    reportId: string,
+    requirementId: string,
+    backend: string,
+    confirmHosted: boolean,
+  ): Promise<SuggestionResponse> {
+    const body = JSON.stringify({
+      requirement_id: requirementId,
+      backend,
+      confirm_hosted: confirmHosted,
+    });
+    return this.call("POST", `/api/reports/${encodeURIComponent(reportId)}/suggestions`, body);
   }
 
   report(reportId: string): Promise<ReportResponse> {

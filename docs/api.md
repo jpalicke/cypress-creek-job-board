@@ -38,7 +38,9 @@ Because the check runs before routing, a write without the token is refused with
 | `POST /api/blacklist` | Body `{"match_kind": "company_key" \| "slug" \| "domain", "value", "reason"}`. The value is normalized exactly as the filter does, so `ACME Incorporated` is the same entry as `Acme Corp`. Answers 201 with the entry, `already_blacklisted` (409) for a repeat, `invalid_request` for a value that cannot be normalized. |
 | `DELETE /api/blacklist/{id}` | Removes one entry: `{"removed": true}`, or `not_found` (404). Removing it does not add anything to the watchlist. |
 
-The draft help route arrives later (G4 and D7).
+| `POST /api/reports/{id}/suggestions` | Draft help for one requirement of a stored report. Body `{"requirement_id": "R-1", "backend": "<the configured backend>", "confirm_hosted": false}` and nothing else (a hosted backend needs `confirm_hosted: true`, as for analysis). A requirement the report found no verified support for is never drafted and makes no model call: `status: "no_support"`. Otherwise `status` is `drafted` (or `not_run` with a `failure` label when the backend is down), `needs_human_review` is always true, `sentences` holds each bullet with its cited `fact_ids`, `passed` (true only if every check passed) and its `verdicts` (`validator`, `passed`, `reason`, never the offending text), and `facts` holds the claim text of each cited fact so a reader sees what the bullet rests on. Unknown report or requirement is `not_found` (404). |
+
+Nothing in the API sends, applies or copies anything: draft help is text for a person to read, tick as reviewed and copy by hand.
 
 ### How the routes behave
 - **Budget.** Each analysis gets a fresh budget from the provider settings (`max_requests`, `max_usd` and the token limits), checked before every call. A call that would pass it stops with `budget_exceeded` (409) before anything is sent. The budget is per request, not saved across requests.

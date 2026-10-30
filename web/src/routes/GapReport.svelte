@@ -2,9 +2,22 @@
 <!-- ABOUTME: Every value is shown with text interpolation, which escapes, so hostile text stays text. -->
 <script lang="ts">
   import { groupBySupport, isIncomplete, scoreLine, SUPPORT_ORDER, SUPPORT_TITLES } from "../lib/grouping";
-  import type { GapReport } from "../lib/types";
+  import type { ApiClient } from "../lib/api";
+  import type { GapReport, ProviderInfo } from "../lib/types";
+  import DraftHelp from "./DraftHelp.svelte";
 
-  let { report }: { report: GapReport } = $props();
+  // Draft help needs a stored report to point at and a backend to ask; without them it is not shown.
+  let {
+    report,
+    reportId = null,
+    providers = [],
+    client,
+  }: {
+    report: GapReport;
+    reportId?: string | null;
+    providers?: ProviderInfo[];
+    client?: ApiClient;
+  } = $props();
 
   const groups = $derived(groupBySupport(report.rows));
   const incomplete = $derived(isIncomplete(report));
@@ -67,6 +80,9 @@
             </p>
             {#if row.rationale}<p class="muted">Why: {row.rationale}</p>{/if}
             {#if row.failure}<p class="muted">Model check failed: {row.failure}</p>{/if}
+            {#if reportId !== null && !incomplete}
+              <DraftHelp {reportId} {row} {providers} {...client ? { client } : {}} />
+            {/if}
           </div>
         {/each}
       </section>
