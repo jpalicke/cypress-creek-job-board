@@ -152,12 +152,12 @@ context_tokens = 4096            # the context length the model was loaded with
 ### LM Studio findings (partly verified)
 The command to run, what to record and the other open sign-offs for this adapter are in [issue #130](https://github.com/jpalicke/cypress-creek-job-board/issues/130).
 
-On 2026-10-30 Joe P ran both `live_lmstudio` tests against his LM Studio and they passed (`2 passed`). The run recorded no LM Studio version, model name or server wording, so the rows below say only what the passing tests establish. Everything else is still not known.
+On 2026-10-30 Joe P ran both `live_lmstudio` tests against his LM Studio and they passed (`2 passed`). The run itself recorded no server wording; the version, model and loaded context length were reported afterwards. The rows below say only what the passing tests establish. Everything else is still not known.
 
 | Question | Finding |
 | --- | --- |
-| LM Studio version and model tested | not recorded (the tests passed on 2026-10-30) |
-| Is the loaded context length exposed by the model listing, or must config supply it? | not recorded (the adapter reads `context_tokens` from config; the test config supplied it) |
+| LM Studio version and model tested | LM Studio 0.4.17 (Build 4), model `gemma-4-e4b` (the identifier LM Studio lists carries a vendor prefix), loaded with a context length of 8192 (reported by Joe P after the run) |
+| Is the loaded context length exposed by the model listing, or must config supply it? | not recorded (the adapter reads `context_tokens` from config; the test config supplied it). The model was loaded with 8192; the context value passed to the tests was not reported |
 | Is `response_format` `json_schema` honored for the model? | not established: a conforming reply passes either way because every reply is validated against the schema; `strict_schema` stays false |
 | How is a prompt over the loaded context reported? | A prompt far over the loaded context was detected and raised `ContextTruncated` (test passed). Which signal fired, the reported prompt count or the text of a 400 body, was not recorded, so `CONTEXT_ERROR_MARKERS` is still unconfirmed |
 
