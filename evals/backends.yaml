@@ -1,0 +1,19 @@
+# The backends the comparison table must list, in this order. A backend with no run file shows as
+# "not run". `model` is the exact model of a run, or null for any model of that backend (LM Studio
+# runs whatever model its user loads, and the run records which). Edit freely, it is data.
+targets:
+  - label: Ollama qwen3.5:4b
+    backend: ollama
+    model: qwen3.5:4b
+  - label: Ollama qwen3.5:9b
+    backend: ollama
+    model: qwen3.5:9b
+  - label: LM Studio (the loaded model)
+    backend: openai_compatible
+    model: null
+  - label: OpenAI (the C4 pick, pending confirmation)
+    backend: openai_compatible
+    model: gpt-6-luna
+  - label: Anthropic claude-sonnet-5-5
+    backend: anthropic
+    model: claude-sonnet-5-5

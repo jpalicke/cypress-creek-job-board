@@ -122,6 +122,8 @@ evals/
   harness/metrics.py     The E1 to E4 metric definitions: score_case, pool, repeat_values, aggregate
   harness/injection.py   The injection corpus loader and the E6 metrics: load_injection, score_pair, injection_values
   harness/score.py       The scorer CLI: run files and committed labels in, a metrics JSON and a mismatch view out
+  harness/table.py       The comparison table builder: collect_rows, render_table, update_readme, and the --check CLI
+  backends.yaml          The backends the table must list (data, edit freely)
   fixtures/<ats>-<job id>/  One real posting: posting.txt, meta.yaml, labels.yaml (see evals.md and NOTICE)
   fixtures/injection/<case id>/  A hand written hostile case: attacked.txt, its clean.txt twin and payload.yaml (see evals.md)
   scratch/               Gitignored local JSONL exports
