@@ -310,3 +310,7 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 ## D57. E8 goes ahead after #140; senior A owns it
 - 2026-10-30, Joe P ("run E8 after 140 merges"), manager assigned.
 - Labels were reviewed (PR #147) so they are frozen. E8 runs only local Ollama models (qwen3.5:4b and 9b, 3 repeats at temperature 0, six fixtures) through a manual workflow; hosted rows stay "not run" because no keys or spend were approved. If a model cannot finish on the GitHub runner, what finishes is recorded and the rest is marked with the reason, never faked or silently truncated. The workflow does not push; the run files are committed in a normal PR and the comparison table regenerated. FOR JOE P: a first run on small models with Claude-written labels is a first look, not a benchmark.
+
+## D58. Joe P reviewed G1
+- 2026-10-30, Joe P ("G1 looks good").
+- Treated as the second human review the G1 card asked for (Host and CSRF logic). Recorded in ADR 0028's status line via PR #149; the claim is limited to what he said. He can still order changes. D33, D34 and D41 are closed by this.
