@@ -13,7 +13,7 @@ from cypress_creek.discovery.dedupe import MergedListing, dedupe
 from cypress_creek.discovery.filters import FilterName, ListingFilters, apply_filters
 from cypress_creek.discovery.listings import Listings
 from cypress_creek.discovery.tombstones import normalize_board
-from cypress_creek.discovery.watchlist import Watchlist
+from cypress_creek.discovery.watchlist import Watchlist, WatchlistEntry
 from cypress_creek.ingest.hashing import text_hash
 from cypress_creek.ingest.models import Extractor, Posting, PostingSource
 from cypress_creek.pipeline.report import GapReport, ReportStatus
@@ -123,6 +123,25 @@ def rank(rows: Iterable[RankedListing]) -> list[RankedListing]:
     return sorted(rows, key=key)
 
 
+def unblocked_entries(
+    conn: sqlite3.Connection, blacklist: Sequence[BlacklistEntry]
+) -> tuple[list[WatchlistEntry], int]:
+    """The watchlist entries the blacklist does not block, and how many it blocked."""
+    kept: list[WatchlistEntry] = []
+    blocked = 0
+    for entry in Watchlist(conn).entries():
+        if is_blacklisted(Candidate(entry.display_name, entry.slug, None), blacklist):
+            blocked += 1
+        else:
+            kept.append(entry)
+    return kept, blocked
+
+
+def board_keys(entries: Iterable[WatchlistEntry]) -> dict[tuple[str, str], str]:
+    """Each board of the entries mapped to its company key."""
+    return {(entry.ats, entry.slug): entry.company_key for entry in entries}
+
+
 def run_discovery(
     conn: sqlite3.Connection,
     adapters: Mapping[str, BoardAdapter],
@@ -144,15 +163,11 @@ def run_discovery(
     if cap < 0:
         raise ValueError("the cap cannot be negative")
     listings = Listings(conn)
-    boards: dict[tuple[str, str], str] = {}
+    entries, blocked = unblocked_entries(conn, blacklist)
+    boards = board_keys(entries)
     errors: list[BoardError] = []
-    blocked = 0
     fetched = 0
-    for entry in Watchlist(conn).entries():
-        if is_blacklisted(Candidate(entry.display_name, entry.slug, None), blacklist):
-            blocked += 1
-            continue
-        boards[(entry.ats, entry.slug)] = entry.company_key
+    for entry in entries:
         adapter = adapters.get(entry.ats)
         if adapter is None:
             errors.append(BoardError(entry.ats, entry.slug, "NoAdapter"))
