@@ -18,7 +18,7 @@ Aim for about 10 changed files, with 20 as a practical upper bound. Propose a sp
 Why: B4 landed as a roughly 40-file PR that was difficult to review.
 
 ## Audit documentation affected by a change
-Before reporting a card complete, check the documents that could plausibly be stale because of the change. Examples: README status and usage, the docs index and configuration lists, the codebase layout and flow, contributor commands, the owning doc, and ADRs for significant design decisions. Run new or changed commands; verify existing commands when the change could affect them. Do not reread every document or run every documented command for unrelated edits.
+Before reporting a card complete, run the grep-based audit in `CLAUDE.md` (Documentation).
 
 Why: on B5, weights configuration and the PR-size rule were omitted from several relevant docs until Joe P asked whether they were current.
 
