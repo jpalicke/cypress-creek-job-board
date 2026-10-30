@@ -132,10 +132,10 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 
 ## D24. E3 merged (PR #122, 4c7b7d5) with these rulings
 - 2026-10-29, senior engineer ruled, manager merged.
-- Em dashes in verbatim third party fixture text are accepted unnormalized: the rule governs text we author, the posting SHA-256 is its provenance record, no hook checks it, and main has a precedent (tests/fixtures/lever/palantir_page.json). Reverse: normalize and re-hash.
+- Em dashes in verbatim third party fixture text are accepted unnormalized: the rule governs text we author, the posting SHA-256 is its provenance record, no hook checks it, and main has a precedent (the existing Lever page fixture). Reverse: normalize and re-hash.
 - Inline `# pragma: allowlist secret` is the repo convention (the .secrets.baseline results map is empty). Reverse: move entries into .secrets.baseline.
 - ADR 0024 went to E3; #120 renumbers to 0025.
-- FOR JOE P'S ATTENTION: CLAUDE.md says do not mention any specific employer or industry in the repo. The E3 fixtures, NOTICE and meta.yaml name publishers (the posting text itself names them), following the card's approved posting list and the palantir_page.json precedent. The reviewer did not treat it as a finding but flagged that this widens the exception. Please confirm or order the fixtures reworked.
+- FOR JOE P'S ATTENTION: CLAUDE.md says do not mention any specific employer or industry in the repo. The E3 fixtures, NOTICE and meta.yaml name publishers (the posting text itself names them), following the card's approved posting list and the the existing Lever page fixture precedent. The reviewer did not treat it as a finding but flagged that this widens the exception. Please confirm or order the fixtures reworked.
 - Optional reviewer items on #122 not yet done: assert the span message in the check_labels test; check fixture id vs directory name in load_fixture; document the intentional echo in _check_cues; a contributing.md sentence exempting verbatim third party fixtures; a note on E4/E8 that the runner must call require_committed_labels.
 
 ## D25. Harness behaviours found, and how Dependabot PRs are refreshed
@@ -163,7 +163,7 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 
 ## D29. Caught before merge: D7 draft validators whitelisted posting text (PR #126)
 - 2026-10-29, senior engineer found, Worker G fixing.
-- The first D7 version passed requirement.text to V7, V8 and V10, so numbers, employers and skills from the posting counted as allowed. Repro: "Led 10 engineers using Python and Kubernetes at Google for 10 years [F-0001]" rendered as a clean sentence although the fact says 8 engineers, a different employer and no Kubernetes. This breaches the one rule. Fix: the allow-list is the cited facts only, tests first. Nothing merged. Consider a Joe P review of the final D7 validator wiring, since it is the heart of the product.
+- The first D7 version passed requirement.text to V7, V8 and V10, so numbers, employers and skills from the posting counted as allowed. Repro: "Led 10 engineers using Python and Kubernetes at Acme Corp for 10 years [F-0001]" rendered as a clean sentence although the fact says 8 engineers, a different employer and no Kubernetes. This breaches the one rule. Fix: the allow-list is the cited facts only, tests first. Nothing merged. Consider a Joe P review of the final D7 validator wiring, since it is the heart of the product.
 
 ## D30. G2 design choices (branch G2-posting-analyze-routes, PR opens after #125 merges; Worker E)
 - 2026-10-29, Worker E. Reversal notes in the PR and ADR 0027 (provisional number).
