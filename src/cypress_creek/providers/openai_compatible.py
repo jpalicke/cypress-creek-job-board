@@ -37,6 +37,9 @@ PROVIDER = "openai_compatible"
 DEFAULT_BASE_URL = "https://api.openai.com/v1"
 CHARS_PER_TOKEN = 3
 ERROR_BODY_LIMIT = 200
+# LM Studio's own model listing carries the context a model was loaded with. The standard
+# `/v1/models` listing does not, as far as recorded (LM Studio 0.4.17).
+LOADED_CONTEXT_PATH = "/api/v0/models"
 # Keywords the strict structured output mode rejects. The pydantic model validates the reply
 # afterwards, so dropping them loses no check.
 OPENAI_UNSUPPORTED_KEYWORDS = frozenset(
@@ -162,6 +165,53 @@ class OpenAICompatibleProvider:
         elif settings.api_key_env is not None:
             self._key = resolve_api_key(settings, environ)
         self._cost = self._cost_per_mtok(settings)
+        self._context = self._resolve_context()
+
+    def _resolve_context(self) -> int:
+        """The window the adapter plans for. A loopback server that reports the context it loaded
+        the model with supplies it when the config sets none; a configured value above it is a
+        misconfiguration, refused here. Any other case uses the configured value."""
+        configured = self._settings.context_tokens
+        loaded = self._server_loaded_context()
+        if loaded is None:
+            return configured
+        if "context_tokens" not in self._settings.model_fields_set:
+            return loaded
+        if configured > loaded:
+            raise ConfigError(
+                f"context_tokens is {configured} but the server loaded {self._settings.model} "
+                f"with a context of {loaded}; set context_tokens to at most {loaded} or reload it"
+            )
+        return configured
+
+    def _server_loaded_context(self) -> int | None:
+        """The loaded context LM Studio reports for the model, or None when it cannot be told.
+
+        Only a loopback server is asked. An absent endpoint, an unreachable server or a reply of
+        another shape is None, and the call that follows fails loudly if the server is down."""
+        if not self._local:
+            return None
+        parts = urlsplit(self._base_url)
+        url = f"{parts.scheme}://{parts.netloc}{LOADED_CONTEXT_PATH}"
+        try:
+            response = httpx.get(url, timeout=httpx.Timeout(self._settings.connect_timeout_seconds))
+            body = response.json()
+        except (httpx.HTTPError, ValueError):
+            return None
+        if response.status_code != 200 or not isinstance(body, dict):
+            return None
+        models = body.get("data")
+        if not isinstance(models, list):
+            return None
+        for item in models:
+            if not isinstance(item, dict):
+                continue
+            if item.get("id") != self._settings.model or item.get("state") != "loaded":
+                continue
+            value = item.get("loaded_context_length")
+            if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+                return value
+        return None
 
     def _remote_key(self, settings: ProviderSettings, environ: Mapping[str, str] | None) -> str:
         if not settings.allow_remote:
@@ -190,10 +240,10 @@ class OpenAICompatibleProvider:
     @property
     def capabilities(self) -> Capabilities:
         return Capabilities(
-            context_tokens=self._settings.context_tokens,
-            # Hosted strict mode is documented. A local server is unproven until verified for the
-            # loaded model, so the pipeline validates harder.
-            strict_schema=not self._local,
+            context_tokens=self._context,
+            # Hosted strict mode is documented. LM Studio 0.4.17 was verified to enforce a schema
+            # (one model, one probe, 2026-10-30); every reply is still validated afterwards.
+            strict_schema=True,
             local=self._local,
             cost_per_mtok=self._cost,
         )
@@ -237,7 +287,7 @@ class OpenAICompatibleProvider:
     def complete_structured[T: BaseModel](
         self, system: str, data_block: str, schema: type[T], max_output_tokens: int
     ) -> StructuredResult[T]:
-        context = self._settings.context_tokens
+        context = self._context
         input_tokens = estimate_input_tokens(self, system, data_block, schema)
         check_pre_flight(input_tokens, max_output_tokens, context)
         secrets = [self._key] if self._key else []
@@ -265,7 +315,7 @@ class OpenAICompatibleProvider:
             raise ProviderUnavailable(
                 PROVIDER, f"{type(error).__name__} at {self._base_url}", secrets
             ) from None
-        check_response_status(response, input_tokens, self._settings.context_tokens, secrets)
+        check_response_status(response, input_tokens, self._context, secrets)
         try:
             body = response.json()
         except ValueError:

@@ -26,7 +26,7 @@ Because the check runs before routing, a write without the token is refused with
 | `GET /api/providers` | `{"providers": [{"provider", "model", "local", "strict_schema", "context_tokens", "cost_per_mtok": {"input", "output"}}]}`. Never a key, an environment variable name or a URL. |
 | `GET /api/session` | `{"csrf_token": "..."}`. |
 
-| `POST /api/postings` | Adds a posting. Send `Content-Type: application/json` with `{"source": "paste", "text": "..."}` or `{"source": "link", "url": "https://..."}`; the answer (201) has the new `id`, the normalized `text`, its `text_hash`, `warnings` (such as `control_chars_stripped`), `extraction_warnings` (HTML, such as `hidden_elements_removed`), `fetch_warnings` (such as `cross_host_redirect`), `origin_url` and `created_at`. A link goes through the SSRF guard and the polite fetch limits. A raw body with `Content-Type: application/pdf` is checked for size and the `%PDF-` marker and then answered with `pdf_extraction_unavailable`, because PDF text extraction (card F4) is not built yet. |
+| `POST /api/postings` | Adds a posting. Send `Content-Type: application/json` with `{"source": "paste", "text": "..."}` or `{"source": "link", "url": "https://..."}`; the answer (201) has the new `id`, the normalized `text`, its `text_hash`, `warnings` (such as `control_chars_stripped`), `extraction_warnings` (HTML, such as `hidden_elements_removed`), `fetch_warnings` (such as `cross_host_redirect`), `origin_url` and `created_at`. A link goes through the SSRF guard and the polite fetch limits. A raw body with `Content-Type: application/pdf` (or a link that returns a PDF) is checked for size and the `%PDF-` marker, then read by the PDF extractor in a limited child process ([ADR 0043](adr/0043-pdf-text-in-a-limited-child-process.md)): the posting keeps only the visible text, and `extraction_warnings` counts what was dropped (`hidden_white_text`, `hidden_tiny_text`, `hidden_offpage_text`, `hidden_invisible_text`, `annotations_dropped`, `metadata_dropped`, `form_fields_dropped`). A PDF that cannot be read is a typed 4xx and nothing is stored. |
 | `GET /api/postings/{id}/estimate` | What the extraction call would use at most under the configured budget: `{"covers": "extraction", "requests", "input_tokens", "output_tokens", "usd"}`. Nothing is sent to the backend. One entailment call per requirement follows an analysis and is not in this number. |
 | `POST /api/postings/{id}/analyze` | Body `{"backend": "<configured provider name>", "confirm_hosted": false}`. Runs the pipeline and answers 200 with `{"report_id", "report"}` where `report` is the `GapReport`. The report may be incomplete: with the backend down it is `status: "incomplete"`, has no score and `incomplete_reasons` says `extraction failed: provider_unavailable`. It is never a 500. A hosted backend needs `confirm_hosted: true`. |
 | `GET /api/reports/{id}` | A stored report: `{"report_id", "posting_id", "created_at", "report", "validator_verdicts": [{"stage", "subject", "validator", "passed", "reason"}]}`. The verdicts are those of V4, V5 and V9 over the finished report, without any offending text. |
@@ -74,7 +74,14 @@ Postings and reports live in the SQLite database (`CYPRESS_CREEK_DATA_DIR`, defa
 | `content_too_large` | 413 | The page is over the fetch limits. |
 | `unreadable_content` | 422 | The HTML could not be read as text. |
 | `invalid_pdf` | 422 | A PDF upload without the `%PDF-` marker. |
-| `pdf_extraction_unavailable` | 501 | PDF text extraction is not built yet. |
+| `pdf_too_large` | 413 | The PDF is over the extractor's size limit. |
+| `pdf_too_many_pages` | 422 | The PDF has more pages than the limit (50). |
+| `pdf_too_much_text` | 422 | The PDF has more text than the limit. It is refused, never cut. |
+| `pdf_encrypted` | 422 | The PDF is encrypted. |
+| `pdf_corrupt` | 422 | The PDF is malformed, truncated or not a PDF. |
+| `pdf_no_text` | 422 | The PDF has no extractable text, as a scan has. There is no OCR. |
+| `pdf_timeout` | 422 | Reading the PDF took longer than the limit and the child was killed. |
+| `pdf_resource_limit` | 422 | The PDF needed more memory or decoded size than allowed, as a bomb does. |
 | `unknown_backend` | 422 | The named backend is not the configured one, or none is configured. |
 | `hosted_backend_not_confirmed` | 422 | A hosted backend was named without `confirm_hosted`. |
 | `budget_exceeded` | 409 | The call would pass the configured budget. |

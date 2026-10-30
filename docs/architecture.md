@@ -157,3 +157,7 @@ flowchart TD
 `ASHBY_FETCH_LIMITS` allows 16 MiB on the wire and decoded, a 60 second total timeout and `application/json` only. A real board of 63 jobs with full descriptions measured 1.95 MB on 2026-10-19, so the cap is about eight times that. Titles and locations are at most 1000 characters and a job URL at most 2048. There is no pagination: one response holds the whole board. The client must be built with these limits.
 
 The adapter does not decide what to do with an error. The caller (the scan, later cards) turns `BoardNotFound` into a broken watchlist entry and any other error into a visible failure for that board only.
+
+## The PDF boundary
+
+A PDF is hostile input. `ingest.pdf_text.extract_pdf_text` checks the size and the `%PDF-` marker, then starts `ingest.pdf_worker` as a separate Python process (`python -I`, an empty environment, an empty working directory, its own session) and sends the bytes on stdin. The worker sets its own limits first (address space, CPU seconds, no file writes), makes sockets unusable, and only then imports pypdf. It answers one JSON line: the visible text and counts of what it dropped, or a typed error code. The parent kills it on a timeout, checks the exit code and the size of the answer, and maps every failure to a `PdfError` subclass. A crash, a bomb or a hang therefore costs the request, never the server. See [ADR 0043](adr/0043-pdf-text-in-a-limited-child-process.md) and the PDF section of the [threat model](threat-model.md#pdf-boundary).

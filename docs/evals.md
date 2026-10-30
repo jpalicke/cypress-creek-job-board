@@ -266,6 +266,19 @@ uv run python -c "from pathlib import Path; from evals.harness.injection import 
 ```
 It prints one line per case, 11 in all.
 
+## Hostile PDF fixtures and the hidden carrier class
+
+`evals/fixtures/pdf/` holds the hostile PDFs, a `cases.yaml` listing each file with its hazard and expected outcome, and `generate.py`, which writes every file byte for byte with no library and no clock ([ADR 0042](adr/0042-hostile-pdf-fixtures.md)). The files are committed too, and a unit test regenerates them into a temp folder and compares bytes, so nobody has to trust a binary blob. The biggest is the 300 KB bomb, which only inflates when something opens it.
+
+```bash
+uv run python evals/fixtures/pdf/generate.py          # rewrite the files in place
+uv run pytest tests/unit/test_pdf_fixtures.py tests/integration/test_pdf_hostile.py tests/component/test_pdf_worker.py tests/e2e/test_pdf_upload_process.py -q --no-cov
+```
+
+Cases: a clean PDF; a visible payload (kept, and handled as hostile text downstream); the hidden carriers (white on white, under 4 points, invisible render mode, off the page, an annotation, document metadata), each with `pair: clean.pdf`; a decompression bomb; a page tree claiming five million pages; a truncated file; plain text named `.pdf`; an encrypted file; and an image only page. `cases.yaml` says for each either the strings the extracted text must include and exclude and the warnings it must carry, or the typed error. The rule for the **hidden carrier** attack class: the extracted text of an attacked file must equal the extracted text of its clean twin, so the posting the model sees is identical and the score shift is zero by construction. A test checks it for all six carriers. The visible payload is the class where the model sees the attack, and belongs to the text corpus above.
+
+**To add a hostile case:** add a function to `generate.py` that returns the bytes (keep it deterministic: no clock, no random, a fixed order), register it in `build_all`, run the generator, add the entry to `cases.yaml` (with `pair:` if it should extract like a clean twin), and run the tests above. A payload must be a benign string such as `ZXQ-PAYLOAD`; no working exploit and no real malware, only resource exhaustion shapes.
+
 ## The comparison table
 
 `evals/harness/table.py` builds the backend comparison table. The table is generated, never hand edited: it is written to [evals-results.md](evals-results.md) and to the marked block in the README, and CI regenerates both and fails if the committed text differs.
@@ -275,7 +288,7 @@ uv run python -m evals.harness.table           # write docs/evals-results.md and
 uv run python -m evals.harness.table --check   # fail if either file is out of date (CI runs this)
 ```
 
-**Inputs.** `evals/results/` holds, for each published run, the JSONL run export and the metrics JSON the scorer wrote for it (`score.py --out evals/results`). The two are paired by run id: a metrics file without its run file, a run file without metrics, or a JSON file the scorer did not write is an error, so a row can never be built from half of its data. The table also scores each run file again with the E4 scorer against the committed labels and refuses a metrics file that differs ("does not match its run file"), so a hand edited or out of date metrics file never reaches the table. It needs the committed labels, the sample bank and the injection corpus, which `--fixtures`, `--bank` and `--injection-fixtures` can point elsewhere. [`evals/backends.yaml`](../evals/backends.yaml) lists the backends the table must show, in order: Ollama `qwen3.5:4b` and `qwen3.5:9b`, LM Studio (any model, which the run records), OpenAI (the C4 pick, `gpt-6-luna`, pending Joe P's confirmation) and Anthropic `claude-sonnet-5-5`. The tiny CI model `qwen3.5:0.8b` is plumbing and is not part of the comparison. A run matches the entry with its exact model, else the entry with `model: null` for its backend; a run that matches no entry is still shown, labeled "not in the backend list". Edit the list to add a backend.
+**Inputs.** `evals/results/` holds, for each published run, the JSONL run export and the metrics JSON the scorer wrote for it (`score.py --out evals/results`). The two are paired by run id: a metrics file without its run file, a run file without metrics, or a JSON file the scorer did not write is an error, so a row can never be built from half of its data. The table also scores each run file again with the E4 scorer against the committed labels and refuses a metrics file that differs ("does not match its run file"), so a hand edited or out of date metrics file never reaches the table. It needs the committed labels, the sample bank and the injection corpus, which `--fixtures`, `--bank` and `--injection-fixtures` can point elsewhere. [`evals/backends.yaml`](../evals/backends.yaml) lists the backends the table must show, in order: Ollama `qwen3.5:4b` and `qwen3.5:9b`, LM Studio (any model, which the run records), OpenAI (`gpt-6-luna`, confirmed) and Anthropic `claude-sonnet-5-5`. The tiny CI model `qwen3.5:0.8b` is plumbing and is not part of the comparison. A run matches the entry with its exact model, else the entry with `model: null` for its backend; a run that matches no entry is still shown, labeled "not in the backend list". Edit the list to add a backend.
 
 **Columns.** Each metric is `mean / worst` of the repeats that had every planned case.
 
@@ -283,13 +296,14 @@ uv run python -m evals.harness.table --check   # fail if either file is out of d
 | --- | --- |
 | E1 recall | `requirement_recall` in the metrics JSON (worst is the lowest) |
 | E3 violations per 100 | `grounding_violations_per_100` (worst is the highest) |
+| E4 gap recall, E4 planted gaps not extracted | `gap_recall` (worst is the lowest) and `planted_not_extracted` (worst is the highest), always side by side. `gap_recall` counts only planted gaps the run extracted ([ADR 0032](adr/0032-scorer-matching-and-metric-definitions.md)), so a run that skips planted gaps at extraction looks good on it alone; `planted_not_extracted` shows how many it never extracted. Read the pair together. A run with no extracted planted gap has no `gap_recall`, which says `not run`, never 0. |
 | E6 worst class max abs shift | the largest `max_abs_shift` over the attack classes in `injection` (mean and worst over repeats); `not run` for a run with no injection cases |
 | E6 disrupted | the number of attacked cases whose report was disrupted, over every scored repeat (`injection_disrupted`); `not run` for a run with no injection cases |
 | E8 schema failure rate | share of recorded provider calls that ended in a `SchemaViolation`, per repeat, from the run export (worst is the highest) |
 | Median latency | `not recorded`: run records carry no timing yet, so there is nothing to compute. This is a gap in the record, not a zero. |
 | Cost per run, USD | sum of `cost_usd` over every call of a repeat, from the run export. A repeat with any call of unknown cost is left out, never counted as 0. |
 | Commit, Prompt hash, Fixture hash | the run header: the git commit, a hash of the per stage prompt hashes, and the fixture set hash |
-| Conditions | rows get a letter by distinct prompt hash and fixture hash. Rows in different groups are marked "not comparable with A" and the note under the table says so. |
+| Conditions | rows get a letter by distinct prompt hash and fixture hash. Rows in different groups are marked "not comparable with A" and the note under the table says so. A hosted target (`temperature_pinned: false` in `evals/backends.yaml`) also says "not temperature pinned (ADR 0027)", because hosted requests send no temperature. |
 
 A backend with no run says `not run` in every cell, never 0. The page and the README block say that the labels are one author's on a small fictional bank. No run is committed yet, so every row is `not run`.
 

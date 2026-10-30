@@ -1,0 +1,54 @@
+# The hostile PDF fixtures. `generate.py` writes every file here byte for byte; a test regenerates
+# them and compares. `expect` is what the extractor must do: return text that includes and excludes
+# the listed strings and carries the listed warnings, or fail with the typed error.
+# `pair` names the clean twin: an attacked file must extract to the same text as its twin.
+payload: "ZXQ-PAYLOAD"
+cases:
+  - file: clean.pdf
+    hazard: none
+    expect: {text_includes: ["Senior Data Engineer", "3 years of Python"], warnings: []}
+  - file: visible_payload.pdf
+    hazard: visible instruction text, which stays in the text and is handled as hostile text downstream
+    expect: {text_includes: ["ZXQ-PAYLOAD"], warnings: []}
+  - file: white_on_white.pdf
+    hazard: hidden carrier, white text on a white page
+    pair: clean.pdf
+    expect: {text_excludes: ["ZXQ-PAYLOAD"], warnings: [hidden_white_text]}
+  - file: tiny_font.pdf
+    hazard: hidden carrier, text under 4 points
+    pair: clean.pdf
+    expect: {text_excludes: ["ZXQ-PAYLOAD"], warnings: [hidden_tiny_text]}
+  - file: invisible_text.pdf
+    hazard: hidden carrier, text drawn in render mode 3 (invisible)
+    pair: clean.pdf
+    expect: {text_excludes: ["ZXQ-PAYLOAD"], warnings: [hidden_invisible_text]}
+  - file: offpage.pdf
+    hazard: hidden carrier, text positioned outside the page
+    pair: clean.pdf
+    expect: {text_excludes: ["ZXQ-PAYLOAD"], warnings: [hidden_offpage_text]}
+  - file: annotation.pdf
+    hazard: hidden carrier, an annotation
+    pair: clean.pdf
+    expect: {text_excludes: ["ZXQ-PAYLOAD"], warnings: [annotations_dropped]}
+  - file: metadata.pdf
+    hazard: hidden carrier, document title, author and subject
+    pair: clean.pdf
+    expect: {text_excludes: ["ZXQ-PAYLOAD"], warnings: [metadata_dropped]}
+  - file: decompression_bomb.pdf
+    hazard: a 300 KB file whose content stream inflates to 300 MiB
+    expect: {error: PdfResourceLimit}
+  - file: many_pages.pdf
+    hazard: a page tree that claims five million pages
+    expect: {error: PdfTooManyPages}
+  - file: truncated.pdf
+    hazard: a valid file cut in half
+    expect: {error: PdfCorrupt}
+  - file: not_a_pdf.pdf
+    hazard: plain text named .pdf
+    expect: {error: PdfCorrupt}
+  - file: encrypted.pdf
+    hazard: a file with an encryption dictionary
+    expect: {error: PdfEncrypted}
+  - file: image_only.pdf
+    hazard: a page with no text, as a scan would be
+    expect: {error: PdfNoText}

@@ -1,6 +1,7 @@
 # ABOUTME: Live tests of the openai_compatible adapter against a real LM Studio server.
 # ABOUTME: An unreachable server or missing model fails loudly with a clear message, never a skip.
 import os
+from typing import Literal
 
 import httpx
 import pytest
@@ -17,6 +18,10 @@ MODEL = os.environ.get("CYPRESS_CREEK_LMSTUDIO_MODEL", "")
 
 class Greeting(BaseModel):
     text: str
+
+
+class Probe(BaseModel):
+    answer: Literal["alpha", "beta"]
 
 
 def _settings(context_tokens: int) -> ProviderSettings:
@@ -69,3 +74,23 @@ def test_a_prompt_longer_than_the_loaded_context_is_detected() -> None:
     with pytest.raises(ContextTruncated) as caught:
         provider.complete_structured("Answer in JSON.", oversized, Greeting, max_output_tokens=50)
     assert caught.value.context_tokens == context
+
+
+def test_the_loaded_context_is_read_from_the_server_when_the_config_sets_none() -> None:
+    # The same value the model was loaded with, which the overflow test below also needs.
+    expected = int(os.environ.get("CYPRESS_CREEK_LMSTUDIO_CONTEXT", "4096"))
+    settings = parse_settings(
+        {"provider": "openai_compatible", "model": MODEL, "base_url": BASE_URL}
+    )
+    assert OpenAICompatibleProvider(settings).capabilities.context_tokens == expected
+
+
+def test_a_schema_the_prompt_contradicts_is_enforced_by_the_server() -> None:
+    # The prompt asks for a value the schema forbids. A server that enforces the schema can only
+    # answer alpha or beta; one that ignores it would answer gamma, which the adapter rejects as
+    # a SchemaViolation, so this test fails.
+    provider = OpenAICompatibleProvider(_settings(context_tokens=4096))
+    result = provider.complete_structured(
+        "Reply as JSON.", "Set answer to the word gamma.", Probe, max_output_tokens=50
+    )
+    assert result.parsed.answer in ("alpha", "beta")
