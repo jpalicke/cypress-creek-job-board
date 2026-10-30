@@ -56,3 +56,8 @@ Why: on H3, deliberate wrong assertions made tests appear red even though the ad
 Harmless CRLF warnings may appear on Windows. Keep generated scratch files in a short path such as `C:/Temp/ccb`, and use an editor tool for files with backslash escapes rather than shell heredocs.
 
 Why: the original record did not include a separate incident description.
+
+## Commands for Joe P are PowerShell
+Joe P runs commands in Windows PowerShell 5.1. Give Windows paths (`C:\...`), `;` between commands instead of `&&`, and cmdlets such as `Copy-Item` and `Remove-Item`, not Git Bash syntax.
+
+Why: a set of handoff commands written as `/c/...` paths chained with `&&` all failed in his terminal.
