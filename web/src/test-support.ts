@@ -17,6 +17,8 @@ export function makeRow(overrides: Partial<ReportRow> = {}): ReportRow {
     entailment: "confirmed",
     not_model_checked: false,
     failure: null,
+    span: null,
+    raise_attempted: false,
     ...overrides,
   };
 }

@@ -90,6 +90,9 @@ Every workflow declares `permissions: contents: read` at the top, the minimum a 
 
 Warnings are errors, and a skipped test fails the whole run, so a missing service can never hide as a skip. Tool versions are pinned by `uv.lock`. Run everything by hand with `uv run pre-commit run --all-files`. Never use `--no-verify`.
 
+## The web UI gates
+`web/` is checked by `npm --prefix web run verify` (ESLint with the `{@html}` ban, `svelte-check` in strict mode, vitest with an 80 percent coverage gate, the production build and `check-dist`). A pre-commit hook runs it when a file under `web/` changes, and the `web` CI job runs it again and then the Playwright tests (`npm run e2e`) against the real API. Install the locked dependencies once with `cd web && npm ci`; a missing `node_modules` fails the hook, it is never skipped. Write the failing test first in the same way as for Python: a vitest component test, or a Playwright test for anything the browser enforces. Do not add an npm dependency without a reason in [ADR 0038](adr/0038-web-ui-stack-and-csp.md): it needs a license on the allow list and a clean `npm audit` at the high level.
+
 ## Dependency audit and licenses
 `.github/workflows/audit.yml` runs on every pull request and weekly. It runs `pip-audit` on the locked dependencies and checks every installed license against an allow list (MIT, BSD, Apache-2.0, ISC, PSF, MPL-2.0). Dependabot proposes weekly updates for Python and GitHub Actions.
 
@@ -102,7 +105,7 @@ uv run pip-licenses --format=json > licenses.json
 uv run python scripts/check_licenses.py licenses.json
 ```
 
-If the audit fails, upgrade the dependency to the fixed version shown. If a license check fails, prefer replacing the dependency (copyleft such as AGPL is not acceptable). If an exception is truly justified, add an entry with a written reason to `license-exceptions.toml`. The exception is a reviewed change in the pull request, and an entry without a reason is rejected.
+The same workflow also runs `npm audit --audit-level=high` and `python scripts/check_licenses.py --npm-lock web/package-lock.json` for the web dependencies. If the audit fails, upgrade the dependency to the fixed version shown. If a license check fails, prefer replacing the dependency (copyleft such as AGPL is not acceptable). If an exception is truly justified, add an entry with a written reason to `license-exceptions.toml`. The exception is a reviewed change in the pull request, and an entry without a reason is rejected.
 
 ## ABOUTME headers
 Every code file starts with two comment lines, each beginning with `ABOUTME: `. The first says what the file does, the second adds detail. A shebang line may come first in scripts. The check (`scripts/check_aboutme.py`) verifies structure only. It skips Markdown, JSON, YAML, lockfiles and other non-code files.

@@ -141,6 +141,8 @@ export interface ReportRow {
   entailment: Entailment;
   not_model_checked: boolean;
   failure: string | null;
+  span: [number, number] | null;
+  raise_attempted: boolean;
 }
 
 export type ReportStatus = "complete" | "incomplete";

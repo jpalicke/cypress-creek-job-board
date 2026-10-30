@@ -29,6 +29,13 @@ repos:
         entry: uv run --locked python scripts/check_aboutme.py
         language: system
         types_or: [python, shell, ts, tsx, javascript, sql, svelte]
+      - id: web
+        name: web lint, types, unit tests and build
+        # Needs `npm ci` in web/ once. A missing node_modules fails here, it is never skipped.
+        entry: npm --prefix web run verify
+        language: system
+        files: ^web/
+        pass_filenames: false
       - id: pytest
         name: pytest unit and component with coverage gate
         entry: uv run --locked pytest tests/unit tests/component --cov --cov-fail-under=80

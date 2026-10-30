@@ -1,6 +1,6 @@
 # The local API
 
-A FastAPI app that serves JSON (and, later, the built web bundle) to the browser on the same machine. It is a local tool and must never be reachable from other machines or from a hostile web page the user happens to visit (threats T10, T11 and T15 in the [threat model](threat-model.md)). Every route inherits the rules below. The code is in `src/cypress_creek/api/`.
+A FastAPI app that serves JSON and the built web bundle to the browser on the same machine. It is a local tool and must never be reachable from other machines or from a hostile web page the user happens to visit (threats T10, T11 and T15 in the [threat model](threat-model.md)). Every route inherits the rules below. The code is in `src/cypress_creek/api/`.
 
 ## Rules every route inherits
 | Rule | How it is enforced |
@@ -8,7 +8,7 @@ A FastAPI app that serves JSON (and, later, the built web bundle) to the browser
 | Loopback only | `uv run cypress-creek-api` binds to `127.0.0.1` on port 5309. `CYPRESS_CREEK_API_HOST` exists only so a wrong value can be refused: anything but `127.0.0.1` (including `127.0.0.2`, `::1`, `localhost` and `0.0.0.0`) stops the server with exit code 2 before it listens. There is no `allow_remote` setting for the API. |
 | Host check | `HostCheckMiddleware` runs before everything else. The request must carry exactly one `Host` header equal to `127.0.0.1:5309` or `localhost:5309`. Any other name, a different port, a missing port, a second Host header or a non ASCII value gets a typed 403 `host_not_allowed`. This blocks DNS rebinding. |
 | CSRF token on writes | Every request except `GET`, `HEAD` and `OPTIONS` needs the header `X-CSRF-Token`, exactly once, with the session token. That includes `POST`, `PUT`, `PATCH`, `DELETE` and any unusual method such as `PURGE`. It is compared with `hmac.compare_digest`. A missing, repeated or wrong token gets a typed 403 `csrf_token_invalid`. The check is middleware after the Host check, so it covers every route, mounted sub-apps, unknown paths and static files alike. |
-| Hardening headers | Every answer carries `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` and `Referrer-Policy: no-referrer`. Every `/api` answer also carries `Cache-Control: no-store`, so the session token is never cached. The static bundle is not marked no-store. |
+| Hardening headers | Every answer carries `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer` and a strict `Content-Security-Policy` (below). Every `/api` answer also carries `Cache-Control: no-store`, so the session token is never cached. The static bundle is not marked no-store. |
 | No CORS | No CORS middleware exists, so no `Access-Control-*` header is ever sent and a preflight `OPTIONS` is answered 405. Browsers on other origins are denied by default. |
 | One error shape | Failures are `{"error": {"code", "message", "details"?}}` with stable codes. Messages are fixed text. They never carry a secret, a stack trace, a submitted value or remote content. |
 | Nothing goes outward | There is deliberately no route that submits an application, sends mail or posts anywhere. A unit test lists the route table and fails if any path or operation name suggests it. |
@@ -79,7 +79,10 @@ Postings and reports live in the SQLite database (`CYPRESS_CREEK_DATA_DIR`, defa
 A route raises `ApiError(status, code)` to return its own typed failure.
 
 ## Serving the web bundle
-If `web/dist` exists (the built Svelte bundle from card G3), the app serves it at `/` with `index.html` as the default. The API routes win over the bundle, and an unknown path under `/api` is still a typed 404. With no bundle, `/` is a typed 404.
+If `web/dist` exists (the built Svelte bundle, see [setup.md](setup.md#run-the-web-ui)), the app serves it at `/` with `index.html` as the default. The API routes win over the bundle, and an unknown path under `/api` is still a typed 404. With no bundle, `/` is a typed 404.
+
+### The content security policy
+Every answer carries `default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'; object-src 'none'`. The bundle is local files only, so scripts and styles load from this origin, nothing inline is allowed (no `unsafe-inline`, no `unsafe-eval`), the page may call this API and nothing else, and it cannot be framed or change its base. The UI is built to need none of the loosened settings, and `web/scripts/check-dist.mjs` fails the build on an inline script or a remote origin. See [ADR 0038](adr/0038-web-ui-stack-and-csp.md).
 
 ## Start it and try it
 See [setup.md](setup.md#start-the-api-server) for the commands. The tests are:

@@ -34,3 +34,12 @@ jobs:
       - run: ollama --version
       - name: Live tests
         run: uv run --locked pytest tests/e2e tests/integration -m "live and not needs_network and not live_openai and not live_lmstudio" -q
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Browser test with a real model
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+          npm run e2e:live
+        working-directory: web

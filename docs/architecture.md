@@ -38,6 +38,25 @@ The final response body is read from raw network chunks. The defaults allow at m
 
 The small loopback test entry lives only in `tests/http_support.py`. It substitutes a resolver for a named fixture inside the private transport function and worker; production `fetch_url` always invokes the worker with `validate_url`. Real local HTTP servers test redirects, limits, timeouts and cookie isolation. A real UDP DNS responder changes its answer between queries to test that the transport connects to the first validated IP. That rebinding test is compositional: the F1a public-address policy has independent tests, and the local fixture alone does not claim a production OS-DNS end-to-end rebinding proof.
 
+## The web UI
+
+The browser UI is a thin Svelte 5 app in `web/` (Vite and TypeScript, no SvelteKit). It has two screens: Analyze (paste, link or PDF, a backend picker, a run button, warnings, then the report) and the Gap report, which also has its own address `#/report/<id>`. A hash router in `App.svelte` picks the screen, so the API only ever serves one `index.html`.
+
+```mermaid
+flowchart LR
+    browser[Browser] -->|"GET /, /assets/*"| bundle["web/dist: static bundle"]
+    browser -->|"fetch /api/*"| api["FastAPI on 5309"]
+    api --> bundle
+    dev["Vite dev server on 5150"] -.->|"proxy /api, rewrites Host"| api
+    api -->|"GET /api/session: CSRF token"| browser
+```
+
+- **Thin on purpose.** The UI shows what the API returns. Support, score and incomplete status come from the `GapReport`; the front end only groups rows by `support` for display (`web/src/lib/grouping.ts`) and never recomputes anything.
+- **Typed client.** `web/src/lib/types.ts` is generated from the pydantic models by `scripts/gen_api_types.py`, and a unit test fails when it is stale. `web/src/lib/api.ts` reads the CSRF token once from `GET /api/session`, sends it on every write, asks for a new one once if the server restarted, and turns every failure into an `ApiError` with the API's stable code.
+- **Untrusted text stays text.** Posting text, requirement text, rationales, company names and model output are rendered only with Svelte text interpolation, which escapes. `{@html}` is an ESLint error and `npm run check-dist` fails the build on it. See [the threat model](threat-model.md#the-web-ui-and-rendering-t13).
+- **Nothing happens by itself.** The Analyze screen sends nothing until the button is pressed, and no screen copies, sends or applies anything. A hosted backend needs an explicit tick before the button works.
+- **Strict policy.** The API sends a strict `Content-Security-Policy` ([api.md](api.md#the-content-security-policy)). The dev server on port 5150 is for development only and proxies `/api`.
+
 ## Polite fetching
 
 Discovery code never calls `fetch_url` directly. It calls `PoliteClient.get(url)`, which adds the politeness rules described in [the README](../README.md#discovery-findings-and-sources) on top of the guarded transport. The layering, outermost first:
