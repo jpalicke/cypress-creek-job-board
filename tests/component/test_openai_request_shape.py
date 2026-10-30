@@ -210,7 +210,7 @@ def test_capabilities_for_hosted_and_loopback() -> None:
     assert (hosted.local, hosted.strict_schema) == (False, True)
     assert (hosted.cost_per_mtok.input, hosted.cost_per_mtok.output) == (0.10, 0.50)
     local = _local().capabilities
-    assert (local.local, local.strict_schema) == (True, False)
+    assert (local.local, local.strict_schema) == (True, True)
     assert local.cost_per_mtok.input == 0
 
 
