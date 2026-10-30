@@ -38,7 +38,7 @@ test("a pasted XSS payload shows as text in the posting preview and runs nothing
 
 test("the Analyze flow works with the keyboard alone", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByLabel("Backend")).toContainText("ollama");
+  await expect(page.getByLabel("Backend")).toContainText("openai_compatible");
 
   // Tab order: the two nav links, the mode radios (one stop), the text box, the backend, the button.
   await page.keyboard.press("Tab");

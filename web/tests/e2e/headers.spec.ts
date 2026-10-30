@@ -29,7 +29,7 @@ test("the page makes requests to its own origin only", async ({ page }) => {
   const origins = new Set<string>();
   page.on("request", (request) => origins.add(new URL(request.url()).origin));
   await page.goto("/");
-  await expect(page.getByLabel("Backend")).toContainText("ollama");
+  await expect(page.getByLabel("Backend")).toContainText("openai_compatible");
   expect([...origins]).toEqual(["http://127.0.0.1:5309"]);
 });
 

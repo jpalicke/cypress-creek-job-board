@@ -17,10 +17,17 @@ export interface BackendHealth {
   reachable: "reachable" | "unreachable" | "not_checked";
 }
 
+export interface CitedFact {
+  id: string;
+  claim: string;
+}
+
 export interface CostResponse {
   input: number;
   output: number;
 }
+
+export type DraftStatus = "drafted" | "no_support" | "not_run";
 
 export type DropReason = "text_not_in_posting" | "duplicate_term" | "invalid_field";
 
@@ -215,6 +222,13 @@ export interface ScoreResult {
   inputs: ScoreInputs;
 }
 
+export interface SentenceOut {
+  text: string;
+  fact_ids: string[];
+  passed: boolean;
+  verdicts: VerdictOut[];
+}
+
 export interface SessionResponse {
   csrf_token: string;
 }
@@ -233,6 +247,22 @@ export interface StoredVerdict {
   reason: string;
 }
 
+export interface SuggestionRequest {
+  requirement_id: string;
+  backend: string;
+  confirm_hosted: boolean;
+}
+
+export interface SuggestionResponse {
+  requirement_id: string;
+  requirement_text: string;
+  status: DraftStatus;
+  failure: string | null;
+  needs_human_review: boolean;
+  sentences: SentenceOut[];
+  facts: CitedFact[];
+}
+
 export type Support = "none" | "partial" | "strong";
 
 export interface Tag {
@@ -243,6 +273,12 @@ export interface Tag {
 export interface Usage {
   input_tokens: number;
   output_tokens: number;
+}
+
+export interface VerdictOut {
+  validator: string;
+  passed: boolean;
+  reason: string;
 }
 
 export type WarningKind = "control_chars_stripped";

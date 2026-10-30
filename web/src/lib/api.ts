@@ -12,6 +12,7 @@ import type {
   ReportResponse,
   SessionResponse,
   Share,
+  SuggestionResponse,
 } from "./types";
 
 export class ApiError extends Error {
@@ -166,6 +167,20 @@ export class ApiClient {
 
   deleteFact(id: string): Promise<RemovedResponse> {
     return this.call("DELETE", `/api/facts/${encodeURIComponent(id)}`);
+  }
+
+  suggestions(
+    reportId: string,
+    requirementId: string,
+    backend: string,
+    confirmHosted: boolean,
+  ): Promise<SuggestionResponse> {
+    const body = JSON.stringify({
+      requirement_id: requirementId,
+      backend,
+      confirm_hosted: confirmHosted,
+    });
+    return this.call("POST", `/api/reports/${encodeURIComponent(reportId)}/suggestions`, body);
   }
 
   report(reportId: string): Promise<ReportResponse> {

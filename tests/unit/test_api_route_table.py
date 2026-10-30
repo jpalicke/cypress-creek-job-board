@@ -58,6 +58,7 @@ def test_the_route_table_holds_only_the_known_routes() -> None:
         "/api/postings/{posting_id}/estimate",
         "/api/postings/{posting_id}/analyze",
         "/api/reports/{report_id}",
+        "/api/reports/{report_id}/suggestions",
         "/api/facts",
         "/api/facts/validate",
         "/api/facts/{fact_id}",

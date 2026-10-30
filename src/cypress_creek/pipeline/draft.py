@@ -3,12 +3,11 @@
 import time
 from collections.abc import Callable, Sequence
 from enum import StrEnum
-from typing import Literal
+from typing import Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict
 
 from cypress_creek.facts.models import Bank
-from cypress_creek.ingest.models import Requirement
 from cypress_creek.pipeline.extract import failure_label
 from cypress_creek.pipeline.prompt import Prompt, Stage, build_prompt, prompt_facts
 from cypress_creek.pipeline.retrieve import RequirementCandidates
@@ -44,6 +43,17 @@ DETAIL_LIMIT = 60
 # about the requirement. A draft is a claim about the candidate and the posting is hostile input,
 # so its numbers and terms may come from the cited facts alone.
 NO_EXTRA_TEXT = ""
+
+
+class DraftTarget(Protocol):
+    """What the draft stage needs of a requirement: its id and its text. A stored report row has
+    exactly these, so a draft can be asked for without the extraction record."""
+
+    @property
+    def id(self) -> str: ...
+
+    @property
+    def text(self) -> str: ...
 
 
 class DraftStatus(StrEnum):
@@ -126,7 +136,7 @@ def _by_number(verdict: Verdict) -> int:
 
 def judge_draft(
     output: DraftOutput,
-    requirement: Requirement,
+    requirement: DraftTarget,
     supplied_ids: Sequence[str],
     bank: Bank,
     capabilities: Capabilities,
@@ -162,7 +172,7 @@ def draft_cap(capabilities: Capabilities) -> int:
 
 
 def draft(
-    requirement: Requirement,
+    requirement: DraftTarget,
     candidates: RequirementCandidates,
     bank: Bank,
     provider: Provider,
@@ -228,7 +238,7 @@ def draft(
 
 
 def _unwritten(
-    requirement: Requirement,
+    requirement: DraftTarget,
     status: DraftStatus,
     failure: str | None = None,
     prompt_hash: str | None = None,

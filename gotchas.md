@@ -1,41 +1,53 @@
 # Gotchas
 
-Strict rules added after corrections. Format: the rule, then why.
+Lessons from actual corrections, with the rule and its reason. `CLAUDE.md` is the authoritative engineering policy; `docs/handoff.md` describes the workflow. Before recording another lesson, check whether one here already covers it. Update existing guidance instead of creating duplicate or contradictory rules.
 
 ## Git identity is the noreply address
-Never commit with the personal gmail address. The repo identity is user.name "jpalicke" and user.email "13882087+jpalicke@users.noreply.github.com". Check `git config user.email` before the first commit in any clone.
-Why: the first commit carried the personal address, which is public in a public repo and attracts spam. It had to be amended and force pushed.
+Never commit with a personal email address. The repo identity is `user.name` "jpalicke" and `user.email` "13882087+jpalicke@users.noreply.github.com". Check `git config user.email` before the first commit in a clone.
 
-## Docs ship in the same PR as the code
-Documentation is updated in the same PR as the implementation. Never propose a later docs-only PR. Splitting needs Joe P's explicit approval. Check README.md status and "Try what exists" on every card, not only the doc the card owns.
-Why: the README went stale across two cards, and the proposed fix was a separate docs branch, which was rejected.
+Why: the first commit carried a personal address, which was publicly exposed; the commit had to be amended and force-pushed.
 
-## Keep PRs small
-Aim for at most 10 changed files per PR, hard cap 20. If a card will exceed about 10 files, propose a split into sequential PRs (each with its own docs) before starting.
-Why: B4 landed as a roughly 40 file PR that was too big to review.
+## Documentation ships with the change
+Update documentation affected by a behavior change in the same PR. Do not defer necessary docs to a later PR. Check `README.md` status and "Try what exists" whenever user-visible behavior or run instructions change. For split work, each PR carries the documentation necessary for what it delivers.
 
-## Audit every doc before reporting a card done
-Before reporting, grep README.md, docs/README.md, docs/codebase.md, docs/contributing.md and the owning doc for each new module, config file, command, rule and ADR, and update every place that should mention it (layout, flow, "Ideas to know", "How to change X", config listings, index, process rules). Run each doc command. Stale docs are a shame upon the house.
-Why: on B5 the weights config and the PR size rule were missing from several docs until Joe P asked whether all docs were current.
+Why: the README went stale across two cards, and a separate docs branch was rejected.
 
-## Never write implementation before its failing test
-Write the test, run it, see it fail for the right reason, then write the code. The rule also covers a design change in the middle of a card: change the tests first, watch them fail, then change the code. Never rewrite the implementation and fix the tests afterwards.
-Why: on B6a the implementation was rewritten for the full Unicode confusables data before the tests were updated.
+## Keep PRs reviewable
+Aim for about 10 changed files, with 20 as a practical upper bound. Propose a split if a card will be substantially larger, but do not split a coherent fix merely to meet an arbitrary file count. Each split needs its own relevant documentation.
+
+Why: B4 landed as a roughly 40-file PR that was difficult to review.
+
+## Audit documentation affected by a change
+Before reporting a card complete, check the documents that could plausibly be stale because of the change. Examples: README status and usage, the docs index and configuration lists, the codebase layout and flow, contributor commands, the owning doc, and ADRs for significant design decisions. Run new or changed commands; verify existing commands when the change could affect them. Do not reread every document or run every documented command for unrelated edits.
+
+Why: on B5, weights configuration and the PR-size rule were omitted from several relevant docs until Joe P asked whether they were current.
+
+## Test changed behavior before implementation
+For new or changed observable behavior, first write or adjust a relevant test and confirm it fails for the right reason. This applies to behavioral changes discovered midway through a card. If an existing failing test already demonstrates the requirement, it suffices; do not add another just to follow a ritual. Pure refactoring does not require a new failing test when existing tests protect the behavior. Keep tests focused on distinct defects, and consolidate redundant cases.
+
+Why: on B6a, the implementation was rewritten for full Unicode confusables data before the tests were updated. The failure was changing behavior without first establishing the expected behavior in tests, not an insufficient number of tests.
 
 ## Post the merge summary on the issue too
-When asking Joe P to merge, post the same summary as a comment on the card's issue so the ticket records the completed work.
-Why: Joe P asked for it on B6a.
+When asking Joe P to merge, post the same concise summary as a comment on the card's issue so the ticket records the completed work.
+
+Why: Joe P requested this on B6a.
 
 ## Treat truncated token counts as truncated counts
 Never infer the full input token count from Ollama's `prompt_eval_count` when it matches a truncation signature. Keep a posting character cap separate from the configured model context and verify actual fit with the provider guard.
-Why: a 50,000-character posting returned 16,386 prompt tokens at `num_ctx` 32,768 because Ollama had already cut it to about half the window; that number did not measure the full posting.
 
-- After resolving a merge, grep every touched file for conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`) before `git add`. A resolver script that asserts and fails must stop the commit, never be chained to it.
+Why: a 50,000-character posting returned 16,386 prompt tokens at `num_ctx` 32,768 because Ollama had already truncated its input; that number did not measure the full posting.
 
-## Keep live eval state in SQLite
-Store resumable eval runs in SQLite transactions. Preserve each record's JSON payload there, and write JSONL only as an audit export. Never make an exported file the live state store.
-Why: direct JSONL append could leave a torn final row, and rewriting the whole file to avoid that defect adds file-level recovery work already handled by SQLite transactions.
+## Verify merge conflict resolution
+After resolving a merge, search every touched file for conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`) before `git add`. A resolver script that reports a failure must stop the commit; do not chain the commit so it runs after a failed check.
 
-## Tests written after the code need a mutation check
-When a test is written after the code it covers, a red run proves nothing. Break the behavior one piece at a time (remove the unescape, unmap the 404, drop the budget check), confirm a test fails for each, restore, and record the result in the PR. State plainly which tiers can and cannot catch each break, since a healthy live feed will not exercise hostile input handling.
-Why: on H3 the live tests were red only through deliberate wrong assertions because the adapter already existed, so the red evidence was weak. Joe P flagged it.
+Why: an earlier correction identified the risk of committing unresolved conflict markers or continuing after a failed resolver. The original record did not include a separate incident description.
+
+## Keep live evaluation state in SQLite
+Store resumable evaluation runs in SQLite transactions. Preserve each record's JSON payload there; write JSONL only as an audit export. Never use an exported file as the live state store.
+
+Why: direct JSONL append can leave a torn final row, while rewriting the whole file adds recovery work already handled by SQLite transactions.
+
+## Retrospective tests must demonstrate effectiveness
+When writing tests for behavior that already exists, deliberately introduce a representative defect in each distinct behavior being protected, verify that the relevant test detects it, then restore the implementation. Record what was checked in the PR, including which tiers would and would not detect important failures. Do not mutate every assertion or minor implementation detail, and do not repeat this exercise when a test already demonstrated a genuine red-green cycle.
+
+Why: on H3, deliberate wrong assertions made tests appear red even though the adapter already existed. Those failures did not demonstrate that the tests could catch real defects such as lost unescaping, incorrect 404 mapping, or a missing budget check. Live feeds also did not exercise hostile-input handling.

@@ -18,6 +18,7 @@ from cypress_creek.api.routes import (
     providers,
     reports,
     session,
+    suggestions,
     watchlist,
 )
 from cypress_creek.api.routes.providers import CostResponse, ProviderInfo
@@ -90,6 +91,7 @@ def create_app(
         postings,
         reports,
         facts,
+        suggestions,
         watchlist,
         blacklist,
         discovery,
