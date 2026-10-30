@@ -25,7 +25,7 @@ We are coworkers. JP makes the final call. Be direct, challenge assumptions with
 - Commit messages and PR text have no attribution lines. Do not use em dashes in code, comments, documentation, commits, or PR text.
 
 ## TDD and test selection
-- Use red-green-refactor for new or changed observable behavior. First write or adjust a test that demonstrates the missing or incorrect behavior, run it, and confirm that it fails for the right reason. Then make the smallest meaningful implementation change and refactor with tests green.
+- Use red-green-refactor for new or changed observable behavior. First write or adjust a test that demonstrates the missing or incorrect behavior, run it, and confirm that it fails for the right reason. Then make the smallest meaningful implementation change and refactor with tests green. This applies to behavioral changes discovered midway through a card.
 - A single failing test may justify multiple implementation edits. An existing failing test can satisfy the test-first requirement; do not create a new test for every branch, helper, or edit. Pure refactoring does not require new failing tests if existing tests protect the behavior.
 - Before adding a test, ask what distinct realistic defect, requirement, boundary, regression, or failure mode it would detect that the existing suite would miss. Prefer representative equivalence classes, meaningful boundaries, and parameterized cases instead of exhaustive combinations.
 - Consider unit, component, integration, and e2e tests, but do not require new tests at every tier for each card. Test at the lowest level that meaningfully proves the behavior. Add a higher-level test when it verifies a distinct integration boundary or user-visible guarantee.
@@ -33,7 +33,7 @@ We are coworkers. JP makes the final call. Be direct, challenge assumptions with
 - Keep the existing 80% unit-plus-component coverage gate in pre-commit and CI. Coverage helps identify gaps; it is not a target for test multiplication. If the gate leads to low-value tests, explain the problem rather than fabricating scenarios or silently changing the threshold.
 - No mock mode, fake providers, or stubbed HTTP in application call paths. Recorded real outputs and hostile handwritten inputs may be used as test inputs. Preserve existing test-environment boundaries; do not quietly turn a live integration check into a stubbed success.
 - When a required backend is unreachable, fail loudly rather than silently skip. Respect existing explicit offline/live test separation.
-- For tests added after their implementation already exists, verify effectiveness with a representative deliberate fault in the relevant behavior, then restore it. Do not perform a second mutation exercise for a test that already demonstrated a genuine red-green cycle.
+- For tests added after their implementation already exists, verify effectiveness with a representative deliberate fault in the relevant behavior, then restore it. Record in the PR what was checked, including which tiers would and would not detect important failures. Do not perform a second mutation exercise for a test that already demonstrated a genuine red-green cycle.
 - Keep test output clean. Capture and assert expected error logs.
 
 ## Verification and review
