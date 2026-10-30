@@ -19,7 +19,7 @@ jobs:
         run: uv run --locked python scripts/check_aboutme.py $(git ls-files '*.py' '*.sh' '*.ts' '*.tsx' '*.js' '*.mjs' '*.cjs' '*.sql' '*.svelte')
       - name: Results table is current
         run: uv run --locked python -m evals.harness.table --check
-      - run: uv run --locked pytest tests/unit tests/component --cov --cov-fail-under=80
+      - run: uv run --locked pytest tests/unit tests/component --cov --cov-report=term:skip-covered --cov-fail-under=80 -q
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 15
