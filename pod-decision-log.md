@@ -401,3 +401,6 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 - Adopted at once and passed to Barry: proportional effort and review, test-first for changed behavior without a test per helper, tiers chosen by risk instead of all four on every card, about 10 files per PR with 20 as the practical upper bound (splits proposed first), short reports, targeted doc audits, one representative fault check for retrospective tests, no repeated CI polling.
 - Conflicts with earlier instructions in this session, resolved as follows: (a) the files say merge only after Joe P approves, while Joe P earlier delegated merging to the manager after the senior's approval (D69). Kept the delegation for the pod and asked Joe P to confirm. (b) Joe P earlier lifted the roughly 20 file limit for the autonomous pod; the new files restore it. Followed the new files for new work, #176 (25 files) is left as is.
 - Reverse by telling the manager which rule wins.
+
+## D74a. Joe P's answer on D74
+- 2026-10-30, Joe P: keep the merging and PR directives he gave earlier in this session. So the manager keeps merging after the senior's approval and the roughly 20 file limit stays lifted for the pod. The rest of the new CLAUDE.md, handoff.md and gotchas.md (proportional effort, tests by risk, short reports, targeted doc audits, no repeated CI polling) stays adopted.
