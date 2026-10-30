@@ -111,7 +111,7 @@ print(result.parsed, result.usage)
 It prints a greeting and the real token usage. Without the variable it fails with `environment variable ANTHROPIC_API_KEY is not set` and makes no request. The live tests are `uv run pytest tests/integration/test_anthropic_live.py -q`. They fail, never skip, when the key is missing (the real call test), and the wrong key test needs only the internet.
 
 ## The openai_compatible adapter (OpenAI and LM Studio)
-Code is `src/cypress_creek/providers/openai_compatible.py`, registered as provider `openai_compatible`. One adapter serves OpenAI and LM Studio, chosen by `base_url`. The live OpenAI call passed once on 2026-10-30 (see ADR 0027); LM Studio is still untested. Decisions, the model pick and what is still unverified are in [ADR 0027](adr/0027-openai-compatible-adapter-and-model-pick.md).
+Code is `src/cypress_creek/providers/openai_compatible.py`, registered as provider `openai_compatible`. One adapter serves OpenAI and LM Studio, chosen by `base_url`. The live OpenAI call passed once on 2026-10-30 and both LM Studio live tests passed the same day (see ADR 0027). Decisions, the model pick and what is still unverified are in [ADR 0027](adr/0027-openai-compatible-adapter-and-model-pick.md).
 
 - It calls `POST <base_url>/chat/completions` with the system text and the untrusted data block as two separate messages (`system`, then `user`). The fact bank, when a stage shows facts, travels after the data block inside the user message, as the prompt builder lays it out.
 - Output: `response_format` is `json_schema` with `strict: true`. The schema is the pydantic model's, with every property required and unsupported keywords (`minLength`, `maximum`, defaults and the like) removed by `providers/strict_schema.py`. The reply is parsed with the original model, so the removed constraints are still checked.
@@ -149,17 +149,17 @@ base_url = "http://localhost:1234/v1"
 context_tokens = 4096            # the context length the model was loaded with
 ```
 
-### LM Studio findings (UNVERIFIED)
+### LM Studio findings (partly verified)
 The command to run, what to record and the other open sign-offs for this adapter are in [issue #130](https://github.com/jpalicke/cypress-creek-job-board/issues/130).
 
-Nobody has run this adapter against a real LM Studio yet. Do not read anything below as a measurement. Joe P: run the commands in "Try it locally" and fill in this table, then change this heading.
+On 2026-10-30 Joe P ran both `live_lmstudio` tests against his LM Studio and they passed (`2 passed`). The run recorded no LM Studio version, model name or server wording, so the rows below say only what the passing tests establish. Everything else is still not known.
 
 | Question | Finding |
 | --- | --- |
-| LM Studio version and model tested | not yet tested |
-| Is the loaded context length exposed by the model listing, or must config supply it? | not yet tested (the adapter reads `context_tokens` from config) |
-| Is `response_format` `json_schema` honored for the model? | not yet tested (`strict_schema` is reported false) |
-| How is a prompt over the loaded context reported? | not yet tested (the adapter checks the reported prompt count and 400 bodies naming a context length) |
+| LM Studio version and model tested | not recorded (the tests passed on 2026-10-30) |
+| Is the loaded context length exposed by the model listing, or must config supply it? | not recorded (the adapter reads `context_tokens` from config; the test config supplied it) |
+| Is `response_format` `json_schema` honored for the model? | not established: a conforming reply passes either way because every reply is validated against the schema; `strict_schema` stays false |
+| How is a prompt over the loaded context reported? | A prompt far over the loaded context was detected and raised `ContextTruncated` (test passed). Which signal fired, the reported prompt count or the text of a 400 body, was not recorded, so `CONTEXT_ERROR_MARKERS` is still unconfirmed |
 
 ## The budget guard
 Code is `src/cypress_creek/providers/budget.py`. A run has four limits, and a call that could pass any of them is refused before it is sent.
