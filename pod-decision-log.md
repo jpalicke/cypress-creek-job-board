@@ -355,3 +355,8 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 ## D67. Senior engineer B is named Barry Barrington
 - 2026-10-30, Joe P.
 - Senior B (agent id ab6bba535d773e2bb) is called Barry Barrington from now on. The agent's technical id cannot be renamed, so messages, comments and these docs use the name and keep the id for tooling. Earlier entries that say "senior B" or "B" mean Barry Barrington. Senior A (a66bc9c84628b82fb) is wrapping up and is not renamed.
+
+## D68. Senior A is named Andrew
+- 2026-10-30, Joe P.
+- Senior A (agent id a66bc9c84628b82fb) is called Andrew. Joe P thanked Andrew for his help; Andrew has finished and stopped. His handover is docs/pod/handover-senior-a.md (PR #159). Earlier entries that say "senior A" or "A" mean Andrew.
+- Hand-over from Andrew: #154 (H7b) goes to Barry (a live test failed on the slow runner and needs root-causing); #157 (strict schema rewriter, closes #134) and #159 (handover docs) are for the manager to review; E8, the slug/ats allowlist note and H8 move to Barry.
