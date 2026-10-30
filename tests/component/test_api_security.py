@@ -32,7 +32,7 @@ def make_settings() -> ProviderSettings:
 
 @pytest.fixture
 def client() -> ApiClient:
-    app = create_app(make_settings())
+    app = create_app(make_settings(), static_dir=None)
     app.include_router(write_probe)
     return ApiClient(app)
 
@@ -83,8 +83,8 @@ def test_a_wrong_token_is_rejected(client: ApiClient) -> None:
 
 
 def test_a_token_of_another_server_is_rejected() -> None:
-    first = create_app(make_settings())
-    second = create_app(make_settings())
+    first = create_app(make_settings(), static_dir=None)
+    second = create_app(make_settings(), static_dir=None)
     first.include_router(write_probe)
     second.include_router(write_probe)
     one, two = ApiClient(first), ApiClient(second)
@@ -317,6 +317,30 @@ def test_hardening_headers_are_on_every_answer_and_no_store_on_the_api(
         assert answer.headers["referrer-policy"] == "no-referrer"
     assert client.get("/api/session").headers["cache-control"] == "no-store"
     assert client.get("/api/nothing").headers["cache-control"] == "no-store"
+
+
+def test_a_strict_content_security_policy_is_on_every_answer(client: ApiClient) -> None:
+    answers = [
+        client.get("/api/health"),
+        client.get("/nothing-here"),
+        client.post("/api/write-probe"),
+        client.get("/api/health", headers={"Host": "evil.example"}),
+        client.get("/api/boom"),
+    ]
+
+    for answer in answers:
+        policy = answer.headers["content-security-policy"]
+        directives = dict(part.strip().split(" ", 1) for part in policy.split(";") if part.strip())
+        assert directives["default-src"] == "'none'"
+        assert directives["script-src"] == "'self'"
+        assert directives["style-src"] == "'self'"
+        assert directives["connect-src"] == "'self'"
+        assert directives["base-uri"] == "'none'"
+        assert directives["form-action"] == "'self'"
+        assert directives["frame-ancestors"] == "'none'"
+        assert directives["object-src"] == "'none'"
+        for forbidden in ("unsafe-inline", "unsafe-eval", "http:", "https:", "*", "data:"):
+            assert forbidden not in policy
 
 
 def test_the_static_bundle_is_not_marked_no_store(tmp_path: Path) -> None:

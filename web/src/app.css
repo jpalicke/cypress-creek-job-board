@@ -1,0 +1,154 @@
+/* ABOUTME: Global styles with color tokens for light and dark. No remote font, image or import. */
+/* ABOUTME: Text colors keep at least a 4.5 to 1 contrast against their backgrounds. */
+:root {
+  --bg: #ffffff;
+  --text: #1a1a1a;
+  --muted: #4a4a4a;
+  --border: #b8b8b8;
+  --accent: #0b4f9c;
+  --accent-text: #ffffff;
+  --danger-bg: #fdecea;
+  --danger-text: #7a1010;
+  --warn-bg: #fff4d6;
+  --warn-text: #5a3d00;
+  --ok-bg: #e6f4ea;
+  --ok-text: #0f4a1e;
+  --focus: #ff9900;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14161a;
+    --text: #f1f1f1;
+    --muted: #c4c4c4;
+    --border: #5a5f66;
+    --accent: #8ab8ff;
+    --accent-text: #0a0a0a;
+    --danger-bg: #4a1414;
+    --danger-text: #ffd9d6;
+    --warn-bg: #4a3a0a;
+    --warn-text: #ffe9a8;
+    --ok-bg: #12351c;
+    --ok-text: #c9f0d3;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.5 system-ui, sans-serif;
+}
+
+a {
+  color: var(--accent);
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+main,
+header {
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+textarea,
+input[type="url"],
+select {
+  width: 100%;
+  padding: 0.5rem;
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+textarea {
+  min-height: 12rem;
+}
+
+button {
+  padding: 0.6rem 1.2rem;
+  font: inherit;
+  color: var(--accent-text);
+  background: var(--accent);
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.banner {
+  padding: 0.75rem 1rem;
+  border-radius: 4px;
+  margin: 1rem 0;
+}
+
+.banner.error {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+
+.banner.warn {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+
+.banner.ok {
+  background: var(--ok-bg);
+  color: var(--ok-text);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.row {
+  margin: 0.75rem 0;
+  padding: 0.5rem 0.75rem;
+  border-left: 4px solid var(--border);
+  overflow-wrap: anywhere;
+}
+
+.tag {
+  margin-left: 0.5rem;
+  padding: 0 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 0.85em;
+}
+
+fieldset {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  margin: 1rem 0;
+}
+
+label {
+  display: block;
+  margin: 0.5rem 0 0.25rem;
+}
+
+fieldset label {
+  display: inline-block;
+  margin-right: 1rem;
+}

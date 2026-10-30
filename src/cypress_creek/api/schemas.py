@@ -5,6 +5,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from cypress_creek.discovery.filters import ListingFilters
 from cypress_creek.facts.models import Fact
 from cypress_creek.ingest.models import PostingSource, PostingWarning
 from cypress_creek.pipeline.report import GapReport
@@ -95,3 +96,57 @@ class ValidateResponse(ApiModel):
     fact_count: int
     unverified_ids: list[str]
     problem: BankProblem | None
+
+
+MAX_DISCOVERY_CAP = 200
+
+
+class DiscoveryRefreshRequest(ApiModel):
+    """Refresh the watched boards and score what survives, at most `cap` model calls."""
+
+    backend: str = Field(min_length=1, max_length=100)
+    confirm_hosted: bool = False
+    cap: int | None = Field(default=None, ge=0, le=MAX_DISCOVERY_CAP)
+    filters: ListingFilters = ListingFilters()
+
+
+class BoardErrorResponse(ApiModel):
+    ats: str
+    slug: str
+    reason: str
+
+
+class DiscoverySummaryResponse(ApiModel):
+    fetched: int
+    blocked_boards: int
+    filtered_out: dict[str, int]
+    scored: int
+    cache_hits: int
+    unscored: int
+    stopped_by: Literal["cap", "budget", "backend"] | None
+    errors: list[BoardErrorResponse]
+
+
+class RankedListingResponse(ApiModel):
+    """One listing of the ranked list. The score is for triage, not a probability."""
+
+    id: str
+    title: str
+    location: str
+    ats: str
+    slug: str
+    urls: list[str]
+    posted_at: datetime | None
+    age_days: int | None
+    status: Literal["scored", "no_score", "unscored"]
+    score: float | None
+    strong: int
+    partial: int
+    none: int
+    incomplete: bool
+    run_id: str | None
+
+
+class DiscoveryListingsResponse(ApiModel):
+    note: str
+    listings: list[RankedListingResponse]

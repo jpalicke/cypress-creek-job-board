@@ -30,11 +30,11 @@ def outward_routes(app: FastAPI) -> list[str]:
 
 
 def test_no_route_suggests_submitting_sending_applying_or_posting_outward() -> None:
-    assert outward_routes(create_app(None)) == []
+    assert outward_routes(create_app(None, static_dir=None)) == []
 
 
 def test_the_check_would_catch_an_offending_route() -> None:
-    app = create_app(None)
+    app = create_app(None, static_dir=None)
 
     @app.post("/api/postings/{posting_id}/apply")
     def apply_now(posting_id: str) -> None: ...
@@ -46,7 +46,7 @@ def test_the_check_would_catch_an_offending_route() -> None:
 
 
 def test_the_route_table_holds_only_the_known_routes() -> None:
-    assert set(operations(create_app(None))) == {
+    assert set(operations(create_app(None, static_dir=None))) == {
         "/api/health",
         "/api/providers",
         "/api/session",
@@ -59,6 +59,8 @@ def test_the_route_table_holds_only_the_known_routes() -> None:
         "/api/watchlist",
         "/api/blacklist",
         "/api/blacklist/{entry_id}",
+        "/api/discovery/refresh",
+        "/api/discovery/listings",
     }
 
 
