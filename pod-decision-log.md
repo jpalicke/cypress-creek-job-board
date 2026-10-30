@@ -295,3 +295,9 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 ## D54. Senior engineer switched from Opus to Sonnet
 - 2026-10-30, Joe P asked; manager did it.
 - The Opus reviewer (about 725k tokens over its run) is retired and will not be resumed. A new Sonnet senior engineer took over with a written handover: review standard, conventions (D32, D44, D46, D47, D51), the open PR queue (#136, #138, #143 and the coming H1c, G3, H8, H7b, #140). Trade-off to know: Sonnet is cheaper on the usage window but may catch fewer subtle issues than the Opus reviewer did (which found the D7 whitelist breach, the G1 CSRF mount gap and the E4/E5 metric holes). Reverse: start an Opus reviewer again.
+
+## D55. Two Sonnet seniors fix and review everything; workers retired
+- 2026-10-30, Joe P asked; manager did it.
+- Joe P: have the senior fix anything on the outstanding work, spin up a second senior, set both on all outstanding work. Senior A (the Sonnet reviewer already running) and senior B (new Sonnet agent) each own half of the open work and review the other's PRs. Workers C, E, G, H are retired and are not resumed (their unpushed WIP in /home/user/pod/worker-*/ is handed to the seniors).
+- Share A: #138, H1c PR, H7b #137, H8 #47, #142, #134. Share B: #143, #140, G3 #37, G4 #38, #144. Blocked until Joe P: E8 #30, E6 #28, F4 #34, G5 #39.
+- Trade-off: the author never reviews their own PR, but there are now only two minds on all the code, so review independence is weaker than with five agents; Joe P's final Opus pass is the backstop. Reverse: start more worker agents.
