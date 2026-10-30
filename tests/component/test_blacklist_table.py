@@ -22,6 +22,8 @@ ADDED_AT = datetime(2026, 1, 1, tzinfo=UTC)
 # Latin "Acme Corp" with a Cyrillic A (U+0410), and with a zero width joiner (U+200D) inside.
 CYRILLIC_A_ACME = "Аcme Corp"
 ZERO_WIDTH_ACME = "Ac‍me Corp"
+# Every letter a Cyrillic capital (A, S, M, E), including the capital em U+041C.
+CYRILLIC_CAPITALS_ACME = "\u0410\u0421\u041c\u0415 Corp"
 
 
 def _entry(kind: BlockReason = BlockReason.COMPANY_KEY, value: str = "Acme Corp") -> BlacklistEntry:
@@ -176,7 +178,7 @@ def test_a_blacklist_loaded_from_the_database_blocks_variants(conn: sqlite3.Conn
     blacklist.add(_entry(BlockReason.SLUG, "Globex"))
     blacklist.add(_entry(BlockReason.DOMAIN, "initech.com"))
     loaded = blacklist.entries()
-    for name in [CYRILLIC_A_ACME, ZERO_WIDTH_ACME, "ACME Corporation"]:
+    for name in [CYRILLIC_A_ACME, CYRILLIC_CAPITALS_ACME, ZERO_WIDTH_ACME, "ACME Corporation"]:
         assert is_blacklisted(Candidate(name, None, None), loaded) is BlockReason.COMPANY_KEY
     assert is_blacklisted(Candidate("Other", " GLOBEX ", None), loaded) is BlockReason.SLUG
     assert (
