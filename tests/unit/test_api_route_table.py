@@ -46,7 +46,17 @@ def test_the_check_would_catch_an_offending_route() -> None:
 
 
 def test_the_route_table_holds_only_the_known_routes() -> None:
-    assert set(operations(create_app(None))) == {"/api/health", "/api/providers", "/api/session"}
+    assert set(operations(create_app(None))) == {
+        "/api/health",
+        "/api/providers",
+        "/api/session",
+        "/api/postings",
+        "/api/postings/{posting_id}/estimate",
+        "/api/postings/{posting_id}/analyze",
+        "/api/reports/{report_id}",
+        "/api/facts",
+        "/api/facts/validate",
+    }
 
 
 def test_allowed_hosts_are_the_two_loopback_names_on_the_port() -> None:

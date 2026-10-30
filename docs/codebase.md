@@ -48,6 +48,8 @@ src/cypress_creek/       The library
     safe_http.py         fetch_url, FetchLimits, FetchResponse, SafeHttpError; pinned, bounded HTTP
     fetch.py             fetch_posting, FetchResult, provenance and typed posting fetch errors
     html_text.py         html_to_text, ExtractedText, hidden warnings and typed size/depth errors
+    build.py             build_posting, new_posting_id: the one way text becomes a Posting
+    link_posting.py      posting_from_url, posting_from_fetch, PdfNotSupported: a fetched link becomes a Posting
     _fetch_worker.py     Disposable fetch process that bounds blocking DNS by a whole-fetch deadline
   validators/            Grounding validators V1 to V14, pure functions returning Verdicts
     verdict.py           Verdict, ok(), fail()
@@ -79,11 +81,15 @@ src/cypress_creek/       The library
     security.py          allowed_hosts, HostCheckMiddleware, CsrfMiddleware, SecurityHeadersMiddleware, new_token, API_PORT
     errors.py            ErrorCode, ApiError, ErrorResponse and the handlers for the one error shape
     server.py            main, check_bind_host: the uvicorn entry point (`cypress-creek-api`)
-    routes/              health.py, providers.py, session.py (one router each)
+    routes/              health.py, providers.py, session.py, postings.py, reports.py, facts.py (one router each)
+    context.py           Database (created on first use), Backend, and the dependencies the routes share
+    schemas.py           Request and response models for the posting, analyze, report and fact routes
+    backends.py          check_backend_choice: name the configured backend, confirm a hosted one
   storage/               Mutable state: the company name key and the SQLite database
     company_key.py       company_key, load_confusables: the one company name normalizer
+    repository.py        PostingStore, ReportStore, StoredReport, StoredVerdict, prepare_database
     db.py                data_dir, connect, migrate, schema_version, MigrationError
-    migrations/          Numbered .sql files, including 0003_blacklist.sql, 0004_eval_runs.sql and 0005_watchlist_region.sql
+    migrations/          Numbered .sql files, including 0003_blacklist.sql, 0004_eval_runs.sql 0005_watchlist_region.sql and 0006_postings_reports.sql
   discovery/             Discovery state in SQLite, the polite fetch layer over the guarded transport, and the ATS board adapters
     watchlist.py         WatchlistEntry, Watchlist, Tombstoned, AlreadyWatched, IdentityEvidence
     tombstones.py        Tombstones, Denial, DenialReason, normalize_board: denied companies kept as denied suggestion rows
@@ -232,6 +238,7 @@ See [the fetching architecture](architecture.md), [the SSRF rules and limits](th
 - **A report cites or is refused.** `build_report` ends with `verify_report` (V4, V5, V9), so a fabricated or unverified fact id never reaches a report. Failed stages make the report incomplete rather than quietly partial. See `pipeline.md`.
 - **Retrieval is not a model.** `retrieve` matches tags and aliases, ranks and caps the candidates, and sets the support ceiling. A requirement with no candidate is a gap and costs no model call. See `pipeline.md`.
 - **Hand labels are inputs, checked against the posting and the bank.** `validate_labels` refuses a label whose span is not exact posting text, whose fact is missing, unverified or local only, or whose planted gap row disagrees. `require_committed_labels` refuses a case whose labels are not committed. Importance is the human reading, not the V3 cue rule. See [ADR 0024](adr/0024-hand-labels-are-written-before-runs-and-carry-provenance.md), [evals.md](evals.md#posting-fixtures-and-hand-labels) and [e3-label-decisions.md](e3-label-decisions.md).
+- **A down backend gives an incomplete report, not an error.** `POST /api/postings/{id}/analyze` returns the pipeline's fail closed report with status 200, stores it, and keeps its validator verdicts without their offending text. Only a budget stop and a refused report are errors. See [api.md](api.md) and [ADR 0030](adr/0030-posting-and-analyze-routes.md).
 - **Every API route inherits the security rules from the app, not from itself.** The CSRF check and the Host check are middleware (hardening headers outermost, then Host, then CSRF), so a new route, sub-app or method cannot skip them. The route table test fails if any path or operation name suggests submitting, sending or posting outward. See [api.md](api.md) and [ADR 0028](adr/0028-api-security-layer.md).
 - **The sample bank and its gap table cannot drift.** `PLANTED_GAPS.md` is parsed by a test that runs each row through `retrieve`, so a bank edit that changes a gap fails the build. See `evals.md`.
 - **Dedupe is exact or nothing, and only a clean fetch closes.** Cross source listings merge only on equal company key, title and location fingerprints, never inside one source and never in an ambiguous group. `Listings.apply_fetch` closes listings missing from a successful board fetch, and a skipped job it cannot place stops the closing. See [ADR 0031](adr/0031-conservative-dedupe-filters-and-closing.md).
@@ -290,7 +297,7 @@ Conventions you will trip over if you do not know them:
 ## Adding a new thing, by example
 - **Different score weights:** edit `config/weights.yaml`. `tests/component/test_weights_loader.py` shows the rules, and `docs/pipeline.md#score` must match if you change the defaults.
 - **A new legal suffix for company names:** add it to `LEGAL_SUFFIXES` in `storage/company_key.py`, with a row in `tests/unit/test_company_key.py` first. **Newer Unicode confusables:** see the update steps in `docs/data-model.md`.
-- **A new table or column:** add the next numbered file to `src/cypress_creek/storage/migrations/` (for example `0005_postings.sql`, with `-- ABOUTME: ` header lines), never edit an applied one, and add a test in `tests/component/test_migrations.py` or beside the new code. See `docs/data-model.md#storage-sqlite-and-migrations`.
+- **A new table or column:** add the next numbered file to `src/cypress_creek/storage/migrations/` (for example `0007_example_table.sql`, with `-- ABOUTME: ` header lines), never edit an applied one, and add a test in `tests/component/test_migrations.py` or beside the new code. See `docs/data-model.md#storage-sqlite-and-migrations`.
 - **A new blacklist match kind:** add a `BlockReason` member and its normalizer in `discovery/blacklist.py`, write the failing unit rows in `tests/unit/test_blacklist_filter.py` first, then add the kind to the `CHECK` list with the next numbered migration (never edit `0003_blacklist.sql`) and update [data-model.md](data-model.md#discovery-the-blacklist).
 - **A new model backend:** implement `Provider` in `providers/<name>.py`, register it with `REGISTRY.register`, import it in `providers/__init__.py`, and add the file to the HTTP client allow list in `tests/unit/test_safe_http.py` if it uses httpx. Write the request and response tests first (copy `tests/unit/test_anthropic_adapter.py` and `tests/component/test_anthropic_request_shape.py`), then a `live` integration test that fails without its backend. A hosted backend must demand `allow_remote`, take its key from `api_key_env`, scrub it from errors and map refusals to `Refusal`.
 - **A new tag alias:** add it to `config/aliases.yaml`. The tests in `tests/unit/test_aliases.py` show the rules (an alias belongs to one canonical tag).
