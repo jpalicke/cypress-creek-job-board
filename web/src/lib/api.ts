@@ -2,10 +2,14 @@
 // ABOUTME: Every failure becomes an ApiError with a stable code, and no answer is trusted as markup.
 import type {
   AnalyzeResponse,
+  ApprovedResponse,
+  CandidateOut,
+  CandidatesResponse,
   EstimateResponse,
   Fact,
   FactDraft,
   FactsResponse,
+  ImportResponse,
   RemovedResponse,
   PostingResponse,
   ProvidersResponse,
@@ -139,6 +143,28 @@ export class ApiClient {
   analyze(postingId: string, backend: string, confirmHosted: boolean): Promise<AnalyzeResponse> {
     const body = JSON.stringify({ backend, confirm_hosted: confirmHosted });
     return this.call("POST", `/api/postings/${encodeURIComponent(postingId)}/analyze`, body);
+  }
+
+  importResume(text: string, backend: string, confirmHosted: boolean): Promise<ImportResponse> {
+    const body = JSON.stringify({ text, backend, confirm_hosted: confirmHosted });
+    return this.call("POST", "/api/import/resume", body);
+  }
+
+  importResumePdf(pdf: ArrayBuffer, backend: string, confirmHosted: boolean): Promise<ImportResponse> {
+    const query = `backend=${encodeURIComponent(backend)}&confirm_hosted=${String(confirmHosted)}`;
+    return this.call("POST", `/api/import/resume?${query}`, pdf, "application/pdf");
+  }
+
+  importCandidates(): Promise<CandidatesResponse> {
+    return this.call("GET", "/api/import/candidates");
+  }
+
+  approveCandidate(id: string): Promise<ApprovedResponse> {
+    return this.call("POST", `/api/import/candidates/${encodeURIComponent(id)}/approve`);
+  }
+
+  rejectCandidate(id: string): Promise<CandidateOut> {
+    return this.call("POST", `/api/import/candidates/${encodeURIComponent(id)}/reject`);
   }
 
   facts(): Promise<FactsResponse> {

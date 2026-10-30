@@ -206,7 +206,10 @@
     <p class="muted" aria-live="polite">Loading the bank...</p>
   {:else}
     {#if noBank}
-      <p class="banner warn">No fact bank yet. Adding your first fact creates the file.</p>
+      <p class="banner warn">
+        No fact bank yet. Adding your first fact creates the file, or you can
+        <a href="#/import">start from your resume</a>.
+      </p>
     {/if}
 
     <div class="toolbar">
