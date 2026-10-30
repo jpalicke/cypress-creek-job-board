@@ -371,3 +371,9 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 - json_schema is enforced: a prompt asking for "gamma" against an enum of alpha and beta came back alpha (one probe, one model). `strict_schema` is now true for loopback (PR #161); replies are still validated either way. Other local servers are untested.
 - LM Studio's /api/v0/models reports loaded_context_length (8192) and max_context_length (131072). The adapter reads it once when built: no configured context_tokens means the loaded value is used; a configured value at or below it wins; above it is a ConfigError. No endpoint, unloaded model or odd shape changes nothing.
 - Two live tests were added; the manager could not run them (no LM Studio here), so Joe P's manual probes are the evidence.
+
+## D71. Resume import is in scope, for other users too (new cards F5 and G10)
+- 2026-10-30, Joe P: the project should be usable by more people than its author, so there must be a resume import and a screen for it. His own bank is still built together with Claude in chat.
+- Filed F5 (extraction pipeline with a new deterministic validator) and G10 (the screen), after G9 (the fact bank screen). Shape: the model proposes candidate facts with a source span, code checks each against the resume text, the human approves or rejects each, approved candidates become unverified local-only facts, and verification stays the separate human step in G9. Hosted backends need `confirm_hosted` because a resume is personal data.
+- Alternatives not chosen: letting import write verified facts (breaks the one rule), bulk approve (removes the review), a PDF-only or paste-only import (paste ships first, PDF waits on F4).
+- Reverse by closing F5 and G10; nothing else depends on them.
