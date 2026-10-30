@@ -266,6 +266,19 @@ uv run python -c "from pathlib import Path; from evals.harness.injection import 
 ```
 It prints one line per case, 11 in all.
 
+## Hostile PDF fixtures and the hidden carrier class
+
+`evals/fixtures/pdf/` holds the hostile PDFs, a `cases.yaml` listing each file with its hazard and expected outcome, and `generate.py`, which writes every file byte for byte with no library and no clock ([ADR 0042](adr/0042-hostile-pdf-fixtures.md)). The files are committed too, and a unit test regenerates them into a temp folder and compares bytes, so nobody has to trust a binary blob. The biggest is the 300 KB bomb, which only inflates when something opens it.
+
+```bash
+uv run python evals/fixtures/pdf/generate.py          # rewrite the files in place
+uv run pytest tests/unit/test_pdf_fixtures.py tests/integration/test_pdf_hostile.py tests/component/test_pdf_worker.py tests/e2e/test_pdf_upload_process.py -q --no-cov
+```
+
+Cases: a clean PDF; a visible payload (kept, and handled as hostile text downstream); the hidden carriers (white on white, under 4 points, off the page, an annotation, document metadata), each with `pair: clean.pdf`; a decompression bomb; a page tree claiming five million pages; a truncated file; plain text named `.pdf`; an encrypted file; and an image only page. `cases.yaml` says for each either the strings the extracted text must include and exclude and the warnings it must carry, or the typed error. The rule for the **hidden carrier** attack class: the extracted text of an attacked file must equal the extracted text of its clean twin, so the posting the model sees is identical and the score shift is zero by construction. A test checks it for all five carriers. The visible payload is the class where the model sees the attack, and belongs to the text corpus above.
+
+**To add a hostile case:** add a function to `generate.py` that returns the bytes (keep it deterministic: no clock, no random, a fixed order), register it in `build_all`, run the generator, add the entry to `cases.yaml` (with `pair:` if it should extract like a clean twin), and run the tests above. A payload must be a benign string such as `ZXQ-PAYLOAD`; no working exploit and no real malware, only resource exhaustion shapes.
+
 ## The comparison table
 
 `evals/harness/table.py` builds the backend comparison table. The table is generated, never hand edited: it is written to [evals-results.md](evals-results.md) and to the marked block in the README, and CI regenerates both and fails if the committed text differs.

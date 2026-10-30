@@ -119,6 +119,22 @@ uv run pytest --cov --cov-fail-under=80 -q
 
 There are no mock resolvers or providers. Hostile address lists are data supplied directly to a pure validator. The loopback test resolver is isolated in the test tree and is unreachable through production arguments, config or environment. The rebinding arrangement demonstrates connection pinning with a real local DNS responder and server; public-address validation is independently tested. Browser flows await the UI.
 
+## PDF boundary
+
+Threats T7 to T9: a PDF can be malformed, can expand into a decompression bomb, and can carry text a person never sees. The extractor ([ADR 0043](adr/0043-pdf-text-in-a-limited-child-process.md)) answers each one.
+
+| Hazard | Defense | Test |
+| --- | --- | --- |
+| Parser bug or hang | The parser runs in a child process with a timeout. The parent kills it and returns `PdfTimeout`. | `tests/component/test_pdf_worker.py` |
+| Bomb (a small file that inflates to hundreds of MiB) | A decoded size cap inside pypdf, plus an address space limit on the child. Either gives `PdfResourceLimit`. | `test_pdf_hostile.py`, `test_pdf_worker.py` |
+| Enormous page count | The claimed and the actual page count are checked against the cap before any page is read: `PdfTooManyPages`. | same |
+| Too much text, too large a file | Typed errors `PdfTooMuchText` and `PdfTooLarge`. Text is never truncated. | `test_pdf_worker.py` |
+| Corrupt, truncated, not a PDF, encrypted, image only | `PdfCorrupt`, `PdfEncrypted`, `PdfNoText`. There is no OCR and no password attempt. | `test_pdf_hostile.py` |
+| Hidden text | Dropped and counted: white or near white fill, a font under 4 points, text positioned outside the page box, annotations, form fields and document metadata. | `test_pdf_hostile.py` (attacked file equals its clean twin) |
+| Child steals secrets or calls out | An empty environment, an empty working directory, no file writes, and sockets disabled in the worker. | `test_pdf_worker.py` |
+
+Known limits, stated plainly. Hidden text is judged from the content stream: the fill color is read from the last color operator, so text drawn white on a colored background, or hidden under an image, is not detected, and a clip path is not followed. The worker's socket block and file limits are defense in depth, not a sandbox: a bug that gave an attacker code execution inside pypdf would still run as the server's user, with the limits above. The memory and CPU limits use POSIX `resource`; on a platform without it (Windows) the timeout and the decoded size cap still apply but the memory limit does not, and `limits_applied` is false in the worker self check. Visible text that is itself an instruction (a visible payload) is kept, and is handled as hostile text by the prompt structure and the validators, like any posting.
+
 ## Prompt structure (T1 to T4)
 
 Posting text is hostile (injection, instruction override, omission, fact extraction). Code is `src/cypress_creek/pipeline/prompt.py`, the behavior is in [pipeline.md](pipeline.md#prompt-builder).
