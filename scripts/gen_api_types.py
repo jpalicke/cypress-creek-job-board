@@ -8,6 +8,12 @@ from pydantic import BaseModel
 
 from cypress_creek.api.routes.facts import RemovedResponse, ShareRequest
 from cypress_creek.api.routes.health import HealthResponse
+from cypress_creek.api.routes.imports import (
+    ApprovedResponse,
+    CandidatesResponse,
+    ImportResponse,
+    ResumeRequest,
+)
 from cypress_creek.api.routes.providers import ProvidersResponse
 from cypress_creek.api.routes.session import SessionResponse
 from cypress_creek.api.routes.suggestions import SuggestionRequest, SuggestionResponse
@@ -39,6 +45,10 @@ API_MODELS: list[type[BaseModel]] = [
     FactDraft,
     ShareRequest,
     RemovedResponse,
+    ResumeRequest,
+    ImportResponse,
+    CandidatesResponse,
+    ApprovedResponse,
 ]
 HEADER = (
     "// ABOUTME: Types of the API answers, generated from the pydantic models. Do not edit.\n"

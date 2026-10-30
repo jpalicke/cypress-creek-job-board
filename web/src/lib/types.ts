@@ -11,10 +11,28 @@ export interface AnalyzeResponse {
   report: GapReport;
 }
 
+export interface ApprovedResponse {
+  candidate: CandidateOut;
+  fact: Fact;
+}
+
 export interface BackendHealth {
   provider: string;
   model: string;
   reachable: "reachable" | "unreachable" | "not_checked";
+}
+
+export interface CandidateOut {
+  id: string;
+  claim: string;
+  kind: string;
+  tags: string[];
+  source: string;
+  state: string;
+}
+
+export interface CandidatesResponse {
+  candidates: CandidateOut[];
 }
 
 export interface CitedFact {
@@ -54,6 +72,11 @@ export interface Evidence {
 export type EvidenceType = "employer_doc" | "repo" | "certificate" | "public_url" | "self_attested";
 
 export interface ExtractionWarning {
+  kind: string;
+  count: number;
+}
+
+export interface ExtractionWarningOut {
   kind: string;
   count: number;
 }
@@ -111,6 +134,17 @@ export type Gate = "no_candidate" | "familiar_level" | "no_dates" | "years_below
 export interface HealthResponse {
   status: "ok";
   backends: BackendHealth[];
+}
+
+export interface ImportResponse {
+  resume_hash: string;
+  status: string;
+  failure: string | null;
+  backend: string;
+  hosted: boolean;
+  candidates: CandidateOut[];
+  dropped: Record<string, number>;
+  extraction_warnings: ExtractionWarningOut[];
 }
 
 export type Importance = "required" | "preferred" | "unspecified";
@@ -200,6 +234,12 @@ export interface ReportRow {
 }
 
 export type ReportStatus = "complete" | "incomplete";
+
+export interface ResumeRequest {
+  text: string;
+  backend: string;
+  confirm_hosted: boolean;
+}
 
 export interface ScoreInputs {
   weights: Weights;

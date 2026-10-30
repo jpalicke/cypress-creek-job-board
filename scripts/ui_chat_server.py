@@ -1,6 +1,7 @@
 # ABOUTME: A tiny real loopback chat server for the UI end to end tests, with hand written replies.
-# ABOUTME: Draft requests get one clean and one flawed bullet; every other request gets a 503.
+# ABOUTME: Draft requests get a clean and a flawed bullet, resume imports a fact per line, else 503.
 import json
+import re
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -14,6 +15,27 @@ DRAFT = {
         {"text": FLAWED, "fact_ids": ["F-0001"]},
     ],
 }
+
+
+RESUME = re.compile(r"<<<POSTING (\w+)>>>\n(.*)\n<<<END POSTING \1>>>", re.S)
+INVENTED = {
+    "claim": "Led 40 engineers.",
+    "kind": "employment",
+    "tags": [],
+    "source": "Led 40 engineers",
+}
+
+
+def resume_reply(request: str) -> dict[str, object]:
+    """One candidate per line of the resume, quoting it, plus one the resume cannot support."""
+    user = json.loads(request)["messages"][1]["content"]
+    found = RESUME.search(user)
+    lines = [line for line in (found.group(2) if found else "").split("\n") if line.strip()]
+    candidates: list[dict[str, object]] = [
+        {"claim": line[:300], "kind": "employment", "tags": [], "source": line}
+        for line in lines[:5]
+    ]
+    return {"schema_version": 1, "candidates": [*candidates, INVENTED]}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -31,12 +53,16 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         length = int(self.headers.get("Content-Length", "0"))
         request = self.rfile.read(length).decode("utf-8", errors="replace")
-        if '"DraftOutput"' not in request:
-            self._send(503, {"error": "this test server only drafts"})
+        if '"DraftOutput"' in request:
+            answer: dict[str, object] = DRAFT
+        elif '"ResumeImportOutput"' in request:
+            answer = resume_reply(request)
+        else:
+            self._send(503, {"error": "this test server only drafts and imports"})
             return
         choice = {
             "finish_reason": "stop",
-            "message": {"role": "assistant", "content": json.dumps(DRAFT)},
+            "message": {"role": "assistant", "content": json.dumps(answer)},
         }
         self._send(
             200, {"choices": [choice], "usage": {"prompt_tokens": 50, "completion_tokens": 30}}

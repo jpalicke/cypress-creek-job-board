@@ -174,6 +174,12 @@ Open <http://127.0.0.1:5309/#/facts> (the **Fact bank** link in the header). Wit
 - The screen shows the API's own error next to the field when a fact breaks a rule (a date in the future, an unknown skill level). It does not repeat the rules itself.
 - The file is rewritten by the screen, so comments in a hand edited bank are not kept (see [data-model.md](data-model.md#editing-the-bank-from-the-browser)).
 
+## Start a bank from your resume
+
+Open <http://127.0.0.1:5309/#/import> (**Start from a resume** in the header). Paste your resume text or choose a PDF, and press **Find facts in this resume**. Nothing is sent before that, and the screen shows what will be sent: only the text of the resume, to the one backend the app is configured for. **Privacy:** with a local backend (Ollama, LM Studio on this computer) the resume never leaves your machine. With a hosted backend the resume text goes to that provider, so the screen asks you to tick a confirmation first. The resume itself is not stored; only a hash is kept.
+
+A model proposes facts, and each one is shown with the words of the resume it came from. Code drops any proposal that says more than its source (an invented number, month, name or skill) and the screen counts the dropped ones by reason. For a PDF it also lists the hidden text it removed. Then you decide, one proposal at a time: **Approve this fact** writes it to your bank as **unverified and local only**, **Reject** keeps it out. There is no approve all. Approved facts have the lowest skill level and no dates; open the **Fact bank** screen to add those and press **Verify this fact** yourself. Unverified facts are not used by any report or draft.
+
 ## Fetch a job board politely
 
 Discovery fetches go through one library, `PoliteClient`, which adds a per-host delay, a refresh window, an ETag disk cache and backoff on top of the guarded transport. The discovery routes use it for every board; this example uses it directly. It makes two real requests to a public job board feed, and the cache goes in a throwaway directory so nothing lands in your data directory. From the repository root, in a bash shell:
