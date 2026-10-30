@@ -318,3 +318,7 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 ## D59. Trap: the label guard blocks `git merge main` on older branches
 - 2026-10-30, senior A found, manager prioritised the fix.
 - After the labels went to `review: reviewed` (PR #147), the pre-commit pytest gate's committed-labels check (evals/harness/labels.py) compares labels.yaml against HEAD, so a merge in progress fails it. Workarounds used without any hook bypass: update_pull_request_branch (server side) or cherry-pick onto a branch from main (H1c became PR #150, #146 closed). Senior A fixes the check (red test first; the guard must still refuse a real uncommitted edit).
+
+## D60. The Anthropic adapter is proven against the live API (issue #129)
+- 2026-10-30, Joe P ran `uv run pytest tests/integration/test_anthropic_live.py -q` with a real key: "2 passed in 3.00s".
+- The "not yet proven" wording in docs/providers.md, ADR 0025 and docs/contributing.md is replaced by the dated result (PR #153, closes #129). No model id or usage numbers were reported, so none are recorded. D14's "needs from Joe P: an ANTHROPIC_API_KEY" is satisfied. The C4 OpenAI and LM Studio sign-offs (#130) remain open.
