@@ -31,7 +31,14 @@ class ErrorCode(StrEnum):
     CONTENT_TOO_LARGE = "content_too_large"
     UNREADABLE_CONTENT = "unreadable_content"
     INVALID_PDF = "invalid_pdf"
-    PDF_EXTRACTION_UNAVAILABLE = "pdf_extraction_unavailable"
+    PDF_TOO_LARGE = "pdf_too_large"
+    PDF_TOO_MANY_PAGES = "pdf_too_many_pages"
+    PDF_TOO_MUCH_TEXT = "pdf_too_much_text"
+    PDF_ENCRYPTED = "pdf_encrypted"
+    PDF_CORRUPT = "pdf_corrupt"
+    PDF_NO_TEXT = "pdf_no_text"
+    PDF_TIMEOUT = "pdf_timeout"
+    PDF_RESOURCE_LIMIT = "pdf_resource_limit"
     UNKNOWN_BACKEND = "unknown_backend"
     HOSTED_BACKEND_NOT_CONFIRMED = "hosted_backend_not_confirmed"
     BUDGET_EXCEEDED = "budget_exceeded"
@@ -63,7 +70,14 @@ MESSAGES = {
     ErrorCode.CONTENT_TOO_LARGE: "The page is too large.",
     ErrorCode.UNREADABLE_CONTENT: "The page could not be read as text. Paste the posting text.",
     ErrorCode.INVALID_PDF: "The upload is not a PDF.",
-    ErrorCode.PDF_EXTRACTION_UNAVAILABLE: "PDF text extraction is not built yet. Paste the text.",
+    ErrorCode.PDF_TOO_LARGE: "The PDF is larger than the size limit. Paste the text instead.",
+    ErrorCode.PDF_TOO_MANY_PAGES: "The PDF has more pages than the limit. Paste the text instead.",
+    ErrorCode.PDF_TOO_MUCH_TEXT: "The PDF has more text than the limit. Paste the text instead.",
+    ErrorCode.PDF_ENCRYPTED: "The PDF is encrypted. Paste the text instead.",
+    ErrorCode.PDF_CORRUPT: "The PDF could not be read. Paste the text instead.",
+    ErrorCode.PDF_NO_TEXT: "The PDF has no text, as a scan has. Paste the text instead.",
+    ErrorCode.PDF_TIMEOUT: "Reading the PDF took too long. Paste the text instead.",
+    ErrorCode.PDF_RESOURCE_LIMIT: "The PDF needed more resources than allowed. Paste the text.",
     ErrorCode.UNKNOWN_BACKEND: "That backend is not the configured one.",
     ErrorCode.HOSTED_BACKEND_NOT_CONFIRMED: "A hosted backend must be confirmed in the request.",
     ErrorCode.BUDGET_EXCEEDED: "The call would pass the configured budget.",

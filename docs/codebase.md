@@ -56,7 +56,9 @@ src/cypress_creek/       The library
     fetch.py             fetch_posting, FetchResult, provenance and typed posting fetch errors
     html_text.py         html_to_text, ExtractedText, hidden warnings and typed size/depth errors
     build.py             build_posting, new_posting_id: the one way text becomes a Posting
-    link_posting.py      posting_from_url, posting_from_fetch, PdfNotSupported: a fetched link becomes a Posting
+    link_posting.py      posting_from_url, posting_from_fetch, posting_from_pdf: a fetched link or an uploaded PDF becomes a Posting
+    pdf_text.py          extract_pdf_text: the visible text of a PDF from a limited child process, with typed PdfError subclasses
+    pdf_worker.py        the child process entry point: limits first, then pypdf, hidden text dropped and counted
     _fetch_worker.py     Disposable fetch process that bounds blocking DNS by a whole-fetch deadline
   validators/            Grounding validators V1 to V14, pure functions returning Verdicts
     verdict.py           Verdict, ok(), fail()

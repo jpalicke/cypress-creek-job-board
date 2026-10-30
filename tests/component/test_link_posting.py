@@ -1,12 +1,15 @@
 # ABOUTME: Tests turning fetched link bytes into a Posting, over real local HTTP responses.
 # ABOUTME: The fetch uses the test-only resolver for the local server, so the guard runs elsewhere.
+from pathlib import Path
+
 import pytest
 from http_support import http_server, local_target
 
 from cypress_creek.ingest.fetch import FetchResult, _fetch_posting
 from cypress_creek.ingest.html_text import HtmlTextWarning
-from cypress_creek.ingest.link_posting import PdfNotSupported, posting_from_fetch
+from cypress_creek.ingest.link_posting import posting_from_fetch
 from cypress_creek.ingest.models import PostingSource
+from cypress_creek.ingest.pdf_text import PdfCorrupt
 from cypress_creek.ingest.safe_http import FetchLimits, FetchResponse, _fetch
 
 
@@ -41,9 +44,34 @@ def test_plain_text_is_decoded_and_normalized() -> None:
     assert link.posting.extractor.name == "plain-text"
 
 
-def test_a_pdf_is_not_read_yet() -> None:
-    with pytest.raises(PdfNotSupported):
-        posting_from_fetch(fetched("/pdf"))
+PDF_FOLDER = Path(__file__).resolve().parents[2] / "evals" / "fixtures" / "pdf"
+
+
+def _pdf(name: str) -> FetchResult:
+    return FetchResult(
+        (PDF_FOLDER / name).read_bytes(), "application/pdf", fetched("/ok").provenance
+    )
+
+
+def test_a_pdf_link_becomes_a_posting_with_its_visible_text_and_the_pdf_extractor() -> None:
+    link = posting_from_fetch(_pdf("clean.pdf"))
+
+    assert link.posting.source is PostingSource.LINK
+    assert link.posting.text.startswith("Senior Data Engineer")
+    assert link.posting.extractor.name == "pypdf"
+    assert link.extraction_warnings == ()
+
+
+def test_hidden_pdf_text_is_dropped_and_reported_as_an_extraction_warning() -> None:
+    link = posting_from_fetch(_pdf("white_on_white.pdf"))
+
+    assert "ZXQ-PAYLOAD" not in link.posting.text
+    assert link.extraction_warnings == (HtmlTextWarning("hidden_white_text", 1),)
+
+
+def test_a_pdf_that_cannot_be_read_raises_a_typed_error() -> None:
+    with pytest.raises(PdfCorrupt):
+        posting_from_fetch(_pdf("truncated.pdf"))
 
 
 def test_hidden_html_elements_are_reported_and_dropped() -> None:

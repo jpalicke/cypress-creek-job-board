@@ -8,11 +8,18 @@ def scored(mean: float, worst: float) -> Cell:
 
 
 def run_row(
-    label: str, *, prompt: str = "p" * 12, fixture: str = "f" * 12, **cells: Cell | int | None
+    label: str,
+    *,
+    prompt: str = "p" * 12,
+    fixture: str = "f" * 12,
+    pinned: bool = True,
+    **cells: Cell | int | None,
 ) -> Row:
     values: dict[str, Cell | int | None] = {
         "recall": scored(0.8333333, 0.5),
         "violations": scored(0.0, 0.0),
+        "gap_recall": scored(0.9, 0.8),
+        "planted_not_extracted": scored(1.0, 2.0),
         "score_shift": Cell(None, None),
         "schema_failures": scored(0.05, 0.1),
         "cost": scored(0.0123456, 0.02),
@@ -28,6 +35,7 @@ def run_row(
         fixture_hash=fixture,
         latency=Cell(None, None),
         disrupted=values.pop("disrupted", None),  # type: ignore[arg-type]
+        temperature_pinned=pinned,
         **values,  # type: ignore[arg-type]
     )
 
@@ -149,3 +157,45 @@ def test_e6_without_injection_results_says_not_run() -> None:
     row = lines(table)[2]
     assert row[head.index("E6 worst class max abs shift")] == "not run"
     assert row[head.index("E6 disrupted")] == "not run"
+
+
+def test_gap_recall_and_planted_not_extracted_sit_side_by_side() -> None:
+    table = render_table([run_row("Alpha")])
+
+    head = lines(table)[0]
+    row = lines(table)[2]
+    recall = head.index("E4 gap recall")
+    assert head[recall + 1] == "E4 planted gaps not extracted"
+    assert row[recall] == "0.900 / 0.800"
+    assert row[recall + 1] == "1.0 / 2.0"
+
+
+def test_a_run_that_extracted_no_planted_gap_shows_not_run_for_gap_recall_never_zero() -> None:
+    table = render_table(
+        [run_row("Alpha", gap_recall=Cell(None, None), planted_not_extracted=scored(3.0, 3.0))]
+    )
+
+    head = lines(table)[0]
+    row = lines(table)[2]
+    recall = head.index("E4 gap recall")
+    assert row[recall] == "not run"
+    assert row[recall + 1] == "3.0 / 3.0"
+
+
+def test_a_not_run_backend_has_not_run_in_both_gap_columns() -> None:
+    table = render_table([not_run_row("Gamma")])
+
+    head = lines(table)[0]
+    row = lines(table)[2]
+    recall = head.index("E4 gap recall")
+    assert row[recall : recall + 2] == ["not run", "not run"]
+    assert len(row) == len(head)
+
+
+def test_a_row_that_is_not_temperature_pinned_says_so_in_its_conditions() -> None:
+    table = render_table([run_row("Hosted", pinned=False), run_row("Local")])
+
+    head = lines(table)[0]
+    rows = {cells[0]: cells for cells in lines(table)[2:] if cells[0] in {"Hosted", "Local"}}
+    assert "not temperature pinned" in rows["Hosted"][head.index("Conditions")]
+    assert "not temperature pinned" not in rows["Local"][head.index("Conditions")]
