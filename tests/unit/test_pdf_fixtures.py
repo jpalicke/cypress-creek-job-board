@@ -54,3 +54,17 @@ def test_every_attacked_case_names_a_clean_twin_that_exists() -> None:
 
 def test_the_fixtures_stay_small_enough_to_commit() -> None:
     assert all(path.stat().st_size < 400_000 for path in FOLDER.glob("*.pdf"))
+
+
+def test_a_committed_fixture_holds_no_carriage_return_the_generator_did_not_write() -> None:
+    # git autocrlf on Windows rewrites a text file's line endings and breaks the xref offsets.
+    generated = _generator().build_all()
+
+    for path in FOLDER.glob("*.pdf"):
+        assert path.read_bytes().count(b"\r") == generated[path.name].count(b"\r"), path.name
+
+
+def test_git_treats_every_pdf_fixture_as_binary() -> None:
+    attributes = (ROOT / ".gitattributes").read_text(encoding="utf-8").split("\n")
+
+    assert "*.pdf binary" in attributes
