@@ -286,3 +286,8 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 - 2026-10-29, Worker H. ADR 0036.
 - A watchlist add needs `"approval": "human_confirmed"` and refuses any extra field, so a model-proposed name cannot arrive as a human approval; the server stamps the approval time. The blacklist is checked first and wins over the watchlist; tombstoned companies stay out; conflicts are typed 409s. Routes: GET/POST /api/watchlist, GET/POST /api/blacklist, DELETE /api/blacklist/{id}.
 - Unverified in the sandbox: the needs_network integration test (no network); CI dispatch is the evidence.
+
+## D53. Manager resolved #136's docs conflict while the agents were rate-limited
+- 2026-10-30 02:15 UTC, manager.
+- All four workers and the reviewer hit the account's 5-hour usage limit (reset 04:10 UTC). The only blocker on #136 was a docs/README.md ADR-row conflict after #139 merged. I merged main into d-draft-limits in a scratch clone (/home/user/pod/manager-fix), kept the 0030 to 0033 rows in order, committed with the repo hooks and pushed (f533638). No code changed. Reverse: revert that merge commit.
+- #139 (G2) merged as 9e886c6.
