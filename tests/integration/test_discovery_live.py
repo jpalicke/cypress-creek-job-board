@@ -130,8 +130,18 @@ def test_a_run_over_recorded_postings_scores_them_with_a_real_model_and_reuses_t
             report = GapReport.model_validate_json(stored)
             verify_report(report, bank)
             assert report.score_disclaimer == TRIAGE_DISCLAIMER
-        # A complete score is reused with no model call. An incomplete one is tried again.
+        # A complete score is reused with no model call. Anything else is tried again, and a
+        # retry can fail again (a slow runner, a busy model), so a call is not always a score.
         assert second.summary.cache_hits + second.summary.scored + second.summary.unscored == total
-        assert len(calls) - calls_after_first == second.summary.scored
+        second_calls = calls[calls_after_first:]
+        complete = {
+            row.listing.id
+            for row in first.ranked
+            if row.status is not ScoreStatus.UNSCORED and not row.incomplete
+        }
+        assert complete.isdisjoint(second_calls)
+        assert second.summary.cache_hits == len(complete)
+        assert second.summary.scored <= len(second_calls)
+        assert len(second_calls) <= total - len(complete)
     finally:
         conn.close()

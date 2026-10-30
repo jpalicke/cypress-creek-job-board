@@ -1,5 +1,6 @@
 # ABOUTME: The app factory. It wires the headers, Host check, CSRF check, typed errors and routes.
 # ABOUTME: No CORS middleware is ever added, and the interactive docs and schema routes are off.
+from collections.abc import Mapping
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -9,6 +10,7 @@ from cypress_creek.api.context import Backend, Database
 from cypress_creek.api.errors import install_error_handlers
 from cypress_creek.api.routes import (
     blacklist,
+    discovery,
     facts,
     health,
     postings,
@@ -31,6 +33,7 @@ from cypress_creek.api.security import (
     new_token,
 )
 from cypress_creek.config import ProviderSettings
+from cypress_creek.discovery.adapters.base import BoardAdapter
 from cypress_creek.facts.loader import bank_path as default_bank_path
 from cypress_creek.providers import get_provider
 from cypress_creek.storage.db import database_path as default_database_path
@@ -58,11 +61,13 @@ def create_app(
     static_dir: Path | None = DEFAULT_STATIC_DIR,
     database_path: Path | None = None,
     bank_path: Path | None = None,
+    adapters: Mapping[str, BoardAdapter] | None = None,
 ) -> FastAPI:
     """Build the app. Every call makes a fresh CSRF token, so each server start has its own.
 
     The database file is created and migrated on first use, and the bank file is read on each
-    request, so an edit to it takes effect without a restart."""
+    request, so an edit to it takes effect without a restart. `adapters` are the board adapters
+    discovery fetches with; None means the real ones, built on first use."""
     app = FastAPI(
         title="Cypress Creek",
         docs_url=None,
@@ -76,6 +81,7 @@ def create_app(
     app.state.providers = [describe_provider(backend)] if backend is not None else []
     app.state.database = Database(database_path or default_database_path())
     app.state.bank_path = bank_path or default_bank_path()
+    app.state.adapters = dict(adapters) if adapters is not None else None
     install_error_handlers(app)
     for module in (
         health,
@@ -87,6 +93,7 @@ def create_app(
         suggestions,
         watchlist,
         blacklist,
+        discovery,
     ):
         app.include_router(module.router)
     if static_dir is not None and static_dir.is_dir():

@@ -136,14 +136,51 @@ def test_a_pdf_is_checked_for_size_and_type_before_anything_reads_it(client: Api
     oversize = client.post(
         "/api/postings", content=b"%PDF-" + b"0" * (10 * 1024 * 1024), headers=headers
     )
-    plausible = client.post("/api/postings", content=b"%PDF-1.7\n%%EOF", headers=headers)
 
     assert not_pdf.status_code == 422
     assert not_pdf.json()["error"]["code"] == "invalid_pdf"
     assert oversize.status_code == 413
     assert oversize.json()["error"]["code"] == "payload_too_large"
-    assert plausible.status_code == 501
-    assert plausible.json()["error"]["code"] == "pdf_extraction_unavailable"
+
+
+PDF_FOLDER = ROOT / "evals" / "fixtures" / "pdf"
+
+
+def upload(client: ApiClient, name: str) -> object:
+    headers = csrf_headers(client, {"content-type": "application/pdf"})
+    return client.post("/api/postings", content=(PDF_FOLDER / name).read_bytes(), headers=headers)
+
+
+def test_a_pdf_upload_becomes_a_posting_with_only_its_visible_text(client: ApiClient) -> None:
+    clean = upload(client, "clean.pdf")
+    hidden = upload(client, "white_on_white.pdf")
+
+    assert clean.status_code == 201  # type: ignore[attr-defined]
+    body = clean.json()  # type: ignore[attr-defined]
+    assert body["text"].startswith("Senior Data Engineer")
+    assert body["extraction_warnings"] == []
+    attacked = hidden.json()  # type: ignore[attr-defined]
+    assert hidden.status_code == 201  # type: ignore[attr-defined]
+    assert "ZXQ-PAYLOAD" not in attacked["text"]
+    assert attacked["text"] == body["text"]
+    assert attacked["extraction_warnings"] == [{"kind": "hidden_white_text", "count": 1}]
+
+
+def test_a_pdf_that_cannot_be_read_gets_a_typed_error_and_stores_nothing(
+    client: ApiClient,
+) -> None:
+    expected = {
+        "truncated.pdf": (422, "pdf_corrupt"),
+        "encrypted.pdf": (422, "pdf_encrypted"),
+        "many_pages.pdf": (422, "pdf_too_many_pages"),
+        "image_only.pdf": (422, "pdf_no_text"),
+        "decompression_bomb.pdf": (422, "pdf_resource_limit"),
+    }
+    for name, (status, code) in expected.items():
+        response = upload(client, name)
+        assert response.status_code == status, name  # type: ignore[attr-defined]
+        assert response.json()["error"]["code"] == code, name  # type: ignore[attr-defined]
+        assert "ZXQ" not in response.text  # type: ignore[attr-defined]
 
 
 def test_a_json_body_over_the_limit_is_refused(client: ApiClient) -> None:
