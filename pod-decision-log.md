@@ -351,3 +351,7 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 - 2026-10-30, Joe P ("option 1, keep it").
 - Gap recall is computed over the planted gaps that were extracted, with `planted_not_extracted` published beside it (ADR 0032). Alternatives not chosen: all planted gaps as the denominator (double counts extraction misses, blurs which stage failed) or publishing both as named headline numbers.
 - Follow-up found while checking: the E7 comparison table (merged) shows E1 recall but neither gap_recall nor planted_not_extracted, so the headline honesty pair is not in the table yet. Issue filed (title: Comparison table: show gap_recall with planted_not_extracted, and fix the OpenAI row label); to be done by senior B before the first published run (E8). The same issue fixes the OpenAI row label, which still says "pending confirmation".
+
+## D67. Senior engineer B is named Barry Barrington
+- 2026-10-30, Joe P.
+- Senior B (agent id ab6bba535d773e2bb) is called Barry Barrington from now on. The agent's technical id cannot be renamed, so messages, comments and these docs use the name and keep the id for tooling. Earlier entries that say "senior B" or "B" mean Barry Barrington. Senior A (a66bc9c84628b82fb) is wrapping up and is not renamed.
