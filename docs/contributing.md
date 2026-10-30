@@ -35,6 +35,8 @@ The posting fixtures and their hand labels have their own check: `uv run python 
 
 The scorer (`evals/harness/score.py`, `metrics.py`, `injection.py`) and the injection corpus have unit, component, e2e and live tests; the command is in [evals.md](evals.md#scoring-a-run). Run it when you touch either file or `ReportRow`.
 
+The discovery routes have component tests over loopback boards (`uv run pytest tests/component/test_api_discovery_runs.py -q`), an offline e2e test on the real server (`tests/e2e/test_api_discovery_runs_process.py`), a `needs_network` test over real Lever boards (`tests/integration/test_api_discovery_runs_network.py`) and a `live` test with a real Ollama model (`tests/integration/test_api_discovery_runs_live.py`). The network and live ones run in `network.yml` and `live.yml`.
+
 The API has an e2e test that starts the real server on port 5309: `uv run pytest tests/e2e/test_api_server_process.py -q --no-cov`. Nothing else may be listening on that port, and it fails, never skips, if it is busy. Run it when you touch anything under `src/cypress_creek/api/`.
 
 The integration and e2e tiers are not in the gated run, so run them by hand when you touch what they cover. For the blacklist: `uv run pytest tests/e2e/test_blacklist_process.py tests/integration/test_blacklist_dns.py -q`. The e2e file starts real child Python processes against a real temp SQLite file. The integration file is marked `needs_network` and resolves a real host, so an unreachable network makes it fail, never skip.
@@ -47,7 +49,7 @@ Before a PR is ready, in the same PR:
 - README.md status and "Try what exists" reflect what now works.
 - The docs index (docs/README.md) lists any new doc or decision record.
 - docs/codebase.md matches the code: layout, the flow diagram and the module list.
-- A new design decision has an ADR in `docs/adr/`. Numbers are sequential and gaps are fine. The latest on main is 0039 (E7). 0036 is H1c (this change). Numbers reserved by the plan for open work: 0037 H7b, 0038 G3, 0040 the runner wiring (#140), 0041 H8. Check `ls docs/adr` and the open pull requests before you pick one; the last PR to merge resolves any clash.
+- A new design decision has an ADR in `docs/adr/`. Numbers are sequential and gaps are fine. The latest on main is 0039 (E7) and 0036 is H1c. 0037 is H7b (the discovery routes). Numbers reserved by the plan for open work: 0038 G3, 0040 the runner wiring (#140), 0041 H8. Check `ls docs/adr` and the open pull requests before you pick one; the last PR to merge resolves any clash.
 - Configuration files (for example `config/aliases.yaml`) are described in the doc that owns them.
 
 ## Setup

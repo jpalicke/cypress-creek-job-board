@@ -63,6 +63,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [0034](adr/0034-discovery-run-cap-cache-and-stops.md) | The discovery run caches scores by run id, counts only analyzer calls against the cap (most recent first), stops on a backend outage or a spent budget, and reuses only complete reports |
 | [0035](adr/0035-injection-corpus-pairs-and-score-shift.md) | The injection corpus pairs each attacked posting with a clean twin that differs only by the payload, and score shift is attacked minus clean, averaged per class in a repeat |
 | [0036](adr/0036-watchlist-and-blacklist-routes.md) | The watchlist is written only through a human approval marker with no proposer field, the server stamps the time, the blacklist is checked first and wins, and conflicts are typed 409s with fixed text |
+| [0037](adr/0037-discovery-routes.md) | The discovery routes call the library run and the stored ranking unchanged: one budget for the whole run, the adapters are a parameter of create_app with a real factory by default, failures are a 200 summary, and the rows never carry the listing text |
 | [0039](adr/0039-comparison-table-is-generated-from-paired-run-and-metrics-files.md) | The comparison table is generated from paired run and metrics files, a target list owns the rows, conditions are a column, missing is never zero, and CI checks the table is current |
 
 ## Configuration
