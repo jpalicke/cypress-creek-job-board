@@ -21,6 +21,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [handoff.md](handoff.md) | The card routine step by step, for a new contributor or assistant picking up a card |
 | [contributing.md](contributing.md) | How we work, quality gates, dependency audit, ABOUTME headers, docs checklist |
 | [E2b2 documentation audit](audits/AUDIT_REPORT_2026-10-17.md) | Verified runner and export claims against the implementation |
+| [pod/report.md](pod/report.md), [pod/decision-log.md](pod/decision-log.md) | Working records of the autonomous pod session of 2026-10-29: what was merged and what was left, and every judgement call made on Joe P's behalf with how to reverse it. Safe to delete when no longer wanted |
 
 ## Decision records
 | ADR | Decision |
