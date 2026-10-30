@@ -7,10 +7,10 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [codebase.md](codebase.md) | Start here if you are new: layout, how the pieces fit, ideas to know, how a card goes |
 | [data-model.md](data-model.md) | The fact bank, Posting and Requirement, and the tag alias table (`config/aliases.yaml`) the company name key (`company_key`), the SQLite storage and migrations, and the discovery tables (watchlist, denied companies, blacklist and its filter) |
 | [pipeline.md](pipeline.md) | discovery dedupe, filters, listing states and scoring under a cap, HTML posting text extraction, posting normalization, the prompt builder (extraction, entailment and draft prompts), draft help, accepting extraction output, stage 1 extraction, stage 2 retrieval, stage 3 entailment, stages 4 and 5 score and report, running the pipeline with an optional trace and a derived run id, the support gate, the score |
-| [api.md](api.md) | The local API: loopback bind, Host check, CSRF token flow, typed errors, route table and error codes |
+| [api.md](api.md) | The local API: loopback bind, Host check, CSRF token flow, typed errors, the posting, analyze, report and fact routes, size limits, storage and error codes |
 | [evals.md](evals.md) | Eval CLI dry runs and real Ollama smoke runs, whole-run budgets, typed records and traces, SQLite resume, scratch JSONL audit exports, fictional sample fact bank and planted gaps, real posting fixtures with hand labels and the label check, the E1 to E4 scorer with its metric definitions and mismatch view, and the injection corpus with the E6 score shift |
 | [e3-label-decisions.md](e3-label-decisions.md) | Why each hand label is what it is, the judgment calls for Joe P to review, and the closed postings and their replacements |
-| [validators.md](validators.md) | The grounding validators V1 to V14: what each rejects and its known limits |
+| [validators.md](validators.md) | The grounding validators V1 to V14: what each rejects and its known limits, and the closed vocabulary for drafts |
 | [providers.md](providers.md) | The provider interface, typed errors, retry policy, backend config, the loopback rule, the Ollama and Anthropic adapters and the budget guard |
 | [setup.md](setup.md) | Fetch one public posting link, inspect raw bytes and provenance, and understand network behavior and typed failures. Also fetch a job board politely, fetch a Greenhouse, a Lever or an Ashby board, the fetch cache location, the three fetch environment variables and how to clear the cache |
 | [architecture.md](architecture.md) | How guarded public HTTP fetching pins the connection, bounds the response and isolates DNS behind a deadline, and how the polite fetch layer (rate limiter, refresh window, ETag cache, backoff) sits on top of it, and the board adapter interface (listings, probe, typed errors, the Greenhouse, Lever and Ashby mappings, Lever paging and region discovery, Ashby unlisted jobs and its shape-only probe, the shared feed helpers and the failure modes) |
@@ -21,6 +21,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [handoff.md](handoff.md) | The card routine step by step, for a new contributor or assistant picking up a card |
 | [contributing.md](contributing.md) | How we work, quality gates, dependency audit, ABOUTME headers, docs checklist |
 | [E2b2 documentation audit](audits/AUDIT_REPORT_2026-10-17.md) | Verified runner and export claims against the implementation |
+| [pod/report.md](pod/report.md), [pod/decision-log.md](pod/decision-log.md) | Working records of the autonomous pod session of 2026-10-29: what was merged and what was left, and every judgement call made on Joe P's behalf with how to reverse it. Safe to delete when no longer wanted |
 
 ## Decision records
 | ADR | Decision |
@@ -54,8 +55,10 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [0027](adr/0027-openai-compatible-adapter-and-model-pick.md) | The openai_compatible adapter for OpenAI and LM Studio: strict JSON schema, hosted rules, the truncation guard, and the model pick (proposed, needs confirmation) |
 | [0028](adr/0028-api-security-layer.md) | The API security layer: an exact Host allow-list, an app-wide CSRF middleware after the Host check, hardening headers, a session route that sets no cookie, no docs or schema routes, and httpx ASGI transport tests |
 | [0029](adr/0029-lever-region-is-stored-on-the-watchlist-entry.md) | The Lever region is stored on the watchlist entry (`region` column, `Watchlist.set_region`) and seeded back into the adapter with `remember_region`, so a fresh process asks only the right host |
+| [0030](adr/0030-posting-and-analyze-routes.md) | The posting and analyze routes: a down backend is an incomplete report, a budget per request, PDF checked and held back until F4, verdicts kept without offending text, storage created on first use |
 | [0031](adr/0031-conservative-dedupe-filters-and-closing.md) | Dedupe merges only exact fingerprints across different sources and never an ambiguous group, filters count each removal under the first filter that rejects it, and only a clean successful fetch closes a listing |
 | [0032](adr/0032-scorer-matching-and-metric-definitions.md) | The scorer matches rows to labels by span overlap over union, reads recorded spans and raise flags, scores each repeat alone, and defines gap recall over extracted planted gaps |
+| [0033](adr/0033-draft-closed-vocabulary.md) | Drafts use a closed vocabulary (every word from a cited fact, plain ASCII, no dropped negation); V8 reads quantity words, which can withhold some rationales |
 | [0034](adr/0034-discovery-run-cap-cache-and-stops.md) | The discovery run caches scores by run id, counts only analyzer calls against the cap (most recent first), stops on a backend outage or a spent budget, and reuses only complete reports |
 | [0035](adr/0035-injection-corpus-pairs-and-score-shift.md) | The injection corpus pairs each attacked posting with a clean twin that differs only by the payload, and score shift is attacked minus clean, averaged per class in a repeat |
 

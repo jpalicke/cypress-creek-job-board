@@ -110,3 +110,18 @@ def test_rejects_excessive_nesting() -> None:
 @given(st.binary(max_size=2000))
 def test_arbitrary_bytes_do_not_crash(payload: bytes) -> None:
     html_to_text(payload, None)
+
+
+def test_a_title_in_the_head_is_not_page_text_but_a_body_heading_is() -> None:
+    """The shape of the live example page after it moved its heading into the title."""
+    page = (
+        b"<!doctype html><html><head><title>Example Domain</title><style>p{}</style></head>"
+        b"<body><p>This domain is for use in documentation examples.</p>"
+        b"<script src=/s.js></script></body></html>"
+    )
+    with_heading = page.replace(b"<body>", b"<body><h1>Senior Engineer</h1>")
+
+    assert html_to_text(page).text == "This domain is for use in documentation examples."
+    assert html_to_text(with_heading).text == (
+        "Senior Engineer\nThis domain is for use in documentation examples."
+    )

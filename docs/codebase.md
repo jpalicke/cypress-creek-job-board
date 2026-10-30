@@ -49,6 +49,8 @@ src/cypress_creek/       The library
     safe_http.py         fetch_url, FetchLimits, FetchResponse, SafeHttpError; pinned, bounded HTTP
     fetch.py             fetch_posting, FetchResult, provenance and typed posting fetch errors
     html_text.py         html_to_text, ExtractedText, hidden warnings and typed size/depth errors
+    build.py             build_posting, new_posting_id: the one way text becomes a Posting
+    link_posting.py      posting_from_url, posting_from_fetch, PdfNotSupported: a fetched link becomes a Posting
     _fetch_worker.py     Disposable fetch process that bounds blocking DNS by a whole-fetch deadline
   validators/            Grounding validators V1 to V14, pure functions returning Verdicts
     verdict.py           Verdict, ok(), fail()
@@ -60,6 +62,8 @@ src/cypress_creek/       The library
     requirements.py      V11 cap and dedupe, V13 cue sentence coverage
     fact_dates.py        V12 date sanity (wraps facts/dates.py)
     names.py             V14 company name shape
+    claim_words.py       Quantity words (V8) and the negation list the draft check uses
+    vocabulary.py        The closed vocabulary for drafts: function words, inflection rule, character check
     registry.py          REGISTRY: id, name, rule and function for each validator
   providers/             The model backend interface, typed errors and retry policy
     base.py              Provider protocol, Capabilities, CostPerMtok, Usage, StructuredResult, estimate_input_tokens
@@ -78,11 +82,15 @@ src/cypress_creek/       The library
     security.py          allowed_hosts, HostCheckMiddleware, CsrfMiddleware, SecurityHeadersMiddleware, new_token, API_PORT
     errors.py            ErrorCode, ApiError, ErrorResponse and the handlers for the one error shape
     server.py            main, check_bind_host: the uvicorn entry point (`cypress-creek-api`)
-    routes/              health.py, providers.py, session.py (one router each)
+    routes/              health.py, providers.py, session.py, postings.py, reports.py, facts.py (one router each)
+    context.py           Database (created on first use), Backend, and the dependencies the routes share
+    schemas.py           Request and response models for the posting, analyze, report and fact routes
+    backends.py          check_backend_choice: name the configured backend, confirm a hosted one
   storage/               Mutable state: the company name key and the SQLite database
     company_key.py       company_key, load_confusables: the one company name normalizer
+    repository.py        PostingStore, ReportStore, StoredReport, StoredVerdict, prepare_database
     db.py                data_dir, connect, migrate, schema_version, MigrationError
-    migrations/          Numbered .sql files, including 0003_blacklist.sql, 0004_eval_runs.sql and 0005_watchlist_region.sql
+    migrations/          Numbered .sql files, including 0003_blacklist.sql, 0004_eval_runs.sql 0005_watchlist_region.sql, 0006_postings_reports.sql and 0007_discovery_reports.sql
   discovery/             Discovery state in SQLite, the polite fetch layer over the guarded transport, and the ATS board adapters
     watchlist.py         WatchlistEntry, Watchlist, Tombstoned, AlreadyWatched, IdentityEvidence
     tombstones.py        Tombstones, Denial, DenialReason, normalize_board: denied companies kept as denied suggestion rows
@@ -230,11 +238,12 @@ See [the fetching architecture](architecture.md), [the SSRF rules and limits](th
 - **A positive verdict must cite.** `judge` counts a `supports` or `partial` verdict with no valid citation (candidate, verified, shareable) as `does_not_support`, and withholds any rationale that fails V7 to V10. See `pipeline.md`.
 - **A run id is derived, not random.** `run_id` hashes the posting, the fact bank, the backend and the model, so the same inputs give the same id and a changed input gives a new one. See `pipeline.md`.
 - **Eval resume identity is stricter than report identity.** `RunHeader.run_id` hashes the complete eval header, including commit, prompts, schemas, fixture set, bank, case plan and repeats. `EvalStore` validates SQLite records and resumes only unrecorded case pairs; JSONL is a read-only export, and only a terminal record marks a run complete. This is separate from the pipeline report's `run_id`, which intentionally excludes prompt versions. See [evals.md](evals.md#run-record-format) and [ADR 0018](adr/0018-eval-run-identity.md).
-- **Draft help can only show data.** `pipeline/draft.py` checks each sentence with V4 to V10, keeps failures visible as `NOT VERIFIED` and never as clean text, answers a gap with `no verified fact supports this` and no model call, and has no send, copy or apply path (a unit test audits its imports). The checks are heuristics and four known classes of unsupported claim still print as clean, so every draft needs a human read. See [pipeline.md](pipeline.md#draft-help).
+- **Draft help can only show data.** `pipeline/draft.py` checks each sentence with V4 to V10, keeps failures visible as `NOT VERIFIED` and never as clean text, answers a gap with `no verified fact supports this` and no model call, and has no send, copy or apply path (a unit test audits its imports). The checks are heuristics (drafts use a closed vocabulary: every word must come from a cited fact, see `validators/vocabulary.py`), so every draft still needs a human read. See [pipeline.md](pipeline.md#draft-help).
 - **The pipeline trace records what ran.** Pass a `PipelineTrace` to `analyze` or `assess` for per-attempt provider records and the actual validator verdicts. Extraction, entailment and report assembly append to the same trace. Missing usage is nullable, never guessed in the audit. The eval CLI persists completed case traces and failed terminal attempts through `EvalStore`; see [evals.md](evals.md#run-the-harness).
 - **A report cites or is refused.** `build_report` ends with `verify_report` (V4, V5, V9), so a fabricated or unverified fact id never reaches a report. Failed stages make the report incomplete rather than quietly partial. See `pipeline.md`.
 - **Retrieval is not a model.** `retrieve` matches tags and aliases, ranks and caps the candidates, and sets the support ceiling. A requirement with no candidate is a gap and costs no model call. See `pipeline.md`.
 - **Hand labels are inputs, checked against the posting and the bank.** `validate_labels` refuses a label whose span is not exact posting text, whose fact is missing, unverified or local only, or whose planted gap row disagrees. `require_committed_labels` refuses a case whose labels are not committed. Importance is the human reading, not the V3 cue rule. See [ADR 0024](adr/0024-hand-labels-are-written-before-runs-and-carry-provenance.md), [evals.md](evals.md#posting-fixtures-and-hand-labels) and [e3-label-decisions.md](e3-label-decisions.md).
+- **A down backend gives an incomplete report, not an error.** `POST /api/postings/{id}/analyze` returns the pipeline's fail closed report with status 200, stores it, and keeps its validator verdicts without their offending text. Only a budget stop and a refused report are errors. See [api.md](api.md) and [ADR 0030](adr/0030-posting-and-analyze-routes.md).
 - **Every API route inherits the security rules from the app, not from itself.** The CSRF check and the Host check are middleware (hardening headers outermost, then Host, then CSRF), so a new route, sub-app or method cannot skip them. The route table test fails if any path or operation name suggests submitting, sending or posting outward. See [api.md](api.md) and [ADR 0028](adr/0028-api-security-layer.md).
 - **The sample bank and its gap table cannot drift.** `PLANTED_GAPS.md` is parsed by a test that runs each row through `retrieve`, so a bank edit that changes a gap fails the build. See `evals.md`.
 - **A discovery score is cached by run id and pipeline version, capped per run, and stops cleanly.** The run id covers text, bank, backend and model, and the pipeline version covers the prompts, validators, scoring code and config, so an unchanged listing under unchanged judges is never scored again. At most `cap` analyzer calls are made (a failed extraction counts), most recent first, and the rest are reported unscored. A backend outage or a spent budget ends scoring and keeps what was stored. See [ADR 0034](adr/0034-discovery-run-cap-cache-and-stops.md).
@@ -294,7 +303,7 @@ Conventions you will trip over if you do not know them:
 ## Adding a new thing, by example
 - **Different score weights:** edit `config/weights.yaml`. `tests/component/test_weights_loader.py` shows the rules, and `docs/pipeline.md#score` must match if you change the defaults.
 - **A new legal suffix for company names:** add it to `LEGAL_SUFFIXES` in `storage/company_key.py`, with a row in `tests/unit/test_company_key.py` first. **Newer Unicode confusables:** see the update steps in `docs/data-model.md`.
-- **A new table or column:** add the next numbered file to `src/cypress_creek/storage/migrations/` (for example `0005_postings.sql`, with `-- ABOUTME: ` header lines), never edit an applied one, and add a test in `tests/component/test_migrations.py` or beside the new code. See `docs/data-model.md#storage-sqlite-and-migrations`.
+- **A new table or column:** add the next numbered file to `src/cypress_creek/storage/migrations/` (for example `0007_example_table.sql`, with `-- ABOUTME: ` header lines), never edit an applied one, and add a test in `tests/component/test_migrations.py` or beside the new code. See `docs/data-model.md#storage-sqlite-and-migrations`.
 - **A new blacklist match kind:** add a `BlockReason` member and its normalizer in `discovery/blacklist.py`, write the failing unit rows in `tests/unit/test_blacklist_filter.py` first, then add the kind to the `CHECK` list with the next numbered migration (never edit `0003_blacklist.sql`) and update [data-model.md](data-model.md#discovery-the-blacklist).
 - **A new model backend:** implement `Provider` in `providers/<name>.py`, register it with `REGISTRY.register`, import it in `providers/__init__.py`, and add the file to the HTTP client allow list in `tests/unit/test_safe_http.py` if it uses httpx. Write the request and response tests first (copy `tests/unit/test_anthropic_adapter.py` and `tests/component/test_anthropic_request_shape.py`), then a `live` integration test that fails without its backend. A hosted backend must demand `allow_remote`, take its key from `api_key_env`, scrub it from errors and map refusals to `Refusal`.
 - **A new tag alias:** add it to `config/aliases.yaml`. The tests in `tests/unit/test_aliases.py` show the rules (an alias belongs to one canonical tag).
