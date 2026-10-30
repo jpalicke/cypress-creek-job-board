@@ -7,6 +7,7 @@ import sys
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 ALLOWED = {
     "mit",
@@ -23,6 +24,11 @@ ALLOWED = {
     "python software foundation license",
     "mpl-2.0",
     "mozilla public license 2.0 (mpl 2.0)",
+    # Permissive licenses that appear in the web UI's npm dependencies (reviewed in ADR 0038).
+    "mit-0",
+    "0bsd",
+    "blueoak-1.0.0",
+    "cc0-1.0",
 }
 
 
@@ -69,14 +75,38 @@ def check(report: list[dict[str, str]], exceptions: Exceptions) -> list[Violatio
     ]
 
 
+def npm_report(lock: dict[str, Any]) -> list[dict[str, str]]:
+    """A report in the pip-licenses shape from a package-lock.json (lockfile version 3). The name
+    is the last node_modules path segment group, and a package with no license is UNKNOWN."""
+    report = []
+    for path, entry in lock.get("packages", {}).items():
+        if not path:
+            continue
+        name = path.rsplit("node_modules/", 1)[-1]
+        report.append(
+            {
+                "Name": name,
+                "Version": str(entry.get("version", "")),
+                "License": str(entry.get("license", "UNKNOWN")),
+            }
+        )
+    return report
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Check dependency licenses against the allow list."
     )
-    parser.add_argument("report", type=Path, help="pip-licenses --format=json output")
+    parser.add_argument("report", type=Path, nargs="?", help="pip-licenses --format=json output")
+    parser.add_argument("--npm-lock", type=Path, help="a package-lock.json to check instead")
     parser.add_argument("--exceptions", type=Path, default=Path("license-exceptions.toml"))
     args = parser.parse_args(argv)
-    report = json.loads(args.report.read_text(encoding="utf8"))
+    if args.npm_lock is not None:
+        report = npm_report(json.loads(args.npm_lock.read_text(encoding="utf8")))
+    elif args.report is not None:
+        report = json.loads(args.report.read_text(encoding="utf8"))
+    else:
+        parser.error("give a pip-licenses report or --npm-lock")
     violations = check(report, Exceptions.load(args.exceptions))
     for v in violations:
         print(f"DISALLOWED LICENSE: {v.name} {v.version}: {v.license}")

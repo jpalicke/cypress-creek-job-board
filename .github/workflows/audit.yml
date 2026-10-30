@@ -20,3 +20,13 @@ jobs:
         run: |
           uv run --locked pip-licenses --format=json > licenses.json
           uv run --locked python scripts/check_licenses.py licenses.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Vulnerability audit of the web dependencies
+        run: |
+          npm ci --ignore-scripts
+          npm audit --audit-level=high
+        working-directory: web
+      - name: License allow list for the web dependencies
+        run: uv run --locked python scripts/check_licenses.py --npm-lock web/package-lock.json

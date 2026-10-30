@@ -30,3 +30,26 @@ jobs:
       # Offline end to end and integration tests only: real child processes, real SQLite and
       # real loopback servers. Tests that need the internet or a model run in network.yml and live.yml.
       - run: uv run --locked pytest tests/e2e tests/integration -m "not needs_network and not live and not live_openai and not live_lmstudio" -q
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+      - run: uv sync --locked
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+        working-directory: web
+      # Lint with the {@html} ban, strict types, vitest with the 80 percent gate, the production
+      # build and the dist check (no {@html}, inline script or remote origin).
+      - run: npm run verify
+        working-directory: web
+      # The browser tests drive the real API on port 5309 with the backend down, so they need no model.
+      - run: npx playwright install --with-deps chromium
+        working-directory: web
+      - run: npm run e2e
+        working-directory: web

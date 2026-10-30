@@ -16,7 +16,13 @@ config/                  Data that behaves like code but is edited by hand
   confusables.txt        Unicode confusables data (UTS #39), unmodified, used by company_key
 docs/                    Documentation, indexed in docs/README.md
   adr/                   Decision records, one per design decision
-scripts/                 Repo tooling run by hooks and CI (ABOUTME check, license check)
+scripts/                 Repo tooling run by hooks and CI (ABOUTME check, license check, UI type generator, UI test fixtures)
+web/                     The browser UI: Svelte 5, Vite and TypeScript strict, no SvelteKit
+  src/lib/               api.ts (typed client, CSRF token flow), types.ts (generated from the pydantic models), grouping.ts
+  src/routes/            Analyze.svelte, GapReport.svelte, ReportPage.svelte
+  src/App.svelte         The shell and the hash router
+  scripts/check-dist.mjs Build check: no {@html}, inline script or remote origin
+  tests/e2e/             Playwright tests against the real API on 5309; tests/live/ needs a real Ollama
 src/cypress_creek/       The library
   terms.py               normalize_term: the one term normalizer
   eval_records.py        Typed eval records, identity checks and JSONL export reader
@@ -134,7 +140,7 @@ evals/
   scratch/               Gitignored local JSONL exports
   results/               Published labeled JSONL exports only after E3 labels exist
 tests/
-  unit/                  Pure functions and models, including the Anthropic request, schema rewrite and response parsing, the strict schema helper, eval case loading and dry-run planning, fetch policy and limiter, adapter contract, Greenhouse, Lever and Ashby feed mappings, and the Lever region on a watchlist entry and adapter seed
+  unit/                  Pure functions and models, including the UI type generator and the license check on the npm lockfile, including the Anthropic request, schema rewrite and response parsing, the strict schema helper, eval case loading and dry-run planning, fetch policy and limiter, adapter contract, Greenhouse, Lever and Ashby feed mappings, and the Lever region on a watchlist entry and adapter seed
   component/             Real files and local servers, including the discovery refresh and listing routes over a real database and loopback boards, the watchlist and blacklist routes over a real database, the Anthropic and openai_compatible adapters over real HTTP (wire request, error mapping, retry, budget guard), the no-network eval CLI dry run, response cache, polite client, and the Greenhouse, Lever and Ashby adapters (Lever on US and EU path prefixes, Ashby also answering a weak ETag with a 304)
   integration/           Public DNS and feeds (needs_network, including the list routes making no lookup and the discovery routes over real Lever boards), a live discovery run with a real model, also through the discovery routes, dedupe, filters and listing states over a real public board, real Ollama eval runs and failure persistence, the live Anthropic call (needs a key, fails without one), the credentialed live_openai and live_lmstudio tests, and live Greenhouse, paged US and EU Lever (including a stored EU region that reaches the EU host with no US request), and Ashby boards (the probe, a made-up slug and a real weak ETag revalidation)
   e2e/                   Separate-process flows for the openai_compatible adapter against a loopback chat server, URL guard, posting fetch, HTML text, blacklist filtering, the watchlist and blacklist routes and a discovery refresh of a blacklisted board on the real server, a stored Lever region used by a fresh process, listing state refreshes and discovery score reuse across processes, and eval CLI resume of pending cases
@@ -222,6 +228,7 @@ See [the fetching architecture](architecture.md), [the SSRF rules and limits](th
 `fetch_posting(url)` is the one-off, user-initiated library caller. It applies the fixed transport policy and returns HTML, plain text or PDF bytes with requested and final URL provenance. Typed failures distinguish blocked targets, disallowed content, size limits, authentication and empty responses. HTML callers can then use `html_to_text` as a separate step. See [the setup guide](setup.md), [HTML extraction](pipeline.md#html-posting-text) and [ADR 0015](adr/0015-link-fetch-browser-signals.md).
 
 ## Ideas to know
+- **The UI is thin.** `web/` shows what the API returns and recomputes nothing: support, the score, the disclaimer text and the incomplete status all come from the `GapReport`. Untrusted text is rendered with text interpolation only; `{@html}` is a lint error and a build failure. Types come from the pydantic models (`scripts/gen_api_types.py`, checked by a unit test). See [architecture.md](architecture.md#the-web-ui) and [ADR 0038](adr/0038-web-ui-stack-and-csp.md).
 - **One source of truth.** The bank file is the only record of facts. Verification is derived from `verified_on` and is never stored as a separate flag. The pipeline only ever sees `Bank.verified_facts()`.
 - **Pure and deterministic.** Scoring functions take everything as arguments, including `today`. Nothing reads the clock or the network.
 - **Coverage is visible.** V3 and V13 read the same cue word list. The report keeps uncovered cue sentences and their source offsets in `not_assessed`; the text view puts the count by the score without changing that score.

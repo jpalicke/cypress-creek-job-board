@@ -32,6 +32,7 @@ Never commit with a personal email address. Secrets live in the environment or a
    uv run pytest tests/e2e tests/integration -m "not needs_network and not live and not live_openai and not live_lmstudio" -q
    uv run pre-commit run --all-files
    ```
+   A card that touches `web/` also passes `cd web && npm ci && npm run verify && npm run e2e` (see [setup.md](setup.md#run-the-web-ui)); the pre-commit hook runs `verify` for you.
    The e2e line is an offline gate in CI too. Tests marked `needs_network` or `live` (integration and e2e) run in `network.yml` and `live.yml` (start them from the Actions tab with `workflow_dispatch` on your branch when your card touches them), and the run is the evidence.
    If a hook fails: read the whole output, name the tool and cause, fix the root cause, re-run. Never use `--no-verify` or any bypass flag.
 8. **Commit and push.** Short imperative message, no attribution lines, no em dashes. The hooks run on commit.

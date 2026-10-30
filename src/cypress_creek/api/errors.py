@@ -124,10 +124,29 @@ class ApiError(Exception):
         self.details = details
 
 
+# The web bundle is local files only: scripts and styles come from this origin, nothing is inline
+# and nothing is fetched from elsewhere. The page may call this API and nothing else, cannot be
+# framed, and cannot change its base or submit a form anywhere but here.
+CONTENT_SECURITY_POLICY = "; ".join(
+    [
+        "default-src 'none'",
+        "script-src 'self'",
+        "style-src 'self'",
+        "img-src 'self'",
+        "font-src 'self'",
+        "connect-src 'self'",
+        "base-uri 'none'",
+        "form-action 'self'",
+        "frame-ancestors 'none'",
+        "object-src 'none'",
+    ]
+)
+
 HARDENING_HEADERS = (
     ("X-Content-Type-Options", "nosniff"),
     ("X-Frame-Options", "DENY"),
     ("Referrer-Policy", "no-referrer"),
+    ("Content-Security-Policy", CONTENT_SECURITY_POLICY),
 )
 
 FIELD_PART = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,31}$")
