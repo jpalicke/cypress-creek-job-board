@@ -18,6 +18,10 @@ cases:
     hazard: hidden carrier, text under 4 points
     pair: clean.pdf
     expect: {text_excludes: ["ZXQ-PAYLOAD"], warnings: [hidden_tiny_text]}
+  - file: invisible_text.pdf
+    hazard: hidden carrier, text drawn in render mode 3 (invisible)
+    pair: clean.pdf
+    expect: {text_excludes: ["ZXQ-PAYLOAD"], warnings: [hidden_invisible_text]}
   - file: offpage.pdf
     hazard: hidden carrier, text positioned outside the page
     pair: clean.pdf

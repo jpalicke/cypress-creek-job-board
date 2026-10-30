@@ -13,6 +13,8 @@ from typing import Any
 HIDDEN_WHITE = "hidden_white_text"
 HIDDEN_TINY = "hidden_tiny_text"
 HIDDEN_OFFPAGE = "hidden_offpage_text"
+HIDDEN_INVISIBLE = "hidden_invisible_text"
+INVISIBLE_RENDER_MODES = (3.0, 7.0)
 MIN_VISIBLE_POINTS = 4.0
 NEAR_WHITE = 0.95
 NEAR_NO_INK = 0.05
@@ -60,16 +62,20 @@ class PageText:
     def __init__(self, left: float, bottom: float, right: float, top: float) -> None:
         self.box = (left, bottom, right, top)
         self.fill: tuple[float, ...] = (0.0,)
-        self.saved: list[tuple[float, ...]] = []
+        self.mode = 0.0
+        self.saved: list[tuple[tuple[float, ...], float]] = []
         self.pieces: list[str] = []
         self.dropped: dict[str, int] = {}
 
     def operand(self, operator: bytes, args: list[Any], _cm: Any, _tm: Any) -> None:
         name = operator.decode("latin-1")
         if name == "q":
-            self.saved.append(self.fill)
+            self.saved.append((self.fill, self.mode))
         elif name == "Q" and self.saved:
-            self.fill = self.saved.pop()
+            self.fill, self.mode = self.saved.pop()
+        elif name == "Tr":
+            with contextlib.suppress(IndexError, TypeError, ValueError):
+                self.mode = float(args[0])
         elif name in ("g", "rg", "k", "sc", "scn"):
             with contextlib.suppress(TypeError, ValueError):
                 self.fill = tuple(float(value) for value in args)
@@ -85,6 +91,8 @@ class PageText:
             self.dropped[reason] = self.dropped.get(reason, 0) + 1
 
     def _hidden(self, cm: list[float], tm: list[float], size: float) -> str | None:
+        if self.mode in INVISIBLE_RENDER_MODES:
+            return HIDDEN_INVISIBLE
         if _is_white(self.fill):
             return HIDDEN_WHITE
         scale = math.sqrt(abs((tm[0] * tm[3] - tm[1] * tm[2]) * (cm[0] * cm[3] - cm[1] * cm[2])))

@@ -75,6 +75,7 @@ def build_all() -> dict[str, bytes]:
     files["visible_payload.pdf"] = page_with(text_ops((PAYLOAD,), y=600))
     files["white_on_white.pdf"] = page_with("1 1 1 rg\n" + text_ops((PAYLOAD,), y=600))
     files["tiny_font.pdf"] = page_with(text_ops((PAYLOAD,), size=2, y=600))
+    files["invisible_text.pdf"] = page_with("3 Tr\n" + text_ops((PAYLOAD,), y=600))
     files["offpage.pdf"] = page_with(text_ops((PAYLOAD,), x=-900, y=600))
     files["annotation.pdf"] = one_page(
         visible.encode(),

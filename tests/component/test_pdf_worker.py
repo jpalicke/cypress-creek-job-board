@@ -2,6 +2,8 @@
 # ABOUTME: The parent stays healthy after a bomb, a timeout and a crash, and nothing is truncated.
 import json
 import os
+import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -48,7 +50,7 @@ def test_the_child_has_an_empty_environment_and_cannot_open_a_socket() -> None:
     assert set(report["env"]) <= {"LC_CTYPE"}
     assert "must-not-leak" not in json.dumps(report)
     assert report["socket_blocked"] is True
-    assert report["limits_applied"] is True
+    assert report["limits_applied"] is (os.name == "posix")
 
 
 def test_a_file_over_the_size_cap_is_refused_before_any_child_starts() -> None:
@@ -71,6 +73,7 @@ def test_a_run_that_takes_too_long_is_killed_with_a_typed_error() -> None:
         extract_pdf_text(_read("clean.pdf"), PdfLimits(timeout_seconds=0.01))
 
 
+@pytest.mark.skipif(os.name != "posix", reason="the memory limit uses POSIX resource limits")
 def test_the_memory_limit_stops_the_bomb_even_when_the_decode_cap_is_off() -> None:
     limits = PdfLimits(max_decoded_bytes=2_000_000_000, memory_bytes=400 * 1024 * 1024)
 
@@ -93,3 +96,18 @@ def test_a_worker_that_crashes_gives_a_typed_error(monkeypatch: pytest.MonkeyPat
 
     with pytest.raises(PdfResourceLimit):
         extract_pdf_text(_read("clean.pdf"))
+
+
+def test_a_worker_that_floods_its_output_is_stopped_while_reading(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    flood = "import sys\nwhile True:\n    sys.stdout.write('x' * 65536)\n    sys.stdout.flush()\n"
+    monkeypatch.setattr(
+        pdf_text, "worker_command", lambda _limits, *_flags: [sys.executable, "-I", "-c", flood]
+    )
+    started = time.monotonic()
+
+    with pytest.raises(PdfResourceLimit):
+        extract_pdf_text(_read("clean.pdf"), PdfLimits(max_chars=1000, timeout_seconds=30))
+
+    assert time.monotonic() - started < 10

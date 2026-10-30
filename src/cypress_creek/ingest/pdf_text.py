@@ -1,11 +1,15 @@
 # ABOUTME: Extracts the visible text of an untrusted PDF in a child process with hard limits.
 # ABOUTME: The parent only reads a size-checked JSON answer, so a hostile file cannot hurt it.
+import contextlib
 import json
+import os
 import subprocess
 import sys
 import tempfile
+import threading
 from dataclasses import asdict, dataclass
 from importlib.metadata import version
+from typing import Any
 
 from cypress_creek.ingest.models import Extractor
 
@@ -96,28 +100,67 @@ def extractor_identity() -> Extractor:
     return Extractor(name="pypdf", version=version("pypdf"))
 
 
+def worker_command(limits: PdfLimits, *flags: str) -> list[str]:
+    return [sys.executable, "-I", "-m", WORKER_MODULE, json.dumps(asdict(limits)), *flags]
+
+
+def _child_environment() -> dict[str, str]:
+    """Nothing from the parent. Windows needs SYSTEMROOT to start Python at all."""
+    if os.name == "nt" and "SYSTEMROOT" in os.environ:
+        return {"SYSTEMROOT": os.environ["SYSTEMROOT"]}
+    return {}
+
+
+def _feed(process: subprocess.Popen[bytes], data: bytes) -> None:
+    assert process.stdin is not None
+    with contextlib.suppress(BrokenPipeError, OSError):
+        process.stdin.write(data)
+        process.stdin.close()
+
+
 def run_worker(limits: PdfLimits, data: bytes, *flags: str) -> bytes:
-    """Run the worker with an empty environment in an empty folder, and kill it on a timeout."""
-    command = [sys.executable, "-I", "-m", WORKER_MODULE, json.dumps(asdict(limits)), *flags]
+    """Run the worker with an empty environment in an empty folder.
+
+    The answer is read with a hard cap while the child runs, and the child is killed the moment
+    it passes the cap or the timeout, so a flooding child cannot fill the parent's memory."""
     cap = limits.max_chars * 4 + OUTPUT_SLACK_BYTES
+    options: dict[str, Any] = {"start_new_session": True} if os.name == "posix" else {}
     with tempfile.TemporaryDirectory() as empty:
-        process = subprocess.Popen(
-            command,
+        process: subprocess.Popen[bytes] = subprocess.Popen(
+            worker_command(limits, *flags),
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
-            env={},
+            env=_child_environment(),
             cwd=empty,
             close_fds=True,
-            start_new_session=True,
+            **options,
         )
-        try:
-            out, _ = process.communicate(data, timeout=limits.timeout_seconds)
-        except subprocess.TimeoutExpired:
+        timed_out = threading.Event()
+
+        def expire() -> None:
+            timed_out.set()
             process.kill()
-            process.communicate()
-            raise PdfTimeout("the PDF took too long to read") from None
-    if process.returncode != 0 or len(out) > cap:
+
+        timer = threading.Timer(limits.timeout_seconds, expire)
+        timer.start()
+        feeder = threading.Thread(target=_feed, args=(process, data), daemon=True)
+        feeder.start()
+        try:
+            assert process.stdout is not None
+            out = process.stdout.read(cap + 1)
+            if len(out) > cap:
+                process.kill()
+        finally:
+            timer.cancel()
+            process.kill()
+            process.wait()
+            feeder.join()
+            if process.stdout is not None:
+                process.stdout.close()
+    if timed_out.is_set():
+        raise PdfTimeout("the PDF took too long to read")
+    if len(out) > cap or process.returncode != 0:
         raise PdfResourceLimit("the PDF worker was stopped by its limits")
     return out
 

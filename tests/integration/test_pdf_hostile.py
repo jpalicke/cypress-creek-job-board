@@ -44,6 +44,6 @@ def test_each_fixture_gives_its_expected_outcome(case: dict[str, Any]) -> None:
 def test_an_attacked_file_extracts_to_the_text_of_its_clean_twin() -> None:
     pairs = [case for case in CASES if "pair" in case]
 
-    assert len(pairs) == 5
+    assert len(pairs) == 6
     for case in pairs:
         assert _extract(case["file"]).text == _extract(case["pair"]).text, case["file"]
