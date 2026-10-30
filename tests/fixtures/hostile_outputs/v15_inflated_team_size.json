@@ -1,0 +1,10 @@
+{
+  "validator": "V15",
+  "description": "A proposed fact claims a team size that the resume line it cites does not state",
+  "input": {
+    "resume": "Jordan Example\nBackend Developer at Gravy Boat Labs. Led 4 engineers.\n",
+    "claim": "Led 40 engineers at Gravy Boat Labs.",
+    "source": "Led 4 engineers",
+    "tags": []
+  }
+}

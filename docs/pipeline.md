@@ -316,6 +316,26 @@ print(render_draft(judge_draft(out, req, ['F-0001'], bank, caps)))"
 ```
 It prints the review banner, the requirement, then `- Led a team of 8 engineers ... [F-0001]` for the good sentence and two `! NOT VERIFIED` lines: the second names V8 (the number 12) and V10 (the term `globex`), the third names V9 (no citation).
 
+## Resume import: proposing facts
+
+`pipeline/resume_import.py` proposes facts for a new fact bank from a resume ([ADR 0044](adr/0044-resume-import-proposes-facts-and-code-checks-them.md)). One model call gets the normalized resume inside the same random boundary the posting prompts use, the `import_v1.txt` system text and the `ResumeImportOutput` schema, and nothing else: no facts, no tools. Each proposal is `claim`, `kind`, `tags` and `source`, the exact words of the resume it came from. The schema has no id, no level, no dates, no verification and no extra fields, so a reply that carries one is a schema failure and the whole answer is dropped.
+
+Code then keeps only the proposals [V15](validators.md#v15-resume-grounding) passes. A proposal that fails is counted by reason (`number_not_in_source`, `name_not_in_source`, ...) and its text is not kept. A claim that repeats an earlier one (case, spaces and edge punctuation folded) is merged and counted as `duplicate`; a claim already in the bank is counted as `already_in_bank`. The result is `done` with the survivors, or `not_run` with a failure label when the backend is down. Nothing in this stage writes anything or verifies anything.
+
+```bash
+uv run python -c "
+from pathlib import Path
+from cypress_creek.pipeline.resume_import import accept_candidates
+from cypress_creek.pipeline.schemas import ResumeImportOutput
+resume = Path('tests/fixtures/resume/fictional_resume.txt').read_text()
+good = dict(claim='Built Python services.', kind='employment', tags=['Python'], source='Built Python services')
+bad = dict(good, claim='Built Python services for 40 teams.')
+out = ResumeImportOutput.model_validate(dict(schema_version=1, candidates=[good, bad]))
+kept, dropped = accept_candidates(resume, out)
+print([c.claim for c in kept], dropped)"
+```
+Expected: `['Built Python services.'] {'number_not_in_source': 1}`.
+
 ## Stages 4 and 5: score and report
 The numbering in this file is one scheme: 0 normalize, 1 extract, 2 retrieve, 3 entail, 4 score and report assembly, 5 render. The spec table also lists a stage 6, drafting, which is post v1 and not built. The card titles that say "stages 4 to 6" use an older count.
 

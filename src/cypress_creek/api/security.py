@@ -13,7 +13,7 @@ API_PORT = 5309
 TOKEN_HEADER = "X-CSRF-Token"
 MAX_BODY_BYTES = 1024 * 1024
 MAX_PDF_BYTES = 10 * 1024 * 1024
-PDF_UPLOAD_ROUTE = ("POST", "/api/postings")
+PDF_UPLOAD_ROUTES = frozenset({("POST", "/api/postings"), ("POST", "/api/import/resume")})
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 TOKEN_HEADER_BYTES = TOKEN_HEADER.lower().encode("ascii")
 TOKEN_BYTES = 32
@@ -65,7 +65,8 @@ class BodyLimitMiddleware:
 
     A declared length over the limit is refused before anything is read. Every body is also
     counted as it is received, so a missing, wrong or chunked length cannot let more through. The
-    larger PDF limit applies only to the posting upload route (`POST /api/postings`)."""
+    larger PDF limit applies only to the two PDF upload routes (`POST /api/postings` and
+    `POST /api/import/resume`)."""
 
     def __init__(self, app: ASGIApp, default_limit: int, pdf_limit: int) -> None:
         self._app = app
@@ -74,7 +75,7 @@ class BodyLimitMiddleware:
 
     def _limit_for(self, scope: Scope, headers: dict[bytes, bytes]) -> int:
         media = headers.get(b"content-type", b"").split(b";")[0].strip().lower()
-        is_upload = (scope["method"], scope["path"]) == PDF_UPLOAD_ROUTE
+        is_upload = (scope["method"], scope["path"]) in PDF_UPLOAD_ROUTES
         return self._pdf_limit if is_upload and media == b"application/pdf" else self._default_limit
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:

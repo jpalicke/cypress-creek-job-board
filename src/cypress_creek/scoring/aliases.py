@@ -37,6 +37,11 @@ class AliasTable:
         """Canonical tag for a term or alias, or None when the table does not know it."""
         return self._canonical_by_term.get(normalize_term(term))
 
+    def terms_for(self, term: str) -> set[str]:
+        """The normalized term and every alias that names the same tag."""
+        canonical = self.canonical(term)
+        return {canonical} | {t for t, c in self._canonical_by_term.items() if c == canonical}
+
     def canonical(self, term: str) -> str:
         """Canonical tag when known, otherwise the normalized term itself."""
         return self.resolve(term) or normalize_term(term)

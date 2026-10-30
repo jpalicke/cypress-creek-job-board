@@ -40,6 +40,7 @@ src/cypress_creek/       The library
     extract.py           extract_requirements, ExtractionResult, accept_proposals, Acceptance, Dropped, DropReason
     entail.py            entail, judge, EntailedMatch, Entailment: stage 3, the verdict only lowers support
     draft.py             draft, judge_draft, render_draft, Draft: optional draft help, every sentence checked, nothing is sent
+    resume_import.py     propose_candidates, accept_candidates: facts proposed from a resume, V15 keeps only what it says
     report.py            GapReport, build_report, verify_report, ReportRefused: stage 4, the report as data
     render.py            render_text: stage 5, the plain text view of a report
     version.py           pipeline_version, fingerprint: a digest of the stages, prompts, validators, scoring code and config, part of the discovery cache key
@@ -60,7 +61,7 @@ src/cypress_creek/       The library
     pdf_text.py          extract_pdf_text: the visible text of a PDF from a limited child process, with typed PdfError subclasses
     pdf_worker.py        the child process entry point: limits first, then pypdf, hidden text dropped and counted
     _fetch_worker.py     Disposable fetch process that bounds blocking DNS by a whole-fetch deadline
-  validators/            Grounding validators V1 to V14, pure functions returning Verdicts
+  validators/            Grounding validators V1 to V15, pure functions returning Verdicts
     verdict.py           Verdict, ok(), fail()
     cues.py              The one list of importance cue words, sentence splitting
     extraction.py        V1 schema, V2 verbatim span, V3 importance cues
@@ -70,6 +71,7 @@ src/cypress_creek/       The library
     requirements.py      V11 cap and dedupe, V13 cue sentence coverage
     fact_dates.py        V12 date sanity (wraps facts/dates.py)
     names.py             V14 company name shape
+    candidates.py        V15 resume grounding: a proposed fact says only what its resume span says
     claim_words.py       Quantity words (V8) and the negation list the draft check uses
     vocabulary.py        The closed vocabulary for drafts: function words, inflection rule, character check
     registry.py          REGISTRY: id, name, rule and function for each validator

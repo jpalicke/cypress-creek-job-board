@@ -1,8 +1,9 @@
-# ABOUTME: The catalogue of validators V1 to V14: id, name, rule and the function that checks it.
+# ABOUTME: The catalogue of validators V1 to V15: id, name, rule and the function that checks it.
 # ABOUTME: The eval harness looks validators up here so it runs exactly what production runs.
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from cypress_creek.validators.candidates import check_candidate_grounded
 from cypress_creek.validators.citations import (
     check_fact_exists,
     check_fact_shareable,
@@ -93,5 +94,12 @@ REGISTRY: dict[str, ValidatorInfo] = _catalogue(
         "Company name shape",
         "A suggested company name is short plain text with no URL, slug or free text.",
         check_company_name,
+    ),
+    (
+        "V15",
+        "Resume grounding",
+        "A fact proposed from a resume has its span in the resume and its numbers, months, names "
+        "and tags in the span.",
+        check_candidate_grounded,
     ),
 )

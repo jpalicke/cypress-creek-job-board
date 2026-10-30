@@ -1,0 +1,4 @@
+Jordan Example
+Backend Developer at Gravy Boat Labs, 2015 to 2019. Built Python services and cut the nightly batch from 6 hours to 90 minutes.
+Senior Data Engineer at Turbo Tortoise Systems, 2019 to 2024. Ran the PostgreSQL reporting warehouse and led 4 engineers.
+Education: BSc in Computer Science from Pine Valley College, May 2014.
