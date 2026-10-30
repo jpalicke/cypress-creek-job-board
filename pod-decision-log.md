@@ -328,3 +328,8 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 - Recorded in ADR 0027 and docs/providers.md via PR (openai-live-verified). #130 stays open: LM Studio findings, explicit confirmation of the gpt-6-luna pick and prices, and the temperature decision for E8 (the call passed without a temperature, so hosted rows are not temperature-pinned; E8 as scoped runs only local models, so this only matters when a hosted row is added).
 - No model id or usage numbers were reported.
 - Both seniors hit the 5-hour usage limit again at about 03:20 UTC (reset 04:10 UTC); they are resumed after that.
+
+## D62. LM Studio verified in part (issue #130 item 2)
+- 2026-10-30, Joe P ran the two live_lmstudio tests (2 passed) against LM Studio 0.4.17 (Build 4), model gemma-4-e4b, context 8192 for both the load and the tests, and recorded the server's overflow reply (error as a plain string, "The number of tokens to keep from the initial prompt is greater than the context length (n_keep: 20015>= n_ctx: 8192)...").
+- Recorded in PR #155 with a component test that pins the reply (a characterization test: the existing "context length" marker already matched, so no red step). json_schema honoring and whether the model listing exposes the context length remain unknown; strict_schema stays false for loopback. The model id and usage numbers for the OpenAI run were not reported.
+- #130 stays open for: the explicit confirmation of the gpt-6-luna pick and prices, and the temperature decision.
