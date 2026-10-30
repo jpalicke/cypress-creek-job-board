@@ -36,8 +36,9 @@ from cypress_creek.ingest.fetch import (
     UnsupportedContent,
 )
 from cypress_creek.ingest.html_text import HtmlTextError
-from cypress_creek.ingest.link_posting import LinkPosting, PdfNotSupported, posting_from_url
+from cypress_creek.ingest.link_posting import LinkPosting, posting_from_pdf, posting_from_url
 from cypress_creek.ingest.models import Extractor, Posting, PostingSource
+from cypress_creek.ingest.pdf_text import PdfError
 from cypress_creek.pipeline.extract import output_cap
 from cypress_creek.pipeline.prompt import Stage, build_prompt
 from cypress_creek.pipeline.report import ReportRefused
@@ -80,6 +81,38 @@ def posting_from_paste(text: str) -> Posting:
     return build_posting(text, PostingSource.PASTE, Extractor(name="paste", version=__version__))
 
 
+PDF_ERRORS: dict[str, tuple[int, ErrorCode]] = {
+    "PdfTooLarge": (413, ErrorCode.PDF_TOO_LARGE),
+    "PdfTooManyPages": (422, ErrorCode.PDF_TOO_MANY_PAGES),
+    "PdfTooMuchText": (422, ErrorCode.PDF_TOO_MUCH_TEXT),
+    "PdfEncrypted": (422, ErrorCode.PDF_ENCRYPTED),
+    "PdfCorrupt": (422, ErrorCode.PDF_CORRUPT),
+    "PdfNoText": (422, ErrorCode.PDF_NO_TEXT),
+    "PdfTimeout": (422, ErrorCode.PDF_TIMEOUT),
+    "PdfResourceLimit": (422, ErrorCode.PDF_RESOURCE_LIMIT),
+}
+
+
+def pdf_api_error(error: PdfError) -> ApiError:
+    """The typed API error for a PDF failure. The message never carries the file's content."""
+    status, code = PDF_ERRORS.get(type(error).__name__, (422, ErrorCode.PDF_CORRUPT))
+    return ApiError(status, code)
+
+
+def ingest_pdf(body: bytes, database: Path) -> PostingResponse:
+    """Read an uploaded PDF in the limited child process and store its visible text."""
+    try:
+        link = posting_from_pdf(body, PostingSource.PDF)
+    except PdfError as error:
+        raise pdf_api_error(error) from None
+    except EmptyPosting:
+        raise ApiError(422, ErrorCode.EMPTY_POSTING) from None
+    except PostingTooLong:
+        raise ApiError(413, ErrorCode.POSTING_TOO_LONG) from None
+    PostingStore(database).add(link.posting)
+    return posting_response(link.posting, link)
+
+
 def ingest(payload: PostingRequest, database: Path) -> PostingResponse:
     """Build the Posting for a paste or a link, mapping every library failure to a typed error."""
     link: LinkPosting | None = None
@@ -107,8 +140,8 @@ def ingest(payload: PostingRequest, database: Path) -> PostingResponse:
         raise ApiError(413, ErrorCode.CONTENT_TOO_LARGE) from None
     except HtmlTextError:
         raise ApiError(422, ErrorCode.UNREADABLE_CONTENT) from None
-    except PdfNotSupported:
-        raise ApiError(501, ErrorCode.PDF_EXTRACTION_UNAVAILABLE) from None
+    except PdfError as error:
+        raise pdf_api_error(error) from None
     except FetchFailed:
         raise ApiError(502, ErrorCode.FETCH_FAILED) from None
     PostingStore(database).add(posting)
@@ -125,7 +158,7 @@ async def create_posting(request: Request, database: DatabasePath) -> PostingRes
     if media == PDF_TYPE:
         if not body.startswith(PDF_MAGIC):
             raise ApiError(422, ErrorCode.INVALID_PDF)
-        raise ApiError(501, ErrorCode.PDF_EXTRACTION_UNAVAILABLE)
+        return await run_in_threadpool(ingest_pdf, body, database)
     try:
         payload = PostingRequest.model_validate_json(body)
     except ValidationError as error:

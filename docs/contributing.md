@@ -31,6 +31,8 @@ The Lever adapter has its own `needs_network` integration test: it reads a real 
 
 The Ashby adapter has its own `needs_network` integration test: it fetches a real public board, checks every listing, probes it, probes and fetches a made-up slug, and revalidates the stored weak ETag against the real server, which must answer 304: `uv run pytest tests/integration/test_ashby_network.py -q`. It takes a few seconds. It needs the internet and fails, never skips, when the network is unreachable. Run it when you touch `discovery/adapters/ashby.py`, `discovery/adapters/feed_common.py` or the polite client's conditional requests.
 
+The PDF extractor has its own tests, all offline: `uv run pytest tests/unit/test_pdf_fixtures.py tests/integration/test_pdf_hostile.py tests/component/test_pdf_worker.py tests/e2e/test_pdf_upload_process.py -q --no-cov` (the fixture generator is deterministic, every hostile file gives its listed outcome, the child process limits hold, and the real server survives a bomb). See [evals.md](evals.md#hostile-pdf-fixtures-and-the-hidden-carrier-class).
+
 The posting fixtures and their hand labels have their own check: `uv run python -m evals.harness.check_labels`. Its tests are listed in [evals.md](evals.md#posting-fixtures-and-hand-labels). Run it when you touch anything under `evals/fixtures/` or `evals/harness/labels.py`. A label edit must be committed before any eval run, and the scorer refuses labels that are not.
 
 The scorer (`evals/harness/score.py`, `metrics.py`, `injection.py`) and the injection corpus have unit, component, e2e and live tests; the command is in [evals.md](evals.md#scoring-a-run). Run it when you touch either file or `ReportRow`.
