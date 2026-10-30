@@ -301,3 +301,8 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 - Joe P: have the senior fix anything on the outstanding work, spin up a second senior, set both on all outstanding work. Senior A (the Sonnet reviewer already running) and senior B (new Sonnet agent) each own half of the open work and review the other's PRs. Workers C, E, G, H are retired and are not resumed (their unpushed WIP in /home/user/pod/worker-*/ is handed to the seniors).
 - Share A: #138, H1c PR, H7b #137, H8 #47, #142, #134. Share B: #143, #140, G3 #37, G4 #38, #144. Blocked until Joe P: E8 #30, E6 #28, F4 #34, G5 #39.
 - Trade-off: the author never reviews their own PR, but there are now only two minds on all the code, so review independence is weaker than with five agents; Joe P's final Opus pass is the backstop. Reverse: start more worker agents.
+
+## D56. pypdf approved by Joe P; E6 and F4 unblocked
+- 2026-10-30, Joe P ("pypdf is fine"), manager executed.
+- Earlier the pod's `uv add pypdf` was denied by the permission classifier (D48) and nobody worked around it. After Joe P's approval the manager ran `uv add pypdf` in a scratch clone: pypdf 6.21.4, licence BSD-3-Clause (allowed list), `pip-audit` on the exported lock reports no known vulnerabilities, check_licenses passes. The dependency change (pyproject.toml plus uv.lock, 55 lines) is saved at /home/user/pod/pypdf-dependency.patch for senior B to apply in the E6/F4 PRs; ADR numbers 0042 (E6 fixtures) and 0043 (library choice).
+- E6 (#28) then F4 (#34) go to senior B after #140 and G3. A PDF parser reading hostile files is the riskiest code left; Joe P's Opus pass should look at it.
