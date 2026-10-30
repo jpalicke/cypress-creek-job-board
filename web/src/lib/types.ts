@@ -39,9 +39,48 @@ export interface EstimateResponse {
   usd: number;
 }
 
+export interface Evidence {
+  type: EvidenceType;
+  pointer: string;
+}
+
+export type EvidenceType = "employer_doc" | "repo" | "certificate" | "public_url" | "self_attested";
+
 export interface ExtractionWarning {
   kind: string;
   count: number;
+}
+
+export interface Fact {
+  id: string;
+  claim: string;
+  kind: Kind;
+  employer: string | null;
+  issuer: string | null;
+  role: string | null;
+  start: string | null;
+  end: string | null;
+  tags: Tag[];
+  verified_on: string | null;
+  evidence: Evidence;
+  share: Share;
+}
+
+export interface FactDraft {
+  claim: string;
+  kind: Kind;
+  employer: string | null;
+  issuer: string | null;
+  role: string | null;
+  start: string | null;
+  end: string | null;
+  tags: Tag[];
+  evidence: Evidence;
+}
+
+export interface FactsResponse {
+  facts: Fact[];
+  unverified_ids: string[];
 }
 
 export interface GapReport {
@@ -68,6 +107,10 @@ export interface HealthResponse {
 }
 
 export type Importance = "required" | "preferred" | "unspecified";
+
+export type Kind = "employment" | "project" | "education" | "certification" | "achievement";
+
+export type Level = "familiar" | "working" | "expert";
 
 export interface NotAssessedSentence {
   reason: "cue_sentence_uncovered";
@@ -121,6 +164,10 @@ export interface ProvidersResponse {
   providers: ProviderInfo[];
 }
 
+export interface RemovedResponse {
+  removed: boolean;
+}
+
 export interface ReportResponse {
   report_id: string;
   posting_id: string;
@@ -172,6 +219,12 @@ export interface SessionResponse {
   csrf_token: string;
 }
 
+export type Share = "shareable" | "local_only";
+
+export interface ShareRequest {
+  share: Share;
+}
+
 export interface StoredVerdict {
   stage: string;
   subject: string;
@@ -181,6 +234,11 @@ export interface StoredVerdict {
 }
 
 export type Support = "none" | "partial" | "strong";
+
+export interface Tag {
+  name: string;
+  level: Level;
+}
 
 export interface Usage {
   input_tokens: number;

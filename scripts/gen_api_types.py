@@ -6,6 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from cypress_creek.api.routes.facts import RemovedResponse, ShareRequest
 from cypress_creek.api.routes.health import HealthResponse
 from cypress_creek.api.routes.providers import ProvidersResponse
 from cypress_creek.api.routes.session import SessionResponse
@@ -13,10 +14,12 @@ from cypress_creek.api.schemas import (
     AnalyzeRequest,
     AnalyzeResponse,
     EstimateResponse,
+    FactsResponse,
     PostingRequest,
     PostingResponse,
     ReportResponse,
 )
+from cypress_creek.facts.store import FactDraft
 
 OUTPUT = Path(__file__).resolve().parents[1] / "web" / "src" / "lib" / "types.ts"
 API_MODELS: list[type[BaseModel]] = [
@@ -29,6 +32,10 @@ API_MODELS: list[type[BaseModel]] = [
     AnalyzeRequest,
     AnalyzeResponse,
     ReportResponse,
+    FactsResponse,
+    FactDraft,
+    ShareRequest,
+    RemovedResponse,
 ]
 HEADER = (
     "// ABOUTME: Types of the API answers, generated from the pydantic models. Do not edit.\n"

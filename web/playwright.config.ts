@@ -4,7 +4,8 @@ import { resolve } from "node:path";
 import { defineConfig } from "@playwright/test";
 
 const dataDir = resolve(import.meta.dirname, ".e2e-data");
-const bank = resolve(import.meta.dirname, "..", "evals", "bank", "sample_bank.yaml");
+// A copy of the fictional sample bank, made by the seed script: the fact bank screen edits it.
+const bank = resolve(dataDir, "bank.yaml");
 
 export default defineConfig({
   testDir: "tests/e2e",

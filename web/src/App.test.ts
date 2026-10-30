@@ -40,4 +40,16 @@ describe("App", () => {
     mounted = mount(App, { target: freshHost() });
     expect(document.querySelector("main h2")?.textContent).toBe("Analyze a posting");
   });
+
+  it("shows the fact bank at its address and links to it from the navigation", async () => {
+    window.location.hash = "#/facts";
+    mounted = mount(App, { target: freshHost() });
+    expect(document.querySelector('nav[aria-label="Main"] a[href="#/facts"]')?.textContent).toBe(
+      "Fact bank",
+    );
+    expect(document.querySelector("main h2")?.textContent).toBe("Fact bank");
+    await vi.waitFor(() => {
+      expect(document.querySelector('[role="alert"]')?.textContent).toContain("unreachable");
+    });
+  });
 });

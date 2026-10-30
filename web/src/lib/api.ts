@@ -3,10 +3,15 @@
 import type {
   AnalyzeResponse,
   EstimateResponse,
+  Fact,
+  FactDraft,
+  FactsResponse,
+  RemovedResponse,
   PostingResponse,
   ProvidersResponse,
   ReportResponse,
   SessionResponse,
+  Share,
 } from "./types";
 
 export class ApiError extends Error {
@@ -133,6 +138,34 @@ export class ApiClient {
   analyze(postingId: string, backend: string, confirmHosted: boolean): Promise<AnalyzeResponse> {
     const body = JSON.stringify({ backend, confirm_hosted: confirmHosted });
     return this.call("POST", `/api/postings/${encodeURIComponent(postingId)}/analyze`, body);
+  }
+
+  facts(): Promise<FactsResponse> {
+    return this.call("GET", "/api/facts");
+  }
+
+  addFact(draft: FactDraft): Promise<Fact> {
+    return this.call("POST", "/api/facts", JSON.stringify(draft));
+  }
+
+  editFact(id: string, draft: FactDraft): Promise<Fact> {
+    return this.call("PUT", `/api/facts/${encodeURIComponent(id)}`, JSON.stringify(draft));
+  }
+
+  setFactShare(id: string, share: Share): Promise<Fact> {
+    return this.call("PUT", `/api/facts/${encodeURIComponent(id)}/share`, JSON.stringify({ share }));
+  }
+
+  verifyFact(id: string): Promise<Fact> {
+    return this.call("POST", `/api/facts/${encodeURIComponent(id)}/verify`);
+  }
+
+  unverifyFact(id: string): Promise<Fact> {
+    return this.call("POST", `/api/facts/${encodeURIComponent(id)}/unverify`);
+  }
+
+  deleteFact(id: string): Promise<RemovedResponse> {
+    return this.call("DELETE", `/api/facts/${encodeURIComponent(id)}`);
   }
 
   report(reportId: string): Promise<ReportResponse> {
