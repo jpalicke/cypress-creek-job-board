@@ -391,3 +391,7 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
   - An ATS-like check fits the existing design if it stays deterministic: parse the resume the way common systems do, match required terms against the posting, and report what a parser could not read. It must say it approximates; real systems differ and mostly do not publish their rules, so it cannot claim a pass or fail guarantee.
   - Recruiter accounts change the trust model: a recruiter would see job seekers' data, which needs the job seeker's consent and a clear sharing rule. The fact bank's shareable flag is a starting point.
   - Screening candidates by automated score is regulated in some places (for example New York City Local Law 144 and the EU AI Act's rules for employment tools). The current triage-only score is a job seeker aid; a recruiter-facing score needs legal review before it is built.
+
+## D73a. Clarification on the ATS-like check
+- 2026-10-30, Joe P: there are no guarantees. The check only gives a job seeker an idea of whether a document is likely to get a second look or needs work.
+- Wording rule for any future version: a readiness indicator in the same spirit as the triage-only gap score (what a parser could read, which required terms were found), never a pass or fail verdict or a probability. This agrees with D73; it only fixes the framing.
