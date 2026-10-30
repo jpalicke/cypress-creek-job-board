@@ -88,10 +88,10 @@ Blacklists, the denied list and the watchlist all compare companies on one key f
 
 Steps, in order:
 1. Reject names over 1,000 characters (`CompanyNameError`).
-2. NFKD, which splits accents off and turns full-width and styled letters into plain ones, then casefold.
-3. Fold confusables with the Unicode confusables data in `config/confusables.txt` (the UTS #39 skeleton table, about 6,700 entries). Examples: Cyrillic `а` becomes `a`, `0` becomes `o`, `1` becomes `l`, `m` becomes `rn`. The table is applied several times because a target can itself be confusable (`%` becomes `0`, which becomes `o`).
+2. NFKD, which splits accents off and turns full-width and styled letters into plain ones.
+3. Fold confusables with the Unicode confusables data in `config/confusables.txt` (the UTS #39 skeleton table, about 6,700 entries). Examples: Cyrillic `а` becomes `a`, `0` becomes `o`, `1` becomes `l`, `m` becomes `rn`. Each pass reads the table first and casefolds after, because a capital and its small form can map differently (Cyrillic capital `М` is Latin `M`, its small form is not). The table is applied several times because a target can itself be confusable (`%` becomes `0`, which becomes `o`).
 4. Accent marks and zero-width and other format characters are dropped. Periods and apostrophes are dropped without splitting a word (`L.L.C.` becomes `llc`, `O'Reilly` becomes `oreilly`). Any other non letter, non digit character separates words.
-5. `i` becomes `l`. Casefolding turns a capital `I` into `i` before the table can map it to `l`, so without this `IBM` and `lBM` would differ.
+5. `i` becomes `l`. The table maps a capital `I` to `l` but not a small `i`, so without this `IBM` and `ibm` would differ.
 6. Trailing legal suffixes are stripped repeatedly: `inc`, `incorporated`, `llc`, `llp`, `ltd`, `limited`, `corp`, `corporation`, `gmbh`, `plc` (compared in folded form). A suffix in the middle of a name stays, and a name that is only a suffix keeps it. Every addition to `LEGAL_SUFFIXES` needs a test row.
 7. Words are joined with no spaces, so `Ac me` and `Acme` match. A name with no letters or digits raises `CompanyNameError`.
 
@@ -120,7 +120,7 @@ Migration rules:
 - Each file runs in one transaction together with its row in `schema_version`. If it fails, nothing from that file is kept and `MigrationError` names the file. Do not put `BEGIN` or `COMMIT` in a migration.
 - A whole folder is checked before anything runs, so a bad name, a gap or a file that is not utf-8 changes nothing.
 - A database newer than the code, or one whose applied name differs from the file of that number, is refused. Never edit or rename a migration that has been applied; add a new one.
-- `0001_schema_version.sql` creates the version table and holds no domain data. Each card that needs tables adds its own file. `0002_discovery.sql` creates the watchlist, listing and suggestion tables, `0003_blacklist.sql` creates the blacklist table, `0004_eval_runs.sql` stores eval headers and ordered JSON events with a unique case and repeat pair per run, `0005_watchlist_region.sql` adds the Lever region to the watchlist, and `0006_postings_reports.sql` adds the posting and report tables.
+- `0001_schema_version.sql` creates the version table and holds no domain data. Each card that needs tables adds its own file. `0002_discovery.sql` creates the watchlist, listing and suggestion tables, `0003_blacklist.sql` creates the blacklist table, `0004_eval_runs.sql` stores eval headers and ordered JSON events with a unique case and repeat pair per run, `0005_watchlist_region.sql` adds the Lever region to the watchlist, `0006_postings_reports.sql` adds the posting and report tables, and `0007_discovery_reports.sql` stores one gap report per run id and pipeline version for discovery scoring.
 
 Known limits: there are no checksums, so an edited applied migration is not detected (only a renamed one is). There is no downgrade path. The database file is not encrypted.
 
@@ -136,6 +136,7 @@ Code is in `src/cypress_creek/discovery/`. Tables come from `0002_discovery.sql`
 - `listing`: a posting found on a company board. `id` is `ats:slug:job_id`, `state` is new, seen or closed. `Listings` (`discovery/listings.py`) writes it: `apply_fetch` stores a successful board fetch and moves states, and a failed fetch changes nothing. See [pipeline.md](pipeline.md#discovery-dedupe-filters-and-listing-states).
 - `watchlist_entry`: an approved company. `company_key` is the key, derived from `display_name` by `company_key()` and never supplied. `(ats, slug)` is unique, stored trimmed and lower case, and neither part may be empty. `identity_evidence` is strong, weak or none. `region` is null, or `us` or `eu` for a `lever` board only, and records the host the board was found on ([ADR 0029](adr/0029-lever-region-is-stored-on-the-watchlist-entry.md)); `Watchlist.set_region` updates it. The entry is written only by a human approval, so `Watchlist.add` takes the approval time from the caller and never reads a clock.
 - `suggestion`: a proposed company. `state` is pending, approved or denied. A denied row is the permanent tombstone, one per company and board. `ats` and `slug` are both set or both empty. Nothing writes pending or approved rows until the suggestion card.
+- `discovery_report`: a stored gap report for discovery scoring. `(run_id, pipeline_version)` is the key (the run id covers the listing text, the bank, the backend and the model, and the pipeline version is a digest of the prompts, stages, validators, scoring code and config that judged it), `status` is complete or incomplete, and `report_json` is the whole `GapReport`. Only a complete report is reused as a cache hit. Written by `discovery/run.py`; see [pipeline.md](pipeline.md#discovery-scoring-under-a-cap-with-a-cache).
 
 Rules, in `watchlist.py` and `tombstones.py`:
 - `Watchlist.add` refuses with `Tombstoned` when a denied row matches the company key or the board, and with `AlreadyWatched` when the company or the board is already listed. A refusal writes nothing. See [ADR 0017](adr/0017-tombstones-are-removed-only-by-a-human-call.md).

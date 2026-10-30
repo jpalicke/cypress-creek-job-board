@@ -61,7 +61,8 @@ def _confusables() -> dict[str, str]:
 def _fold(name: str) -> list[str]:
     """Words made only of letters and digits: accents, case and homoglyphs folded away."""
     table = _confusables()
-    skeleton = unicodedata.normalize("NFKD", name).casefold()
+    # The table is read before case is folded: a capital and its small form can map differently.
+    skeleton = unicodedata.normalize("NFKD", name)
     for _ in range(FOLD_PASSES):
         mapped = "".join(table.get(char, char) for char in skeleton)
         skeleton = unicodedata.normalize("NFKD", mapped).casefold()

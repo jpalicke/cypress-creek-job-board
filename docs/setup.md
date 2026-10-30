@@ -66,6 +66,35 @@ kill %1
 unset CYPRESS_CREEK_DATA_DIR CYPRESS_CREEK_BANK CYPRESS_CREEK_PROVIDER CYPRESS_CREEK_MODEL
 ```
 
+Watch a company and block another through the same API. A company on the blacklist cannot be added, even under a different spelling, and a name needs the human approval marker. With the server from the block above still running (or started the same way):
+
+```bash
+export CYPRESS_CREEK_DATA_DIR="$(mktemp -d)"
+export CYPRESS_CREEK_PROVIDER=ollama CYPRESS_CREEK_MODEL=qwen3.5:0.8b
+uv run cypress-creek-api &
+sleep 3
+TOKEN=$(curl -s http://127.0.0.1:5309/api/session | python3 -c 'import json,sys; print(json.load(sys.stdin)["csrf_token"])')
+API=http://127.0.0.1:5309
+JSON='Content-Type: application/json'
+curl -s -X POST $API/api/blacklist -H "X-CSRF-Token: $TOKEN" -H "$JSON" \
+  -d '{"match_kind": "company_key", "value": "Initech", "reason": "agency"}'
+echo
+curl -s -X POST $API/api/watchlist -H "X-CSRF-Token: $TOKEN" -H "$JSON" \
+  -d '{"display_name": "INITECH, Inc.", "ats": "greenhouse", "slug": "initech", "identity_evidence": "weak", "approval": "human_confirmed"}'
+echo
+curl -s -X POST $API/api/watchlist -H "X-CSRF-Token: $TOKEN" -H "$JSON" \
+  -d '{"display_name": "Acme Corp", "ats": "greenhouse", "slug": "acme", "identity_evidence": "strong", "approval": "model"}'
+echo
+curl -s -X POST $API/api/watchlist -H "X-CSRF-Token: $TOKEN" -H "$JSON" \
+  -d '{"display_name": "Acme Corp", "ats": "greenhouse", "slug": "acme", "identity_evidence": "strong", "approval": "human_confirmed"}' \
+  | python3 -m json.tool
+curl -s $API/api/watchlist | python3 -m json.tool | head -12
+kill %1
+unset CYPRESS_CREEK_DATA_DIR CYPRESS_CREEK_PROVIDER CYPRESS_CREEK_MODEL
+```
+
+Expected: the first prints the blacklist entry; its `value` is the normalized company key (`lnltech`, because the key folds look-alike letters such as `i` and `l` together, so a look-alike spelling is the same entry). The second is refused with `{"error": {"code": "blacklisted", ...}}` (409) although it is spelled differently. The third is refused with `invalid_request` (422) because the approval marker is not `human_confirmed`, and the answer does not repeat what was sent. The fourth adds Acme Corp (201, with a server stamped `approved_at` and the key `acrne`), and the last lists it. See [ADR 0036](adr/0036-watchlist-and-blacklist-routes.md).
+
 The estimate prints the extraction call's `input_tokens`, `output_tokens` and a `usd` of 0 for a local model. With Ollama running and `qwen3.5:0.8b` pulled, the report has rows and a score. With it not running, the report shows `"status": "incomplete"` and `extraction failed: provider_unavailable`. A write without the `X-CSRF-Token` header is refused with `csrf_token_invalid`. Stop the server with Ctrl+C. Setting `CYPRESS_CREEK_API_HOST=0.0.0.0` makes it exit with code 2 and say that the API only binds to a loopback address. The rules, routes and error codes are in [api.md](api.md).
 
 ## Fetch a job board politely

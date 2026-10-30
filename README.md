@@ -6,7 +6,7 @@ It reads a posting, extracts requirements, maps each requirement to facts in a c
 
 The tool never submits, sends or applies anything for you. Draft help only prints text that you copy by hand, with every sentence checked and failures marked. The checks are heuristics that miss some unsupported claims (see [the draft help limits](docs/pipeline.md#draft-help)), so every draft needs your review.
 
-Status: early implementation. The fact bank, the posting normalizer, the tag alias table, the deterministic support gate, the score formula, the company name normalizer, the SQLite migration runner, the grounding validators, the provider interface, the provider config, the Ollama, Anthropic and openai_compatible (OpenAI and LM Studio) adapters, the budget guard, the prompt builder (extraction, entailment and draft prompts), the extraction stage, candidate retrieval, the entailment stage, draft help for one requirement (every sentence checked, nothing sent), the gap report, the pipeline run, URL target validation, guarded HTTP transport, link fetcher, HTML text extractor, fictional sample fact bank for evals, typed eval run records with SQLite resume and JSONL export, the eval CLI runner, six real posting fixtures with hand labels and their label checker, the E1 to E4 scorer, the prompt injection corpus with its E6 metrics, and the discovery tables with the watchlist, the blacklist table with its deterministic filter, conservative listing dedupe, deterministic listing filters and listing state transitions, the polite fetch layer (fetch policy, per-host rate limiter, ETag disk cache and polite client) and the ATS adapter interface with the Greenhouse, Lever and Ashby adapters (board listings and board probe) exist. The link fetcher returns bounded raw bytes with provenance and typed errors. HTML text extraction is a separate library step that drops hidden content and reports warnings; PDF text extraction and an app workflow are still to come. The local API (loopback only, with a Host check, a CSRF token on writes and typed errors) starts with `uv run cypress-creek-api`; it can add a posting by paste or link, analyze it with the configured backend, show the stored report and the fact bank, and check a bank file; there is no web UI and no PDF reading yet. Work is tracked as a kanban in this repo's issues (one issue per card, labeled by lane). Cards marked `core` are the smallest set that makes the repo credible and demoable on its own.
+Status: early implementation. The fact bank, the posting normalizer, the tag alias table, the deterministic support gate, the score formula, the company name normalizer, the SQLite migration runner, the grounding validators, the provider interface, the provider config, the Ollama, Anthropic and openai_compatible (OpenAI and LM Studio) adapters, the budget guard, the prompt builder (extraction, entailment and draft prompts), the extraction stage, candidate retrieval, the entailment stage, draft help for one requirement (every sentence checked, nothing sent), the gap report, the pipeline run, URL target validation, guarded HTTP transport, link fetcher, HTML text extractor, fictional sample fact bank for evals, typed eval run records with SQLite resume and JSONL export, the eval CLI runner, six real posting fixtures with hand labels and their label checker, the E1 to E4 scorer, the prompt injection corpus with its E6 metrics, and the discovery tables with the watchlist, the blacklist table with its deterministic filter, conservative listing dedupe, deterministic listing filters and listing state transitions and a discovery scoring run with a per-run cap and a score cache, the polite fetch layer (fetch policy, per-host rate limiter, ETag disk cache and polite client) and the ATS adapter interface with the Greenhouse, Lever and Ashby adapters (board listings and board probe) exist. The link fetcher returns bounded raw bytes with provenance and typed errors. HTML text extraction is a separate library step that drops hidden content and reports warnings; PDF text extraction and an app workflow are still to come. The local API (loopback only, with a Host check, a CSRF token on writes and typed errors) starts with `uv run cypress-creek-api`; it can add a posting by paste or link, analyze it with the configured backend, show the stored report and the fact bank, and check a bank file; there is no web UI and no PDF reading yet. Work is tracked as a kanban in this repo's issues (one issue per card, labeled by lane). Cards marked `core` are the smallest set that makes the repo credible and demoable on its own.
 
 The pipeline also exposes an in-memory trace of attempted provider calls and actual validator
 verdicts. The eval CLI saves those traces with each completed case in SQLite and keeps failed
@@ -38,6 +38,7 @@ Each command is copy and paste, and lives with its documentation:
 | Score a run file against the hand labels (E1 to E4 metrics) and read the mismatch view | [docs/evals.md](docs/evals.md#scoring-a-run) |
 | List the prompt injection corpus and see how the E6 score shift is computed | [docs/evals.md](docs/evals.md#the-injection-corpus-and-the-e6-metrics) |
 | Read why each hand label is what it is | [docs/e3-label-decisions.md](docs/e3-label-decisions.md) |
+| Build the backend comparison table from scored run files and check it is current | [docs/evals.md](docs/evals.md#the-comparison-table) |
 | Check SQLite eval resume and JSONL audit export | [docs/evals.md](docs/evals.md#run-record-format) |
 | Plan and run the technical eval smoke case against Ollama, with an optional audit export | [docs/evals.md](docs/evals.md#run-the-harness) |
 | Start the local API, paste a posting, analyze it and read the stored report | [docs/setup.md](docs/setup.md#start-the-api-server) |
@@ -60,6 +61,8 @@ Each command is copy and paste, and lives with its documentation:
 | Normalize a company name to its comparison key | [docs/data-model.md](docs/data-model.md#try-company_key) |
 | Add a company to the watchlist and see a denied one refused | [docs/data-model.md](docs/data-model.md#try-the-discovery-tables) |
 | Dedupe listings, filter them and close the ones that left a board, with no network | [docs/pipeline.md](docs/pipeline.md#try-dedupe-filters-and-states) |
+| Run discovery scoring with a cap and a score cache, and see the cache serve a second run, with no network or model | [docs/pipeline.md](docs/pipeline.md#try-a-discovery-run) |
+| Add a company to the watchlist through the API with a human approval marker, and see a blacklisted one refused | [docs/setup.md](docs/setup.md#start-the-api-server) |
 | Block a company, board slug or domain and see a lookalike filtered | [docs/data-model.md](docs/data-model.md#try-the-blacklist) |
 | Fetch a large public Greenhouse board and print its normalized listings | [docs/setup.md](docs/setup.md#fetch-a-greenhouse-board) |
 | Fetch a large public Lever board, page by page, and print its normalized listings | [docs/setup.md](docs/setup.md#fetch-a-lever-board) |
@@ -72,6 +75,21 @@ Each command is copy and paste, and lives with its documentation:
 | Fetch one public posting link as bounded raw bytes | [docs/setup.md](docs/setup.md#fetch-a-posting-link) |
 | Extract readable text from HTML bytes | [docs/pipeline.md](docs/pipeline.md#html-posting-text) |
 | Fetch a public job board feed politely: download, cache hit, then a 304 revalidation | [docs/setup.md](docs/setup.md#fetch-a-job-board-politely) |
+
+## Evaluation results
+No backend has been evaluated and published yet, so every row below says `not run` (never 0). The table is generated from the committed run files by `uv run python -m evals.harness.table` and checked by CI, so it cannot drift from the data. How to read it, and its limits (one author's labels, a small fictional bank), are in [docs/evals.md](docs/evals.md#the-comparison-table). The full page is [docs/evals-results.md](docs/evals-results.md).
+
+<!-- evals-results:start -->
+| Target | Model | Status | Repeats scored | E1 recall | E3 violations per 100 | E6 worst class max abs shift | E6 disrupted | E8 schema failure rate | Median latency | Cost per run, USD | Commit | Prompt hash | Fixture hash | Conditions |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Ollama qwen3.5:4b | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | - | - | - | - |
+| Ollama qwen3.5:9b | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | - | - | - | - |
+| LM Studio (the loaded model) | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | - | - | - | - |
+| OpenAI (the C4 pick, pending confirmation) | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | - | - | - | - |
+| Anthropic claude-sonnet-5-5 | not run | not run | not run | not run | not run | not run | not run | not run | not run | not run | - | - | - | - |
+
+No backend has been run yet, so every row is not run.
+<!-- evals-results:end -->
 
 ## Discovery findings and sources
 Discovery reads the public job board feeds of three applicant tracking systems. These are findings from reading each provider's documentation and robots.txt on 2026-10-01, not guarantees. None of this is legal advice. The conclusion drawn here is that the three feeds are public by design and that a small personal tool polling an approved list is low risk. Their documentation is silent on terms and limits in some cases, so polite behavior is the mitigation.
@@ -115,7 +133,7 @@ Every supported row cites a verified fact. A model rationale that fails the grou
 The cue warning identifies posting sentences that extraction omitted. Those sentences do not enter the displayed score, so read the warning before using the number for triage.
 
 ## What the score means
-The score (0 to 100) ranks postings so you can triage them. It is a weighted share of requirements your verified facts support. It is not a probability of getting the job, and a posting with no extractable requirements gets no score at all.
+The score (0 to 100) ranks postings so you can triage them. It is a weighted share of requirements your verified facts support. It is not a probability of getting the job, and a posting with no extractable requirements gets no score at all. Discovery uses the same score to rank listings from the companies you watch. It is for triage only, listings with no extractable requirements show no score, and listings beyond the per-run cap are shown as unscored rather than dropped. Nothing in discovery applies to or contacts anyone.
 
 ## Documentation
 New here? Read [docs/codebase.md](docs/codebase.md) first. [docs/README.md](docs/README.md) is the index: the data model, the pipeline stages, the decision records and how we work.

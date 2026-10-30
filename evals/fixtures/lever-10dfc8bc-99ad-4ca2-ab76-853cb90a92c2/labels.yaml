@@ -2,8 +2,8 @@
 # before any model or pipeline ran. See docs/e3-label-decisions.md for the reasoning.
 fixture_id: lever-10dfc8bc-99ad-4ca2-ab76-853cb90a92c2
 provenance:
-  labeled_by: Claude, on delegation from Joe P (Palicke); pending his review
-  review: pending
+  labeled_by: Claude, on delegation from Joe P (Palicke); reviewed by Joe P on 2026-10-30
+  review: reviewed
   labeled_on: '2026-10-29'
   model_output_used: false
 requirements:
