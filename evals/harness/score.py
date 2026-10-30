@@ -14,6 +14,16 @@ from cypress_creek.facts import load_bank
 from cypress_creek.facts.hashing import bank_hash
 from cypress_creek.facts.models import Bank
 from evals.harness.fixtures import Fixture, discover_fixtures, load_fixture
+from evals.harness.injection import (
+    CLEAN_SUFFIX,
+    INJECTION_METRICS,
+    InjectionFixture,
+    PairScore,
+    case_pair,
+    injection_values,
+    load_corpus,
+    score_pair,
+)
 from evals.harness.labels import LabelError, LabelsNotCommitted, require_committed_labels
 from evals.harness.metrics import (
     METRICS,
@@ -30,6 +40,7 @@ from evals.harness.metrics import (
 ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_FIXTURES = ROOT / "evals" / "fixtures"
 DEFAULT_BANK = ROOT / "evals" / "bank" / "sample_bank.yaml"
+DEFAULT_INJECTION = ROOT / "evals" / "fixtures" / "injection"
 FILENAME_UNSAFE = re.compile(r"[^A-Za-z0-9._-]")
 
 
@@ -47,6 +58,9 @@ class RunMetrics(BaseModel):
     cases: list[str]
     metrics: dict[str, MetricValue]
     missed_planted_gaps: list[MissedGap]
+    injection: dict[str, dict[str, MetricValue]] = {}
+    injection_differences: list[str] = []
+    injection_disrupted: list[str] = []
 
 
 def not_run(backend: str) -> RunMetrics:
@@ -69,6 +83,8 @@ def score_cases(state: RunState, fixtures: Mapping[str, Fixture], bank: Bank) ->
         raise ScoreError("the run used a different bank than the one given")
     scores = []
     for case in sorted(state.cases, key=lambda item: (item.repeat, item.case_id)):
+        if case_pair(case.case_id) is not None:
+            continue
         fixture = fixtures.get(case.case_id)
         if fixture is None:
             raise ScoreError(f"no fixture for case {case.case_id}")
@@ -87,21 +103,64 @@ def score_cases(state: RunState, fixtures: Mapping[str, Fixture], bank: Bank) ->
     return scores
 
 
-def summarize(state: RunState, scores: Sequence[CaseScore]) -> RunMetrics:
+def score_pairs(
+    state: RunState, injections: Mapping[str, InjectionFixture], bank: Bank
+) -> list[tuple[int, PairScore]]:
+    """Score each attacked report against its clean twin from the same repeat."""
+    reports = {(case.case_id, case.repeat): case for case in state.cases}
+    pairs = []
+    for case in sorted(state.cases, key=lambda item: (item.repeat, item.case_id)):
+        parsed = case_pair(case.case_id)
+        if parsed is None:
+            continue
+        name, is_attacked = parsed
+        fixture = injections.get(name)
+        if fixture is None:
+            raise ScoreError(f"no injection fixture for case {case.case_id}")
+        expected = fixture.attacked_hash if is_attacked else fixture.clean_hash
+        if case.posting_hash != expected:
+            raise ScoreError(f"the posting of case {case.case_id} differs from its fixture")
+        if not is_attacked:
+            continue
+        twin = reports.get((f"{name}{CLEAN_SUFFIX}", case.repeat))
+        if twin is not None:
+            pairs.append(
+                (
+                    case.repeat,
+                    score_pair(name, fixture.case.attack_class, case.report, twin.report, bank),
+                )
+            )
+    return pairs
+
+
+def summarize(
+    state: RunState,
+    scores: Sequence[CaseScore],
+    pairs: Sequence[tuple[int, PairScore]] = (),
+) -> RunMetrics:
     """Metrics of the repeats that have every planned case. A partial repeat is not scored."""
     header = state.header
-    per_repeat = []
-    for repeat in range(1, header.repeats + 1):
-        chosen = [score for score in scores if score.repeat == repeat]
-        if {score.case_id for score in chosen} == set(header.case_ids):
-            per_repeat.append((repeat, chosen))
+    present = {(case.case_id, case.repeat) for case in state.cases}
+    repeats = [
+        repeat
+        for repeat in range(1, header.repeats + 1)
+        if all((case_id, repeat) in present for case_id in header.case_ids)
+    ]
+    per_repeat = [
+        (repeat, [score for score in scores if score.repeat == repeat]) for repeat in repeats
+    ]
+    injection_by_repeat = {
+        repeat: injection_values([pair for pair_repeat, pair in pairs if pair_repeat == repeat])
+        for repeat in repeats
+    }
+    classes = sorted({name for values in injection_by_repeat.values() for name in values})
     return RunMetrics(
         backend=header.backend,
         model=header.model,
         run_id=header.run_id,
         run_status=state.status,
         repeats_planned=header.repeats,
-        repeats_scored=len(per_repeat),
+        repeats_scored=len(repeats),
         cases=list(header.case_ids),
         metrics=aggregate([repeat_values(pool(chosen)) for _, chosen in per_repeat]),
         missed_planted_gaps=[
@@ -111,11 +170,39 @@ def summarize(state: RunState, scores: Sequence[CaseScore]) -> RunMetrics:
             for gap in score.missed
             if gap.repeat == repeat
         ],
+        injection={
+            name: aggregate(
+                [
+                    injection_by_repeat[repeat][name]
+                    for repeat in repeats
+                    if name in injection_by_repeat[repeat]
+                ],
+                INJECTION_METRICS,
+            )
+            for name in classes
+        },
+        injection_disrupted=[
+            f"repeat {repeat} {pair.case_id}"
+            for repeat, pair in pairs
+            if repeat in repeats and pair.disrupted
+        ],
+        injection_differences=[
+            f"repeat {repeat} {line}"
+            for repeat, pair in pairs
+            if repeat in repeats
+            for line in pair.differences
+        ],
     )
 
 
-def score_run(state: RunState, fixtures: Mapping[str, Fixture], bank: Bank) -> RunMetrics:
-    return summarize(state, score_cases(state, fixtures, bank))
+def score_run(
+    state: RunState,
+    fixtures: Mapping[str, Fixture],
+    bank: Bank,
+    injections: Mapping[str, InjectionFixture] | None = None,
+) -> RunMetrics:
+    pairs = score_pairs(state, injections or {}, bank)
+    return summarize(state, score_cases(state, fixtures, bank), pairs)
 
 
 def render_summary(result: RunMetrics) -> str:
@@ -132,12 +219,32 @@ def render_summary(result: RunMetrics) -> str:
             else f"mean {value.mean:.3f} worst {value.worst:.3f}"
         )
         lines.append(f"  {metric.experiment} {metric.name:31} {shown}")
+    for attack_class, values in result.injection.items():
+        for metric in INJECTION_METRICS:
+            value = values[metric.name]
+            shown = (
+                "not run"
+                if value.mean is None or value.worst is None
+                else f"mean {value.mean:.3f} worst {value.worst:.3f}"
+            )
+            lines.append(f"  E6 {attack_class} {metric.name} {shown}")
+        disrupted = values["disrupted"].worst
+        if disrupted:
+            lines.append(
+                f"  E6 {attack_class} DISRUPTED {int(disrupted)} (the attack left no score)"
+            )
     return "\n".join(lines)
 
 
 def render_diff(result: RunMetrics, scores: Sequence[CaseScore]) -> str:
     """Every mismatch line in case and repeat order, then the planted gaps the run missed."""
     lines = [line for score in scores for line in score.mismatches]
+    if result.injection_disrupted:
+        lines.append("Disrupted attacks:")
+        lines += [f"  {item}" for item in result.injection_disrupted]
+    if result.injection:
+        lines.append("Differences between attacked and clean reports:")
+        lines += [f"  {line}" for line in result.injection_differences] or ["  none"]
     lines.append("Missed planted gaps:")
     if not result.missed_planted_gaps:
         lines.append("  none")
@@ -187,6 +294,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--expect-backend", action="append", default=[], metavar="NAME")
     parser.add_argument("--fixtures", type=Path, default=DEFAULT_FIXTURES)
     parser.add_argument("--bank", type=Path, default=DEFAULT_BANK)
+    parser.add_argument("--injection-fixtures", type=Path, default=DEFAULT_INJECTION)
     parser.add_argument("--out", type=Path, required=True, help="directory for the metrics JSON")
     parser.add_argument("--diff", action="store_true", help="print every mismatch per case")
     args = parser.parse_args(argv)
@@ -202,18 +310,23 @@ def _score_all(args: argparse.Namespace) -> int:
     bank = load_bank(args.bank, strict=True)
     states = [load_run(path) for path in args.run]
     needed = {case_id for state in states for case_id in state.header.case_ids}
-    fixtures = _load_fixtures(args.fixtures, needed)
+    fixtures = _load_fixtures(
+        args.fixtures, {case_id for case_id in needed if not case_pair(case_id)}
+    )
+    has_pairs = any(case_pair(case_id) for case_id in needed)
+    injections = load_corpus(args.injection_fixtures) if has_pairs else {}
     results: list[tuple[RunMetrics, list[CaseScore]]] = []
     for state in states:
         scores = score_cases(state, fixtures, bank)
-        results.append((summarize(state, scores), scores))
+        pairs = score_pairs(state, injections, bank)
+        results.append((summarize(state, scores, pairs), scores))
     seen = {result.backend for result, _ in results}
     results += [(not_run(name), []) for name in args.expect_backend if name not in seen]
     ok = True
     for result, scores in results:
         ok = _write(args.out, _file_name(result), result) and ok
         print(render_summary(result))
-        if args.diff and scores:
+        if args.diff and (scores or result.injection):
             print(render_diff(result, scores))
     return 0 if ok else 1
 

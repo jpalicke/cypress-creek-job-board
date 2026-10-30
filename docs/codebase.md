@@ -48,6 +48,8 @@ src/cypress_creek/       The library
     safe_http.py         fetch_url, FetchLimits, FetchResponse, SafeHttpError; pinned, bounded HTTP
     fetch.py             fetch_posting, FetchResult, provenance and typed posting fetch errors
     html_text.py         html_to_text, ExtractedText, hidden warnings and typed size/depth errors
+    build.py             build_posting, new_posting_id: the one way text becomes a Posting
+    link_posting.py      posting_from_url, posting_from_fetch, PdfNotSupported: a fetched link becomes a Posting
     _fetch_worker.py     Disposable fetch process that bounds blocking DNS by a whole-fetch deadline
   validators/            Grounding validators V1 to V14, pure functions returning Verdicts
     verdict.py           Verdict, ok(), fail()
@@ -59,6 +61,8 @@ src/cypress_creek/       The library
     requirements.py      V11 cap and dedupe, V13 cue sentence coverage
     fact_dates.py        V12 date sanity (wraps facts/dates.py)
     names.py             V14 company name shape
+    claim_words.py       Quantity words (V8) and the negation list the draft check uses
+    vocabulary.py        The closed vocabulary for drafts: function words, inflection rule, character check
     registry.py          REGISTRY: id, name, rule and function for each validator
   providers/             The model backend interface, typed errors and retry policy
     base.py              Provider protocol, Capabilities, CostPerMtok, Usage, StructuredResult, estimate_input_tokens
@@ -77,14 +81,21 @@ src/cypress_creek/       The library
     security.py          allowed_hosts, HostCheckMiddleware, CsrfMiddleware, SecurityHeadersMiddleware, new_token, API_PORT
     errors.py            ErrorCode, ApiError, ErrorResponse and the handlers for the one error shape
     server.py            main, check_bind_host: the uvicorn entry point (`cypress-creek-api`)
-    routes/              health.py, providers.py, session.py (one router each)
+    routes/              health.py, providers.py, session.py, postings.py, reports.py, facts.py (one router each)
+    context.py           Database (created on first use), Backend, and the dependencies the routes share
+    schemas.py           Request and response models for the posting, analyze, report and fact routes
+    backends.py          check_backend_choice: name the configured backend, confirm a hosted one
   storage/               Mutable state: the company name key and the SQLite database
     company_key.py       company_key, load_confusables: the one company name normalizer
+    repository.py        PostingStore, ReportStore, StoredReport, StoredVerdict, prepare_database
     db.py                data_dir, connect, migrate, schema_version, MigrationError
-    migrations/          Numbered .sql files, including 0003_blacklist.sql, 0004_eval_runs.sql and 0005_watchlist_region.sql
+    migrations/          Numbered .sql files, including 0003_blacklist.sql, 0004_eval_runs.sql 0005_watchlist_region.sql and 0006_postings_reports.sql
   discovery/             Discovery state in SQLite, the polite fetch layer over the guarded transport, and the ATS board adapters
     watchlist.py         WatchlistEntry, Watchlist, Tombstoned, AlreadyWatched, IdentityEvidence
     tombstones.py        Tombstones, Denial, DenialReason, normalize_board: denied companies kept as denied suggestion rows
+    listings.py          Listings, StateChanges: the listing table, with new, seen and closed transitions from a successful board fetch
+    dedupe.py            dedupe, MergedListing, fingerprint_text: conservative merge by listing id, then exact cross source fingerprint
+    filters.py           ListingFilters, apply_filters, FilterReport, FilterName: deterministic keyword, location, remote, seniority and age filters
     blacklist.py         The pure filter: is_blacklisted, Candidate, BlacklistEntry, BlockReason, normalize_slug, normalize_domain, InvalidBlacklistValue
     blacklist_repository.py  Blacklist (add, remove, rows, entries) and AlreadyBlacklisted: stores and loads entries, no matching
     fetch_policy.py      FetchPolicy, FetchConfigError, parse_retry_after: refresh window, host delay, retries and backoff, read from env
@@ -109,17 +120,19 @@ evals/
   harness/fixtures.py    Fixture loading, the meta schema and fixture_set_hash
   harness/check_labels.py  Command line check of every posting fixture
   harness/metrics.py     The E1 to E4 metric definitions: score_case, pool, repeat_values, aggregate
+  harness/injection.py   The injection corpus loader and the E6 metrics: load_injection, score_pair, injection_values
   harness/score.py       The scorer CLI: run files and committed labels in, a metrics JSON and a mismatch view out
   harness/table.py       The comparison table builder: collect_rows, render_table, update_readme, and the --check CLI
   backends.yaml          The backends the table must list (data, edit freely)
   fixtures/<ats>-<job id>/  One real posting: posting.txt, meta.yaml, labels.yaml (see evals.md and NOTICE)
+  fixtures/injection/<case id>/  A hand written hostile case: attacked.txt, its clean.txt twin and payload.yaml (see evals.md)
   scratch/               Gitignored local JSONL exports
   results/               Published labeled JSONL exports only after E3 labels exist
 tests/
   unit/                  Pure functions and models, including the Anthropic request, schema rewrite and response parsing, the strict schema helper, eval case loading and dry-run planning, fetch policy and limiter, adapter contract, Greenhouse, Lever and Ashby feed mappings, and the Lever region on a watchlist entry and adapter seed
   component/             Real files and local servers, including the Anthropic and openai_compatible adapters over real HTTP (wire request, error mapping, retry, budget guard), the no-network eval CLI dry run, response cache, polite client, and the Greenhouse, Lever and Ashby adapters (Lever on US and EU path prefixes, Ashby also answering a weak ETag with a 304)
-  integration/           Public DNS and feeds (needs_network), real Ollama eval runs and failure persistence, the live Anthropic call (needs a key, fails without one), the credentialed live_openai and live_lmstudio tests, and live Greenhouse, paged US and EU Lever (including a stored EU region that reaches the EU host with no US request), and Ashby boards (the probe, a made-up slug and a real weak ETag revalidation)
-  e2e/                   Separate-process flows for the openai_compatible adapter against a loopback chat server, URL guard, posting fetch, HTML text, blacklist filtering, a stored Lever region used by a fresh process, and eval CLI resume of pending cases
+  integration/           Public DNS and feeds (needs_network), dedupe, filters and listing states over a real public board, real Ollama eval runs and failure persistence, the live Anthropic call (needs a key, fails without one), the credentialed live_openai and live_lmstudio tests, and live Greenhouse, paged US and EU Lever (including a stored EU region that reaches the EU host with no US request), and Ashby boards (the probe, a made-up slug and a real weak ETag revalidation)
+  e2e/                   Separate-process flows for the openai_compatible adapter against a loopback chat server, URL guard, posting fetch, HTML text, blacklist filtering, listing state refreshes across processes, a stored Lever region used by a fresh process, and eval CLI resume of pending cases
   chat_server.py         Test-only real loopback chat completions server that records requests and plays a set reply
   api_support.py         A synchronous client that drives the real FastAPI app in process over httpx's ASGI transport
     eval_support.py        Test-only builders for hand made labels, reports and run files used by the scorer tests
@@ -184,6 +197,10 @@ flowchart LR
     discovery --> adapter["discovery.adapters.GreenhouseAdapter, LeverAdapter, AshbyAdapter: fetch_board, probe"]
     adapter --> polite
     adapter --> listings["Listing rows: id, title, location, content_text, content_hash"]
+    listings --> store["discovery.listings.Listings.apply_fetch(): new, seen, closed"]
+    store --> db
+    listings --> dedupe["discovery.dedupe.dedupe(): exact merge"]
+    dedupe --> filt["discovery.filters.apply_filters(): counts per filter"]
 ```
 The diagram shows library components, not a running app workflow. The link fetcher returns raw bytes, and a caller can pass HTML bytes separately to the HTML text extractor before normalization. PDF text extraction and a user-facing app workflow remain later cards. Draft help exists as a library step (`pipeline.draft`) that returns checked data and sends nothing (see the issue board and the spec).
 
@@ -209,6 +226,7 @@ See [the fetching architecture](architecture.md), [the SSRF rules and limits](th
 - **Measured truncation signatures are refused.** The Ollama adapter estimates before the call and checks the reported count after it. It raises `ContextTruncated` when the estimate exceeds the configured context or the count matches a measured truncation signature. Other server behavior may need additional detection.
 - **Hosted adapters send the minimum and hide the key.** The Anthropic adapter needs `allow_remote`, sends the system text and the untrusted block as separate fields (prompt building already drops `local_only` facts for a non local backend), offers no tools, never follows a redirect, and scrubs the key from every error. See [ADR 0025](adr/0025-anthropic-native-structured-output.md).
 - **Spend is capped before it happens.** `BudgetedProvider` checks the worst case (estimate plus output cap) against the run limits before a call and records the server's real usage after it. Real usage above an estimate blocks the next call, so the guard fails closed.
+- **Hostile text is data.** The injection corpus keeps attack payloads as files with the exact payload and its offset, next to a clean twin that differs only by that payload. The scorer reads reports, never the payload as an instruction. See [evals.md](evals.md#the-injection-corpus-and-the-e6-metrics).
 - **Scoring reads recorded spans.** `ReportRow` carries the requirement's source span and whether the model tried to raise support, so the scorer matches rows to hand labels by offsets and counts attempted raises before the clamp. Both fields default for reports stored earlier; the scorer refuses a row with no span. The scorer needs committed labels and the run's own bank, and calls a metric with no measurement `not_run`, never 0. See [evals.md](evals.md#scoring-a-run).
 - **Attempted failures count.** A provider error identifies whether a request was attempted and carries complete reported usage when known. The budget counts attempted failed requests, including reported tokens and cost. Unknown usage blocks later calls in that invocation; on eval resume, a context-sized input ceiling and the stage output cap are reserved for that attempt before another call. A preflight refusal spends no request. See [providers.md](providers.md#the-budget-guard) and [evals.md](evals.md#run-the-harness).
 - **Posting text never leaves its block.** `build_prompt` puts the posting between boundary lines carrying a random 128 bit token, keeps it out of the system message and shows extraction no facts. It is the first layer only, the validators are the control.
@@ -217,13 +235,15 @@ See [the fetching architecture](architecture.md), [the SSRF rules and limits](th
 - **A positive verdict must cite.** `judge` counts a `supports` or `partial` verdict with no valid citation (candidate, verified, shareable) as `does_not_support`, and withholds any rationale that fails V7 to V10. See `pipeline.md`.
 - **A run id is derived, not random.** `run_id` hashes the posting, the fact bank, the backend and the model, so the same inputs give the same id and a changed input gives a new one. See `pipeline.md`.
 - **Eval resume identity is stricter than report identity.** `RunHeader.run_id` hashes the complete eval header, including commit, prompts, schemas, fixture set, bank, case plan and repeats. `EvalStore` validates SQLite records and resumes only unrecorded case pairs; JSONL is a read-only export, and only a terminal record marks a run complete. This is separate from the pipeline report's `run_id`, which intentionally excludes prompt versions. See [evals.md](evals.md#run-record-format) and [ADR 0018](adr/0018-eval-run-identity.md).
-- **Draft help can only show data.** `pipeline/draft.py` checks each sentence with V4 to V10, keeps failures visible as `NOT VERIFIED` and never as clean text, answers a gap with `no verified fact supports this` and no model call, and has no send, copy or apply path (a unit test audits its imports). The checks are heuristics and four known classes of unsupported claim still print as clean, so every draft needs a human read. See [pipeline.md](pipeline.md#draft-help).
+- **Draft help can only show data.** `pipeline/draft.py` checks each sentence with V4 to V10, keeps failures visible as `NOT VERIFIED` and never as clean text, answers a gap with `no verified fact supports this` and no model call, and has no send, copy or apply path (a unit test audits its imports). The checks are heuristics (drafts use a closed vocabulary: every word must come from a cited fact, see `validators/vocabulary.py`), so every draft still needs a human read. See [pipeline.md](pipeline.md#draft-help).
 - **The pipeline trace records what ran.** Pass a `PipelineTrace` to `analyze` or `assess` for per-attempt provider records and the actual validator verdicts. Extraction, entailment and report assembly append to the same trace. Missing usage is nullable, never guessed in the audit. The eval CLI persists completed case traces and failed terminal attempts through `EvalStore`; see [evals.md](evals.md#run-the-harness).
 - **A report cites or is refused.** `build_report` ends with `verify_report` (V4, V5, V9), so a fabricated or unverified fact id never reaches a report. Failed stages make the report incomplete rather than quietly partial. See `pipeline.md`.
 - **Retrieval is not a model.** `retrieve` matches tags and aliases, ranks and caps the candidates, and sets the support ceiling. A requirement with no candidate is a gap and costs no model call. See `pipeline.md`.
 - **Hand labels are inputs, checked against the posting and the bank.** `validate_labels` refuses a label whose span is not exact posting text, whose fact is missing, unverified or local only, or whose planted gap row disagrees. `require_committed_labels` refuses a case whose labels are not committed. Importance is the human reading, not the V3 cue rule. See [ADR 0024](adr/0024-hand-labels-are-written-before-runs-and-carry-provenance.md), [evals.md](evals.md#posting-fixtures-and-hand-labels) and [e3-label-decisions.md](e3-label-decisions.md).
+- **A down backend gives an incomplete report, not an error.** `POST /api/postings/{id}/analyze` returns the pipeline's fail closed report with status 200, stores it, and keeps its validator verdicts without their offending text. Only a budget stop and a refused report are errors. See [api.md](api.md) and [ADR 0030](adr/0030-posting-and-analyze-routes.md).
 - **Every API route inherits the security rules from the app, not from itself.** The CSRF check and the Host check are middleware (hardening headers outermost, then Host, then CSRF), so a new route, sub-app or method cannot skip them. The route table test fails if any path or operation name suggests submitting, sending or posting outward. See [api.md](api.md) and [ADR 0028](adr/0028-api-security-layer.md).
 - **The sample bank and its gap table cannot drift.** `PLANTED_GAPS.md` is parsed by a test that runs each row through `retrieve`, so a bank edit that changes a gap fails the build. See `evals.md`.
+- **Dedupe is exact or nothing, and only a clean fetch closes.** Cross source listings merge only on equal company key, title and location fingerprints, never inside one source and never in an ambiguous group. `Listings.apply_fetch` closes listings missing from a successful board fetch, and a skipped job it cannot place stops the closing. See [ADR 0031](adr/0031-conservative-dedupe-filters-and-closing.md).
 - **A denial is permanent until a human removes it.** A denied company is a tombstone matched by `company_key` and by normalized board, and `Watchlist.add` refuses it. Only `Tombstones.remove` lifts one. See [ADR 0017](adr/0017-tombstones-are-removed-only-by-a-human-call.md).
 - **The blacklist filter is pure and runs first.** `is_blacklisted(candidate, entries)` takes everything as arguments, touches no database and no network, and returns the `BlockReason` (company key, slug or domain) or `None`. It is meant to run on a discovered company before any fetch. Entries are normalized when created, and `Blacklist` only stores them. See [data-model.md](data-model.md#discovery-the-blacklist).
 - **Delay is measured from the end of the previous request.** `HostRateLimiter.wait` sleeps until `delay` seconds after the last request to that host finished, and `PoliteClient` calls `finished` in a `finally` after every attempt, so a slow response never eats into the gap. See [ADR 0019](adr/0019-polite-fetch-timing-and-clocks.md).
@@ -279,7 +299,7 @@ Conventions you will trip over if you do not know them:
 ## Adding a new thing, by example
 - **Different score weights:** edit `config/weights.yaml`. `tests/component/test_weights_loader.py` shows the rules, and `docs/pipeline.md#score` must match if you change the defaults.
 - **A new legal suffix for company names:** add it to `LEGAL_SUFFIXES` in `storage/company_key.py`, with a row in `tests/unit/test_company_key.py` first. **Newer Unicode confusables:** see the update steps in `docs/data-model.md`.
-- **A new table or column:** add the next numbered file to `src/cypress_creek/storage/migrations/` (for example `0005_postings.sql`, with `-- ABOUTME: ` header lines), never edit an applied one, and add a test in `tests/component/test_migrations.py` or beside the new code. See `docs/data-model.md#storage-sqlite-and-migrations`.
+- **A new table or column:** add the next numbered file to `src/cypress_creek/storage/migrations/` (for example `0007_example_table.sql`, with `-- ABOUTME: ` header lines), never edit an applied one, and add a test in `tests/component/test_migrations.py` or beside the new code. See `docs/data-model.md#storage-sqlite-and-migrations`.
 - **A new blacklist match kind:** add a `BlockReason` member and its normalizer in `discovery/blacklist.py`, write the failing unit rows in `tests/unit/test_blacklist_filter.py` first, then add the kind to the `CHECK` list with the next numbered migration (never edit `0003_blacklist.sql`) and update [data-model.md](data-model.md#discovery-the-blacklist).
 - **A new model backend:** implement `Provider` in `providers/<name>.py`, register it with `REGISTRY.register`, import it in `providers/__init__.py`, and add the file to the HTTP client allow list in `tests/unit/test_safe_http.py` if it uses httpx. Write the request and response tests first (copy `tests/unit/test_anthropic_adapter.py` and `tests/component/test_anthropic_request_shape.py`), then a `live` integration test that fails without its backend. A hosted backend must demand `allow_remote`, take its key from `api_key_env`, scrub it from errors and map refusals to `Refusal`.
 - **A new tag alias:** add it to `config/aliases.yaml`. The tests in `tests/unit/test_aliases.py` show the rules (an alias belongs to one canonical tag).

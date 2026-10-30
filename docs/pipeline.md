@@ -292,13 +292,7 @@ It prints the entailment status, the failure label or `None`, the final support,
 - **The allow-list is the cited facts only.** The posting text is hostile input and a draft is a claim about you, so a number, employer or skill that appears only in the requirement never makes a sentence clean. (Entailment rationales may use the requirement's words, drafts may not.) A sentence is also capped at 300 characters, the length of a fact claim.
 - **Failures are shown, never clean.** A sentence that fails any check stays in `Draft.sentences` with its verdicts, and `render_draft` prints it as `! NOT VERIFIED (V8: ...)`. Only `Draft.clean_sentences` (those that passed every check) is fit to copy. Model text is flattened to one line, so a sentence cannot forge a line or banner.
 - **Failures.** `status` is `drafted`, `no_support` or `not_run`. A typed provider failure, or a model that returns no sentences, is `not_run` with a `failure` label. `BudgetExceeded` is not caught. The model may write at most half the window, never more than 600 tokens. One call, plus the one schema retry.
-- **Limits.** The checks are heuristics, and four classes of unsupported claim are known to pass every check and print as a clean line (tracked in [issue #131](https://github.com/jpalicke/cypress-creek-job-board/issues/131), and pinned by tests so they cannot be forgotten):
-  - quantity words that are not numbers: "... to Python for a decade" passes because V8 reads digits and number words such as `ten`, not `decade`, `dozen` or `half`;
-  - an invented outcome: "..., doubling revenue" passes because V10 only flags capitalised, digit, acronym or camelCase terms;
-  - seniority or adjective inflation: "... 8 senior staff engineers" passes for the same reason;
-  - negation or reversal: "Never led a team of 8 engineers ..." passes because every word and number is in the fact and the validators do not read meaning.
-
-  Also, V8 cannot tell that a correct number is attached to the wrong thing, and citing an unrelated verified fact still passes V4 to V9. So a clean line means only "no check found a problem", never "this is true". A draft is a human-review aid: `needs_human_review` stays true, and you must read every line against your own record before using it. Cover letters and long form writing are out of scope.
+- **Limits.** Draft sentences use a closed vocabulary ([ADR 0033](adr/0033-draft-closed-vocabulary.md)): every word must come from a cited fact, apart from a short fixed list of connecting words, with plain ASCII only and a dropped negation refused, see [validators.md](validators.md#v10-novel-term-flag). A synonym, a made up result, a rank word, a quantity such as "a decade" or a look-alike letter therefore fails and prints as NOT VERIFIED, without a word list that has to keep growing. The price is that honest rewordings with a new word are flagged too (10 of 22 on the test corpus), so reuse the wording of the facts. What it does not prove: meaning is not read, a recombination of cited words can still mislead, a correct number can be attached to the wrong thing, and citing an unrelated verified fact still passes. A clean line means only "no check found a problem", never "this is true". A draft is a human-review aid: `needs_human_review` stays true, and you must read every line against your own record before using it. Cover letters and long form writing are out of scope.
 
 ### Try judging a draft
 No model is needed. This feeds `judge_draft` a recorded style draft with one good sentence, one that inflates a number and invents an employer, and one that cites nothing.
@@ -434,6 +428,95 @@ print('calls:', len(trace.calls), 'validator verdicts:', len(trace.validators))"
 It prints the gap report, the run id and counts of observed calls and validator verdicts.
 Every cited fact is verified, a rationale that fails the grounding checks is replaced by
 `rationale withheld`, and the score is triage only.
+
+## Discovery: dedupe, filters and listing states
+
+Discovery turns the listings an adapter fetched into the ones worth scoring, before any model call. Three deterministic steps, none of which uses a model. The choices are in [ADR 0031](adr/0031-conservative-dedupe-filters-and-closing.md).
+
+**Dedupe** (`discovery/dedupe.py`, `dedupe(listings, company_keys)`). A false merge hides a real posting, so the rule is exact or nothing.
+1. One listing per listing id (`ats:slug:job_id`). If the same id arrives twice, the copy with the latest `fetched_at` wins, with every other field as the tie breaker, so the answer never depends on input order.
+2. Across sources, two listings merge only when their company key, title and location fingerprints are all equal. The company is `company_key` of the watchlist display name, passed in as a map from the normalized `(ats, slug)` to the key, because a listing does not carry a company name. A listing whose board is not in the map is never merged across sources.
+3. A fingerprint is NFKC, casefold, punctuation turned into a space, whitespace collapsed. `#` is kept, and `+` is not punctuation, so `C#` and `C++` do not collapse into `C`. Location gets the same treatment and nothing more: a region is never expanded to a city.
+4. A fingerprint group merges only if each source (`ats`) appears once in it. Two openings with the same title and place on one board are two jobs, and a group with such a pair merges nothing, because it is unclear which copy matches which.
+5. A merge is a `MergedListing`: the listing with the smallest id, the earliest `posted_at` of the group, every URL (sorted) and every source id (sorted). The result is sorted by id.
+
+**Filters** (`discovery/filters.py`, `apply_filters(listings, ListingFilters(...), today)`). All matching is on whole words after the same fingerprint folding, so `java` does not match `javascript`.
+
+| Field | Keeps a listing when |
+| --- | --- |
+| `max_age_days` | `today` minus the posted date is at most N days. A listing with no `posted_at` is kept, since age cannot be judged. |
+| `locations` | the location contains any listed place |
+| `remote` | `true`: the location says `remote`, or the title says it in a marked form (`Engineer (Remote)`, `Engineer - Remote`, `Remote - Engineer`). `false`: it does not. The word alone inside a title, as in `Remote Sensing Engineer`, is not a work location. |
+| `exclude_seniority` | no term appears in the title |
+| `exclude_keywords` | no term appears in the title or description |
+| `include_keywords` | at least one term appears in the title or description |
+
+The filters run in that order and `FilterReport.removed` counts each removed listing under the first filter that rejected it, so the counts add up to `total_removed` and a filter set that removes everything says which filter did it. `today` is passed in, never read from a clock.
+
+**Listing states** (`discovery/listings.py`, `Listings`). `apply_fetch(ats, slug, fetch)` takes one successful fetch of a whole board and, in one transaction, stores unknown listings as `new`, marks known ones `seen` (a closed listing that returns is `seen` again), and marks stored listings of that board that are missing from the fetch `closed`. A fetch that raised never reaches `apply_fetch`, so a failed fetch closes nothing (`Listings.refresh(adapter, ats, slug)` fetches and applies in one call). A job the adapter skipped as malformed does not close its listing: a skipped job with a known id protects that listing, and a skipped job with no id stops closing for that fetch, because it could have been any of them.
+
+### Try dedupe, filters and states
+No network and no model. This writes only to a throwaway database. From the repository root, in a bash shell:
+
+```bash
+export CYPRESS_CREEK_DATA_DIR="$(mktemp -d)"
+uv run python - <<'PY'
+from datetime import UTC, date, datetime
+
+from cypress_creek.discovery.adapters.base import BoardFetch, Listing
+from cypress_creek.discovery.dedupe import dedupe
+from cypress_creek.discovery.filters import ListingFilters, apply_filters
+from cypress_creek.discovery.listings import Listings
+from cypress_creek.storage.db import connect, database_path, migrate
+
+
+def listing(ats, job_id, title, location="Austin, TX", posted=datetime(2026, 3, 1, tzinfo=UTC)):
+    return Listing(
+        id=f"{ats}:exampleco:{job_id}", ats=ats, slug="exampleco", title=title,
+        location=location, url=f"https://jobs.example.test/{ats}/{job_id}", posted_at=posted,
+        fetched_at=datetime(2026, 3, 31, tzinfo=UTC), content_text="Build services in Python.",
+        content_hash="h",
+    )
+
+
+found = [
+    listing("greenhouse", "1", "Platform Engineer"),
+    listing("lever", "a", "PLATFORM  engineer."),
+    listing("ashby", "z", "Staff Platform Engineer"),
+]
+keys = {("greenhouse", "exampleco"): "exampleco", ("lever", "exampleco"): "exampleco",
+        ("ashby", "exampleco"): "exampleco"}
+merged = dedupe(found, keys)
+print("after dedupe:", [(m.listing.title, len(m.urls)) for m in merged])
+
+report = apply_filters(
+    [m.listing for m in merged], ListingFilters(exclude_seniority=("staff",)), date(2026, 3, 31)
+)
+print("kept:", [item.title for item in report.kept])
+print("removed:", {name.value: count for name, count in report.removed.items() if count})
+
+conn = connect(database_path())
+migrate(conn)
+repo = Listings(conn)
+print(repo.apply_fetch("greenhouse", "exampleco", BoardFetch((found[0],), ())))
+print(repo.apply_fetch("greenhouse", "exampleco", BoardFetch((), ())))
+print([(item.id, item.state.value) for item in repo.board("greenhouse", "exampleco")])
+PY
+unset CYPRESS_CREEK_DATA_DIR
+```
+
+Expected output:
+
+```text
+after dedupe: [('Staff Platform Engineer', 1), ('Platform Engineer', 2)]
+kept: ['Platform Engineer']
+removed: {'seniority': 1}
+StateChanges(added=1, seen=0, closed=0)
+StateChanges(added=0, seen=0, closed=1)
+[('greenhouse:exampleco:1', 'closed')]
+```
+
+The Greenhouse and Lever copies of `Platform Engineer` merged (two URLs), the Ashby `Staff Platform Engineer` stayed separate, the seniority filter removed it, and an empty successful fetch closed the stored listing.
 
 ## Try it locally
 ```bash

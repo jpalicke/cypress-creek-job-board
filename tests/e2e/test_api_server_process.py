@@ -22,16 +22,17 @@ ENV = {
 }
 
 
-def child_env(**extra: str) -> dict[str, str]:
-    return {**os.environ, **ENV, **extra}
+def child_env(data_dir: Path, **extra: str) -> dict[str, str]:
+    """A child environment whose database lives in a throwaway folder, never in the repo."""
+    return {**os.environ, **ENV, "CYPRESS_CREEK_DATA_DIR": str(data_dir), **extra}
 
 
 @contextmanager
-def running_server() -> Iterator[subprocess.Popen[str]]:
+def running_server(data_dir: Path) -> Iterator[subprocess.Popen[str]]:
     process = subprocess.Popen(
         [sys.executable, "-m", "cypress_creek.api.server"],
         cwd=ROOT,
-        env=child_env(),
+        env=child_env(data_dir),
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
@@ -73,8 +74,8 @@ def fetch(path: str, host: str | None = None) -> tuple[int, dict[str, str], obje
         connection.close()
 
 
-def test_the_server_answers_on_loopback_and_enforces_the_host_check() -> None:
-    with running_server():
+def test_the_server_answers_on_loopback_and_enforces_the_host_check(tmp_path: Path) -> None:
+    with running_server(tmp_path):
         status, headers, body = fetch("/api/health")
         assert status == 200
         assert body == {
@@ -116,8 +117,8 @@ def raw_request(
         connection.close()
 
 
-def test_writes_need_exactly_one_right_token_on_the_real_server() -> None:
-    with running_server():
+def test_writes_need_exactly_one_right_token_on_the_real_server(tmp_path: Path) -> None:
+    with running_server(tmp_path):
         _, _, session = fetch("/api/session")
         assert isinstance(session, dict)
         token = session["csrf_token"]
@@ -139,8 +140,8 @@ def test_writes_need_exactly_one_right_token_on_the_real_server() -> None:
         assert right[0] == 404
 
 
-def test_hardening_headers_come_with_every_real_answer() -> None:
-    with running_server():
+def test_hardening_headers_come_with_every_real_answer(tmp_path: Path) -> None:
+    with running_server(tmp_path):
         ok = fetch("/api/health")
         refused = fetch("/api/health", host="evil.example:5309")
         missing = fetch("/api/nothing")
@@ -153,11 +154,13 @@ def test_hardening_headers_come_with_every_real_answer() -> None:
 
 
 @pytest.mark.parametrize("host", ["0.0.0.0", "127.0.0.2", "::1"])
-def test_a_bind_other_than_127_0_0_1_is_refused_before_anything_listens(host: str) -> None:
+def test_a_bind_other_than_127_0_0_1_is_refused_before_anything_listens(
+    host: str, tmp_path: Path
+) -> None:
     result = subprocess.run(
         [sys.executable, "-m", "cypress_creek.api.server"],
         cwd=ROOT,
-        env=child_env(CYPRESS_CREEK_API_HOST=host),
+        env=child_env(tmp_path, CYPRESS_CREEK_API_HOST=host),
         capture_output=True,
         text=True,
         timeout=30,

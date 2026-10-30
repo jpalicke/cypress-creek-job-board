@@ -7,6 +7,7 @@ from decimal import Decimal
 
 from cypress_creek.facts.models import Bank, Fact, Kind
 from cypress_creek.terms import normalize_term
+from cypress_creek.validators.claim_words import fact_text, known_in, quantity_words
 from cypress_creek.validators.verdict import Verdict, fail, ok
 
 _MONTHS = {
@@ -217,11 +218,15 @@ def _fact_numbers(fact: Fact) -> set[str]:
 
 def check_numbers(text: str, cited: Sequence[Fact], requirement_text: str) -> Verdict:
     """V8: every number in the text appears in a cited fact (claim, names, date years) or in the
-    requirement text it answers. The parts of ISO dates are V7's concern."""
+    requirement text it answers. The parts of ISO dates are V7's concern. A quantity word with no
+    digit (decade, dozen, half, doubling) must be used by a cited fact or the requirement too."""
     allowed = set(extract_numbers(requirement_text))
     for fact in cited:
         allowed |= _fact_numbers(fact)
     for number in extract_numbers(_strip_iso_dates(text)):
         if number not in allowed:
             return fail("V8", "number does not appear in any cited fact", number)
+    known = known_in([requirement_text, *(fact_text(fact) for fact in cited)], quantity_words)
+    for word in sorted(quantity_words(text) - known):
+        return fail("V8", "quantity word does not appear in any cited fact", word)
     return ok("V8")

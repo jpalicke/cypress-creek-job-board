@@ -360,6 +360,14 @@ def score_case(
     return CaseScore(case_id=case_id, repeat=repeat, counts=totals, missed=missed, mismatches=lines)
 
 
+def grounding_violations(report: GapReport, bank: Bank) -> int:
+    """Fabricated ids, unverified citations and uncited claims over every row of a report."""
+    total = 0
+    for row in report.rows:
+        total += sum(_grounding(row, bank, "", []))
+    return total
+
+
 def pool(cases: Sequence[CaseScore]) -> Counts:
     """Add the counts of every case in one repeat."""
     total = Counts()
@@ -418,10 +426,12 @@ class MetricValue(BaseModel):
     worst: float | None
 
 
-def aggregate(per_repeat: Sequence[Mapping[str, float | None]]) -> dict[str, MetricValue]:
+def aggregate(
+    per_repeat: Sequence[Mapping[str, float | None]], metrics: Sequence[Metric] = METRICS
+) -> dict[str, MetricValue]:
     """Mean and worst of each metric over the repeats that measured it. No runs is not run."""
     result: dict[str, MetricValue] = {}
-    for metric in METRICS:
+    for metric in metrics:
         runs = [value for values in per_repeat if (value := values.get(metric.name)) is not None]
         worst = None
         if runs:
