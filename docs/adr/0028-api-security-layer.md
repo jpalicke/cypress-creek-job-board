@@ -1,6 +1,6 @@
 # ADR 0028: The API security layer: an exact Host allow-list, an app-wide CSRF middleware, a session route, hardening headers and no schema routes
 
-Status: accepted (card G1). Security card: the Host and CSRF logic wants a second human review.
+Status: accepted (card G1). Security card: the Host and CSRF logic wanted a second human review. Joe P gave it on 2026-10-30 and said G1 looks good; he can still order changes.
 
 ## Context
 
