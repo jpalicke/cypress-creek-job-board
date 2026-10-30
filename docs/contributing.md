@@ -83,7 +83,7 @@ On every commit the hooks run, and CI (`.github/workflows/deterministic.yml`) ru
 - **ruff lint** and **ruff format check**: style and common errors.
 - **ABOUTME header check**: every code file starts with the two line header (see below).
 - **mypy --strict**: strict type check over `src`, `tests` and `scripts`.
-- **pytest** over the unit and component tiers with `--cov-fail-under=80`. Only `src/cypress_creek` counts toward coverage.
+- **pytest** over the unit and component tiers with `--cov-fail-under=80`. Only `src/cypress_creek` counts toward coverage. The report lists only files below full coverage. The hook skips commits that touch only `docs/` or Markdown files; CI still runs it on every push.
 
 Three more CI pieces cover the tiers the gated run leaves out:
 

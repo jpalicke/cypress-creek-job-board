@@ -38,7 +38,7 @@ repos:
         pass_filenames: false
       - id: pytest
         name: pytest unit and component with coverage gate
-        entry: uv run --locked pytest tests/unit tests/component --cov --cov-fail-under=80
+        entry: uv run --locked pytest tests/unit tests/component --cov --cov-report=term:skip-covered --cov-fail-under=80 -q
         language: system
         pass_filenames: false
-        always_run: true
+        exclude: '(^docs/|\.md$)'

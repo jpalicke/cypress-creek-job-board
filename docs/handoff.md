@@ -26,7 +26,7 @@ git config user.email            # must be: 13882087+jpalicke@users.noreply.gith
    uv run ruff format src tests
    uv run ruff check src tests
    uv run mypy                       # strict
-   uv run pytest tests/unit tests/component --cov --cov-fail-under=80 -q
+   uv run pytest tests/unit tests/component --cov --cov-report=term:skip-covered --cov-fail-under=80 -q
    uv run pytest tests/e2e tests/integration -m "not needs_network and not live and not live_openai and not live_lmstudio" -q
    uv run pre-commit run --all-files
    ```
