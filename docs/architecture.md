@@ -57,6 +57,10 @@ flowchart LR
 - **Nothing happens by itself.** The Analyze screen sends nothing until the button is pressed, and no screen copies, sends or applies anything. A hosted backend needs an explicit tick before the button works.
 - **Strict policy.** The API sends a strict `Content-Security-Policy` ([api.md](api.md#the-content-security-policy)). The dev server on port 5150 is for development only and proxies `/api`.
 
+### The fact bank screen
+
+`facts/store.py` is the one writer of the bank file: a draft (claim, kind, dates, tags, evidence) has no id, verification or share field, validation is the loader's own `parse_fact`, and only `verify()` ever sets a verification date. The routes call it under a lock and write atomically. `FactBank.svelte` shows the API's states and errors as text and holds no rule of its own; the trust boundary is the same as before, because the pipeline still receives only verified facts from `load_bank` (and shareable ones for a hosted backend), which an integration test checks over a bank built through the store.
+
 ## Polite fetching
 
 Discovery code never calls `fetch_url` directly. It calls `PoliteClient.get(url)`, which adds the politeness rules described in [the README](../README.md#discovery-findings-and-sources) on top of the guarded transport. The layering, outermost first:

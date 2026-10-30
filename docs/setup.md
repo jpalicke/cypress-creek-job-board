@@ -161,6 +161,17 @@ npm run e2e         # Playwright against the real API on 5309 (needs the bundle 
 
 `npm run e2e` starts the API itself with a fresh throwaway database that holds a few stored reports, one full of hostile markup, and with the backend pointed at a closed port. It needs a Chromium for Playwright: CI runs `npx playwright install --with-deps chromium`, and on a machine that already has one set `PLAYWRIGHT_BROWSERS_PATH`. `npm run e2e:live` runs one more test that needs a real Ollama (see [providers.md](providers.md#try-it-locally)); it fails, never skips, when Ollama is not running. If you change a pydantic model the UI uses, regenerate its types with `uv run python scripts/gen_api_types.py`; a unit test fails when `web/src/lib/types.ts` is stale.
 
+## Build your fact bank in the browser
+
+Open <http://127.0.0.1:5309/#/facts> (the **Fact bank** link in the header). With no bank file yet it says so; adding your first fact creates `facts.private/bank.yaml` (or the path in `CYPRESS_CREEK_BANK`), which is gitignored and stays on this computer. Nothing on this screen sends the bank anywhere.
+
+- **Add a fact**: write what is true, pick its kind, fill in the employer, role, dates and skills with their levels, and say where it can be checked. It is saved **unverified and local only**.
+- **Verify this fact** is a button on each fact, pressed by you, one fact at a time. Unverified facts are not used by any report or draft. There is no bulk verify and nothing preselected.
+- **Allow a model to see this fact** is a separate control. A model may see only a fact that is both verified and shareable; a local only fact is never shown to a model.
+- **Edit** a fact to change what it says: it becomes unverified until you verify it again. **Delete** asks you to confirm.
+- The screen shows the API's own error next to the field when a fact breaks a rule (a date in the future, an unknown skill level). It does not repeat the rules itself.
+- The file is rewritten by the screen, so comments in a hand edited bank are not kept (see [data-model.md](data-model.md#editing-the-bank-from-the-browser)).
+
 ## Fetch a job board politely
 
 Discovery fetches go through one library, `PoliteClient`, which adds a per-host delay, a refresh window, an ETag disk cache and backoff on top of the guarded transport. The discovery routes use it for every board; this example uses it directly. It makes two real requests to a public job board feed, and the cache goes in a throwaway directory so nothing lands in your data directory. From the repository root, in a bash shell:

@@ -225,3 +225,11 @@ It prints `already blacklisted as a company_key, reason: not a fit` (the match k
 uv run python -c "from cypress_creek.storage.db import connect, database_path, migrate, schema_version; c = connect(database_path()); print('applied', migrate(c), 'now at version', schema_version(c)); print('again', migrate(c))"
 ```
 On a fresh database, the first run prints `applied [1, 2, 3, 4]` and creates `data/cypress_creek.sqlite3`. An existing database applies only pending migrations. Running it again prints `applied []`.
+
+### Editing the bank from the browser
+
+The Fact bank screen (`#/facts`) edits the same bank file through `facts/store.py`; you can still edit the file by hand. Things to know:
+- The file is rewritten as a whole with YAML defaults, so **comments and formatting in a hand edited file are not kept** after the first change from the browser. Keep a copy if you care about them. The write is atomic (a temporary file is moved over the bank) and the file is private (mode 0600). A bank file that does not load is never overwritten.
+- A new fact is unverified and local only. Only the verify button sets `verified_on`, one fact at a time, and a model never sets it. Editing what a fact says (the claim, kind, employer, issuer, role, dates, tags or evidence) clears it again; changing only the share state does not.
+- Ids come from a counter kept beside the bank (`bank.yaml.next_id`) as well as from the highest id in the file, so a deleted id is not reused. Deleting a fact does not change stored reports that cite it; they keep showing the id.
+- `facts.private/` is gitignored, so the bank, the counter and temporary files never reach the repository.
