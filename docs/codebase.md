@@ -73,7 +73,7 @@ src/cypress_creek/       The library
     ollama.py            OllamaProvider and its pre-flight and post-flight truncation checks
     anthropic.py         AnthropicProvider: Messages API request, strict schema rewrite, response and error mapping
     openai_compatible.py OpenAICompatibleProvider (OpenAI and LM Studio), build_request, read_completion
-    strict_schema.py     strict_schema: a pydantic schema in the strict subset hosted APIs accept
+    strict_schema.py     strict_schema, close_schema: a pydantic schema in the strict subset a hosted API accepts; the caller passes its own keyword set (`OPENAI_UNSUPPORTED_KEYWORDS`, `ANTHROPIC_UNSUPPORTED_KEYWORDS`, each defined next to its adapter)
     budget.py            Budget, BudgetTracker, BudgetedProvider, dry_run_estimate, budget_from_settings
   config/                Backend settings (not the repo level config/ data folder)
     settings.py          ProviderSettings, load_settings, is_loopback_url, resolve_api_key, ConfigError
