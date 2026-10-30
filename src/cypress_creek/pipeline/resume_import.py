@@ -17,7 +17,7 @@ from cypress_creek.providers import ProviderError
 from cypress_creek.providers.base import Provider, Usage
 from cypress_creek.providers.retry import RetryPolicy, call_with_retry
 from cypress_creek.terms import normalize_term
-from cypress_creek.validators.candidates import ProposedFact, check_candidate_grounded
+from cypress_creek.validators.candidates import ProposedFact, check_candidate_grounded, collapse
 
 SCHEMA_VERSION = 1
 MAX_OUTPUT_TOKENS = 4000
@@ -83,7 +83,7 @@ def accept_candidates(
             seen.add(key)
             kept.append(
                 Candidate(
-                    claim=proposal.claim.strip(),
+                    claim=collapse(proposal.claim),
                     kind=proposal.kind,
                     tags=tags,
                     source=proposal.source.strip(),

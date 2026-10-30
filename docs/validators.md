@@ -103,10 +103,11 @@ Known limit: a short plain phrase such as "Ignore previous instructions" has the
 ## V15 Resume grounding
 `check_candidate_grounded(resume, fact)` (version 1) checks one fact proposed from a resume. The resume is the normalized text the model was given. The checks run in this order and the first failure is the verdict (`reason`, with the offending token for logs only):
 1. `source_not_in_resume`: the source span, with spaces collapsed, must be a continuous piece of the resume. It is case sensitive and exact, so a lookalike letter or a changed word fails.
-2. `number_not_in_source`: every number in the claim (digits with their separators, so `1,200` is not `1,200,000`) and every quantity word (such as dozen or decade) must be in the source.
-3. `month_not_in_source`: every capitalised month name or abbreviation in the claim must be a month named in the source.
-4. `name_not_in_source`: every capitalised word of the claim must be a word of the source, compared by case folding only. This includes the first word of the claim, so a claim must reuse the resume's own opening word. The pronoun `I` is exempt.
-5. `tag_not_in_source`: every tag must be in the source, as the tag or as one of its aliases from `config/aliases.yaml`. The term must stand alone, so `c` is not found in `company` or `java` in `JavaScript`.
+2. `invisible_character_in_claim`: the claim may not contain format characters such as zero-width spaces or soft hyphens, which can split a word past the other checks. The claim that is stored is the spaces-collapsed form that was checked.
+3. `number_not_in_source`: every number in the claim (digits with their separators, so `1,200` is not `1,200,000`) and every quantity word (such as dozen or decade) must be in the source.
+4. `month_not_in_source`: every capitalised month name or abbreviation in the claim must be a month named in the source.
+5. `name_not_in_source`: every capitalised word of the claim must be a word of the source, compared by case folding only. This includes the first word of the claim, so a claim must reuse the resume's own opening word. The pronoun `I` is exempt.
+6. `tag_not_in_source`: every tag must be in the source, as the tag or as one of its aliases from `config/aliases.yaml`. The term must stand alone, so `c` is not found in `company` or `java` in `JavaScript`.
 
 Known limits: a claim can be true to its words and still mislead by what it leaves out; lower case words are not checked (a wrong verb or tool in lower case passes if its capitalised and numeric parts are grounded), and number words such as "five" are only caught when they are in the quantity list. A person reads every candidate. The check is strict on purpose: a proposal that fails is dropped and counted, never repaired.
 

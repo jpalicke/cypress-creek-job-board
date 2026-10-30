@@ -151,6 +151,19 @@ def test_approving_writes_one_unverified_local_only_fact_and_nothing_else(
     assert len(load_bank(tmp_path / "private" / "bank.yaml").facts) == 1
 
 
+def test_a_bank_that_cannot_be_written_leaves_the_candidate_pending(tmp_path: Path) -> None:
+    with chat_server(reply(GOOD)) as (base_url, _):
+        client = make(tmp_path, base_url)
+        candidate = run(client).json()["candidates"][0]
+    (tmp_path / "private").write_text("a file where the bank directory should be")
+
+    failed = send(client, "POST", f"/api/import/candidates/{candidate['id']}/approve")
+
+    assert failed.status_code == 500 and failed.json()["error"]["code"] == "internal_error"
+    pending = client.get("/api/import/candidates").json()["candidates"]
+    assert [c["id"] for c in pending] == [candidate["id"]]
+
+
 def test_rejecting_keeps_it_out_of_the_bank(tmp_path: Path) -> None:
     with chat_server(reply(GOOD)) as (base_url, _):
         client = make(tmp_path, base_url)

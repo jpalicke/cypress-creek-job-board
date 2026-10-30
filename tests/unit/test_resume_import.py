@@ -52,6 +52,12 @@ def test_each_failure_reason_is_counted_separately() -> None:
     assert dropped == {"name_not_in_source": 1, "source_not_in_resume": 1, "tag_not_in_source": 1}
 
 
+def test_the_stored_claim_is_the_form_that_was_validated() -> None:
+    kept, _ = accept(proposal(claim="  Built\u00a0Python   services. "))
+
+    assert [c.claim for c in kept] == ["Built Python services."]
+
+
 def test_a_repeated_claim_is_merged_and_counted() -> None:
     kept, dropped = accept(proposal(), proposal(claim="  built python SERVICES "))
 

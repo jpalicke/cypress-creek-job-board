@@ -171,3 +171,13 @@ def test_a_sentence_initial_word_is_a_name_and_must_be_in_the_source() -> None:
     )
 
     assert verdict.reason == "name_not_in_source" and verdict.offending == "Developed"
+
+
+@pytest.mark.parametrize("invisible", ["\u200b", "\u00ad", "\u2060", "\ufeff"])
+def test_an_invisible_character_in_the_claim_fails(invisible: str) -> None:
+    source = "Wrote Java"
+    verdict = check_candidate_grounded(
+        source, fact(claim=f"Wrote Java{invisible}script", source=source, tags=[])
+    )
+
+    assert verdict.reason == "invisible_character_in_claim"

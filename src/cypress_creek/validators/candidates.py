@@ -37,7 +37,7 @@ def _aliases() -> AliasTable:
     return load_aliases()
 
 
-def _collapse(text: str) -> str:
+def collapse(text: str) -> str:
     return _SPACES.sub(" ", unicodedata.normalize("NFKC", text)).strip()
 
 
@@ -55,18 +55,21 @@ def _mentions(text: str, term: str) -> bool:
 
 
 def _folded_words(text: str) -> set[str]:
-    return {word.strip(".,;:'’").casefold() for word in _WORD.findall(_collapse(text))}
+    return {word.strip(".,;:'’").casefold() for word in _WORD.findall(collapse(text))}
 
 
 def check_candidate_grounded(resume: str, fact: ProposedFact) -> Verdict:
     """Pass only if the span is in the resume and the claim and tags say nothing beyond it.
 
-    Checked in order: the span, numbers, quantity words, months, capitalised names, tags. The
-    first failure is the verdict; the offending text is for logs and is never sent to a caller."""
-    source = _collapse(fact.source)
-    if not source or source not in _collapse(resume):
+    Checked in order: the span, invisible characters, numbers, quantity words, months,
+    capitalised names, tags. The first failure is the verdict; the offending text is for logs
+    and is never sent to a caller."""
+    source = collapse(fact.source)
+    if not source or source not in collapse(resume):
         return fail(VALIDATOR_ID, "source_not_in_resume")
-    claim = _collapse(fact.claim)
+    if any(unicodedata.category(char) == "Cf" for char in fact.claim):
+        return fail(VALIDATOR_ID, "invisible_character_in_claim")
+    claim = collapse(fact.claim)
     for number in sorted(_numbers(claim) - _numbers(source)):
         return fail(VALIDATOR_ID, "number_not_in_source", number)
     for word in sorted(quantity_words(claim) - quantity_words(source)):

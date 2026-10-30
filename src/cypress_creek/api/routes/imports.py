@@ -239,6 +239,9 @@ def approve_candidate(
     except (FactValidationError, BankLoadError, ValueError):
         store.reopen(candidate_id)
         raise ApiError(422, ErrorCode.INVALID_REQUEST) from None
+    except Exception:
+        store.reopen(candidate_id)
+        raise
     store.attach_fact(candidate_id, fact.id)
     approved = store.get(candidate_id)
     assert approved is not None
