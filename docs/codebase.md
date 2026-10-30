@@ -73,7 +73,7 @@ src/cypress_creek/       The library
     ollama.py            OllamaProvider and its pre-flight and post-flight truncation checks
     anthropic.py         AnthropicProvider: Messages API request, strict schema rewrite, response and error mapping
     openai_compatible.py OpenAICompatibleProvider (OpenAI and LM Studio), build_request, read_completion
-    strict_schema.py     strict_schema: a pydantic schema in the strict subset hosted APIs accept
+    strict_schema.py     strict_schema, close_schema: a pydantic schema in the strict subset a hosted API accepts; the caller passes its own keyword set (`OPENAI_UNSUPPORTED_KEYWORDS`, `ANTHROPIC_UNSUPPORTED_KEYWORDS`, each defined next to its adapter)
     budget.py            Budget, BudgetTracker, BudgetedProvider, dry_run_estimate, budget_from_settings
   config/                Backend settings (not the repo level config/ data folder)
     settings.py          ProviderSettings, load_settings, is_loopback_url, resolve_api_key, ConfigError
@@ -118,7 +118,7 @@ src/cypress_creek/       The library
 evals/
   bank/                  The fictional sample fact bank, its unverified lure file and PLANTED_GAPS.md (see evals.md)
   cases/                 Dated fictional postings; technical-smoke.json is the CLI smoke case
-  harness/run.py         Dry-run planner and resumable real-provider CLI
+  harness/run.py         Dry-run planner and resumable real-provider CLI over a manifest or the labeled fixtures
   harness/labels.py      Hand label schema, validate_labels, planted_gap_support, require_committed_labels
   harness/fixtures.py    Fixture loading, the meta schema and fixture_set_hash
   harness/check_labels.py  Command line check of every posting fixture

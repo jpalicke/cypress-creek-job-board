@@ -8,7 +8,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [data-model.md](data-model.md) | The fact bank, Posting and Requirement, and the tag alias table (`config/aliases.yaml`) the company name key (`company_key`), the SQLite storage and migrations, and the discovery tables (watchlist, denied companies, blacklist and its filter) |
 | [pipeline.md](pipeline.md) | discovery dedupe, filters, listing states and scoring under a cap, HTML posting text extraction, posting normalization, the prompt builder (extraction, entailment and draft prompts), draft help, accepting extraction output, stage 1 extraction, stage 2 retrieval, stage 3 entailment, stages 4 and 5 score and report, running the pipeline with an optional trace and a derived run id, the support gate, the score |
 | [api.md](api.md) | The local API: loopback bind, Host check, CSRF token flow, typed errors, the posting, analyze, report and fact routes, size limits, storage and error codes |
-| [evals.md](evals.md) | Eval CLI dry runs and real Ollama smoke runs, whole-run budgets, typed records and traces, SQLite resume, scratch JSONL audit exports, fictional sample fact bank and planted gaps, real posting fixtures with hand labels and the label check, the E1 to E4 scorer with its metric definitions and mismatch view, and the injection corpus with the E6 score shift |
+| [evals.md](evals.md) | Eval CLI dry runs and real Ollama smoke runs, whole-run budgets, typed records and traces, SQLite resume, scratch JSONL audit exports, fictional sample fact bank and planted gaps, real posting fixtures with hand labels and the label check, the E1 to E4 scorer with its metric definitions and mismatch view, and the injection corpus with the E6 score shift, and running the labeled fixtures |
 | [evals-results.md](evals-results.md) | The generated backend comparison table (do not edit by hand) |
 | [e3-label-decisions.md](e3-label-decisions.md) | Why each hand label is what it is, the judgment calls for Joe P to review, and the closed postings and their replacements |
 | [validators.md](validators.md) | The grounding validators V1 to V14: what each rejects and its known limits, and the closed vocabulary for drafts |
@@ -22,7 +22,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [handoff.md](handoff.md) | The card routine step by step, for a new contributor or assistant picking up a card |
 | [contributing.md](contributing.md) | How we work, quality gates, dependency audit, ABOUTME headers, docs checklist |
 | [E2b2 documentation audit](audits/AUDIT_REPORT_2026-10-17.md) | Verified runner and export claims against the implementation |
-| [pod/report.md](pod/report.md), [pod/decision-log.md](pod/decision-log.md) | Working records of the autonomous pod session of 2026-10-29: what was merged and what was left, and every judgement call made on Joe P's behalf with how to reverse it. Safe to delete when no longer wanted |
+| [pod/report.md](pod/report.md), [pod/decision-log.md](pod/decision-log.md), [pod/handover-senior-a.md](pod/handover-senior-a.md) | Working records of the autonomous pod session of 2026-10-29: what was merged and what was left, a handover from senior A, and every judgement call made on Joe P's behalf with how to reverse it. Safe to delete when no longer wanted |
 
 ## Decision records
 | ADR | Decision |
@@ -65,6 +65,7 @@ Start with the [README](../README.md) for setup and the commands you can run tod
 | [0036](adr/0036-watchlist-and-blacklist-routes.md) | The watchlist is written only through a human approval marker with no proposer field, the server stamps the time, the blacklist is checked first and wins, and conflicts are typed 409s with fixed text |
 | [0037](adr/0037-discovery-routes.md) | The discovery routes call the library run and the stored ranking unchanged: one budget for the whole run, the adapters are a parameter of create_app with a real factory by default, failures are a 200 summary, and the rows never carry the listing text |
 | [0039](adr/0039-comparison-table-is-generated-from-paired-run-and-metrics-files.md) | The comparison table is generated from paired run and metrics files, a target list owns the rows, conditions are a column, missing is never zero, and CI checks the table is current |
+| [0040](adr/0040-eval-runner-runs-the-labeled-fixtures.md) | The eval runner runs the committed labeled fixtures: labels are checked first, case ids are fixture ids, and the header records the fixture set hash |
 
 ## Configuration
 - `config/aliases.yaml`: tag alias table, described in [data-model.md](data-model.md#tag-alias-table).

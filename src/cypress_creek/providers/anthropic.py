@@ -1,6 +1,5 @@
 # ABOUTME: The Anthropic adapter, built on the Messages API with native JSON schema output.
 # ABOUTME: Hosted rules: allow_remote, https, key from the environment only and never in an error.
-import copy
 import math
 import os
 import re
@@ -33,6 +32,7 @@ from cypress_creek.providers.errors import (
     SchemaViolation,
 )
 from cypress_creek.providers.factory import REGISTRY
+from cypress_creek.providers.strict_schema import strict_schema
 
 PROVIDER = "anthropic"
 DEFAULT_BASE_URL = "https://api.anthropic.com"
@@ -64,7 +64,7 @@ SAFE_REQUEST_ID = re.compile(r"^req_[A-Za-z0-9]{1,64}$")
 
 # Keywords the structured output grammar rejects with a 400. The pydantic model validates the
 # answer afterwards, so dropping them only loses guidance, never a check.
-UNSUPPORTED_KEYWORDS = frozenset(
+ANTHROPIC_UNSUPPORTED_KEYWORDS = frozenset(
     {
         "minimum",
         "maximum",
@@ -78,42 +78,15 @@ UNSUPPORTED_KEYWORDS = frozenset(
         "uniqueItems",
     }
 )
-SCHEMA_MAPS = frozenset({"properties", "$defs", "definitions"})
 
 
 def estimate_tokens(text: str) -> int:
     return math.ceil(len(text) / CHARS_PER_TOKEN)
 
 
-def _close(node: object) -> object:
-    """Close every object and drop unsupported keywords. Property names are never touched."""
-    if isinstance(node, list):
-        return [_close(item) for item in node]
-    if not isinstance(node, dict):
-        return node
-    result: dict[str, Any] = {}
-    for key, value in node.items():
-        if key in SCHEMA_MAPS and isinstance(value, dict):
-            result[key] = {name: _close(child) for name, child in value.items()}
-        elif (
-            key in UNSUPPORTED_KEYWORDS
-            or key == "minItems"
-            and isinstance(value, int)
-            and value > 1
-        ):
-            continue
-        else:
-            result[key] = _close(value)
-    if result.get("type") == "object" or "properties" in result:
-        result["additionalProperties"] = False
-    return result
-
-
 def strict_json_schema(schema: type[BaseModel]) -> dict[str, Any]:
     """The pydantic schema rewritten to what the structured output grammar accepts."""
-    closed = _close(copy.deepcopy(schema.model_json_schema()))
-    assert isinstance(closed, dict)
-    return closed
+    return strict_schema(schema, ANTHROPIC_UNSUPPORTED_KEYWORDS)
 
 
 def build_request(

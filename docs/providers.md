@@ -64,7 +64,7 @@ ollama pull qwen3.5:4b
 ## The Anthropic adapter
 Code is `src/cypress_creek/providers/anthropic.py`, registered as provider `anthropic`. It calls the Messages API (`POST /v1/messages`) with native structured output and defaults to the model `claude-sonnet-5-5`. Decisions are in [ADR 0025](adr/0025-anthropic-native-structured-output.md).
 
-**Not yet proven against the live API.** As of this card, the real structured call has not yet been accepted by the live API; only the wrong-key path has run against it. Joe P runs `uv run pytest tests/integration/test_anthropic_live.py -q` once with a real key to close this, see [issue #129](https://github.com/jpalicke/cypress-creek-job-board/issues/129) for the command and what to record.
+**Proven against the live API.** On 2026-10-30 Joe P ran `uv run pytest tests/integration/test_anthropic_live.py -q` with a real key and both tests passed (the wrong-key 401 and the real structured call, which returned a conforming object with reported usage). The model id and usage numbers were not recorded; see [issue #129](https://github.com/jpalicke/cypress-creek-job-board/issues/129).
 
 - **Hosted rules.** It needs `allow_remote = true`, an `api_key_env` naming the variable that holds the key (never the key itself), and an https URL for any remote `base_url`. The key is sent only in the `x-api-key` header, redirects are not followed, and every error scrubs it. Facts marked `local_only` are left out of the prompt for any backend whose `local` capability is false, so they never reach the request body.
 - **Request.** The trusted system text is the top level `system` field. The untrusted data block (the posting inside its boundary, then any trusted facts) is the single user message. The schema goes in `output_config.format` after the adapter closes every object and drops the keywords the grammar rejects (the pydantic model still validates the answer). No tools are offered.
@@ -111,12 +111,13 @@ print(result.parsed, result.usage)
 It prints a greeting and the real token usage. Without the variable it fails with `environment variable ANTHROPIC_API_KEY is not set` and makes no request. The live tests are `uv run pytest tests/integration/test_anthropic_live.py -q`. They fail, never skip, when the key is missing (the real call test), and the wrong key test needs only the internet.
 
 ## The openai_compatible adapter (OpenAI and LM Studio)
-Code is `src/cypress_creek/providers/openai_compatible.py`, registered as provider `openai_compatible`. One adapter serves OpenAI and LM Studio, chosen by `base_url`. Decisions, the model pick and what is still unverified are in [ADR 0027](adr/0027-openai-compatible-adapter-and-model-pick.md).
+Code is `src/cypress_creek/providers/openai_compatible.py`, registered as provider `openai_compatible`. One adapter serves OpenAI and LM Studio, chosen by `base_url`. The live OpenAI call passed once on 2026-10-30 and both LM Studio live tests passed the same day (see ADR 0027). Decisions, the model pick and what is still unverified are in [ADR 0027](adr/0027-openai-compatible-adapter-and-model-pick.md).
 
 - It calls `POST <base_url>/chat/completions` with the system text and the untrusted data block as two separate messages (`system`, then `user`). The fact bank, when a stage shows facts, travels after the data block inside the user message, as the prompt builder lays it out.
-- Output: `response_format` is `json_schema` with `strict: true`. The schema is the pydantic model's, with every property required and unsupported keywords (`minLength`, `maximum`, defaults and the like) removed by `providers/strict_schema.py`. The reply is parsed with the original model, so the removed constraints are still checked.
+- Output: `response_format` is `json_schema` with `strict: true`. The schema is the pydantic model's, with every property required and unsupported keywords (`minLength`, `maximum`, defaults and the like) removed by `providers/strict_schema.py` using the keyword set `OPENAI_UNSUPPORTED_KEYWORDS` (the Anthropic adapter passes its own set, which also drops `pattern` and keeps defaults). The reply is parsed with the original model, so the removed constraints are still checked.
 - Where it sends data: with no `base_url` the adapter uses `https://api.openai.com/v1`, which needs `allow_remote = true` (and an https URL, because the key travels in a header), an `api_key_env` naming a set variable and both price settings (`input_usd_per_mtok`, `output_usd_per_mtok`, dollars per million tokens). A loopback `base_url` (LM Studio) needs none of these and costs zero. The key goes only in the `Authorization` header and is scrubbed from every error.
 - `local_only` facts: the adapter reports `local = false` for any host that is not loopback, and `build_prompt` leaves `local_only` facts out of a prompt for a non local backend (validator V6 checks it again on the report). A component test builds a hosted request from a real prompt and shows the fact is absent.
+- Temperature: hosted calls send none. `gpt-6-luna` rejects `temperature: 0` (HTTP 400, "Only the default (1) value is supported", recorded 2026-10-30), so a hosted row is never temperature pinned; see ADR 0027.
 - Capabilities: `context_tokens` is the setting (default 8192; set it to the window the model is loaded with, or the hosted model's window). `strict_schema` is true for a remote host and false for a loopback one until LM Studio is verified.
 
 | Situation | Error |
@@ -149,17 +150,17 @@ base_url = "http://localhost:1234/v1"
 context_tokens = 4096            # the context length the model was loaded with
 ```
 
-### LM Studio findings (UNVERIFIED)
+### LM Studio findings (partly verified)
 The command to run, what to record and the other open sign-offs for this adapter are in [issue #130](https://github.com/jpalicke/cypress-creek-job-board/issues/130).
 
-Nobody has run this adapter against a real LM Studio yet. Do not read anything below as a measurement. Joe P: run the commands in "Try it locally" and fill in this table, then change this heading.
+On 2026-10-30 Joe P ran both `live_lmstudio` tests against his LM Studio and they passed (`2 passed`). The run itself recorded no server wording; the version, model and loaded context length were reported afterwards. The rows below say only what the passing tests establish. Everything else is still not known.
 
 | Question | Finding |
 | --- | --- |
-| LM Studio version and model tested | not yet tested |
-| Is the loaded context length exposed by the model listing, or must config supply it? | not yet tested (the adapter reads `context_tokens` from config) |
-| Is `response_format` `json_schema` honored for the model? | not yet tested (`strict_schema` is reported false) |
-| How is a prompt over the loaded context reported? | not yet tested (the adapter checks the reported prompt count and 400 bodies naming a context length) |
+| LM Studio version and model tested | LM Studio 0.4.17 (Build 4), model `gemma-4-e4b` (the identifier LM Studio lists carries a vendor prefix), loaded with a context length of 8192, the same value passed to the tests as `CYPRESS_CREEK_LMSTUDIO_CONTEXT` (reported by Joe P after the run) |
+| Is the loaded context length exposed by the model listing, or must config supply it? | not recorded (the adapter reads `context_tokens` from config; the test config supplied it). The model was loaded with 8192 and both the load and the tests used 8192 |
+| Is `response_format` `json_schema` honored for the model? | not established: a conforming reply passes either way because every reply is validated against the schema; `strict_schema` stays false |
+| How is a prompt over the loaded context reported? | LM Studio 0.4.17 answers with an error body whose `error` is a plain string: "The number of tokens to keep from the initial prompt is greater than the context length (n_keep: 20015>= n_ctx: 8192). Try to load the model with a larger context length, or provide a shorter input." (recorded by Joe P on 2026-10-30; the HTTP status was not shown, the adapter treats a 400 as the overflow). The existing `context length` marker matches it, and a component test pins the recorded text. The other markers are still guesses |
 
 ## The budget guard
 Code is `src/cypress_creek/providers/budget.py`. A run has four limits, and a call that could pass any of them is refused before it is sent.
