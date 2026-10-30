@@ -39,7 +39,7 @@ Never commit with a personal email address. Keep secrets in environment variable
 11. **Report and wait for approval.** Send a short summary of changes, checks actually passed, important remaining risks, and any decision needed. Post the same summary on the issue (`gh issue comment <n>`). Merge only after Joe P approves; do not auto-merge or poll CI repeatedly. After merging, verify the issue closed and update `main`. Start another card only when asked, and tell Joe P to start it in a fresh session; do not continue in this one.
 
 ## Targeted documentation audit
-Check documents *affected by the change*, not a mandatory full-repository sweep:
+Grep these for the names, commands, flags, and paths the change touched, and edit only the matching sections, as [CLAUDE.md](../CLAUDE.md) requires. This is not a full-repository sweep:
 - `README.md`: user-visible behavior, Status and "Try what exists" when affected.
 - `docs/README.md`: index, configuration listing, or decision table when affected.
 - `docs/codebase.md`: layout, flow, or extension guidance when architecture changes.
