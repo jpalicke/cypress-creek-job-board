@@ -295,3 +295,9 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 ## D54. Senior engineer switched from Opus to Sonnet
 - 2026-10-30, Joe P asked; manager did it.
 - The Opus reviewer (about 725k tokens over its run) is retired and will not be resumed. A new Sonnet senior engineer took over with a written handover: review standard, conventions (D32, D44, D46, D47, D51), the open PR queue (#136, #138, #143 and the coming H1c, G3, H8, H7b, #140). Trade-off to know: Sonnet is cheaper on the usage window but may catch fewer subtle issues than the Opus reviewer did (which found the D7 whitelist breach, the G1 CSRF mount gap and the E4/E5 metric holes). Reverse: start an Opus reviewer again.
+
+## D70. LM Studio: schema enforcement and loaded context adopted (decision on D62)
+- 2026-10-30, Joe P ran two PowerShell probes against LM Studio 0.4.17 (Build 4), model gemma-4-e4b, and chose "options 2 and 3".
+- json_schema is enforced: a prompt asking for "gamma" against an enum of alpha and beta came back alpha (one probe, one model). `strict_schema` is now true for loopback; replies are still validated either way. Other local servers are untested.
+- LM Studio's `/api/v0/models` reports loaded_context_length (8192) and max_context_length (131072). The adapter reads it once when built: no configured context_tokens means the loaded value is used; a configured value at or below it wins; above it is a ConfigError. No endpoint, unloaded model or odd shape changes nothing.
+- Two live tests were added (the loaded context read; the enum probe as a schema test); the manager could not run them (no LM Studio here), so Joe P's earlier manual probes are the evidence.
