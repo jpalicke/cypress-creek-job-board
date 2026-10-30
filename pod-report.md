@@ -10,7 +10,7 @@ You asked for up to five agents working the repo as an autonomous pod, with one 
 
 | Role | Model | Did |
 |---|---|---|
-| Senior engineer | Opus | Reviewed every PR, ran gates locally, probed attacks, posted `SENIOR REVIEW: APPROVED` or `CHANGES REQUESTED` |
+| Senior engineer | Opus until 2026-10-30, then Sonnet (D54) | Reviewed every PR, ran gates locally, probed attacks, posted `SENIOR REVIEW: APPROVED` or `CHANGES REQUESTED` |
 | Worker C | Sonnet | #116 fixes, C4, E4, E5, H8 (in progress) |
 | Worker E | Sonnet | E3 labels, G1, G2, E7 (in review), #140 (next) |
 | Worker G | Sonnet | #77, C5, D7, #128, #131, G3 (in progress), peer reviews |

@@ -291,3 +291,7 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 - 2026-10-30 02:15 UTC, manager.
 - All four workers and the reviewer hit the account's 5-hour usage limit (reset 04:10 UTC). The only blocker on #136 was a docs/README.md ADR-row conflict after #139 merged. I merged main into d-draft-limits in a scratch clone (/home/user/pod/manager-fix), kept the 0030 to 0033 rows in order, committed with the repo hooks and pushed (f533638). No code changed. Reverse: revert that merge commit.
 - #139 (G2) merged as 9e886c6.
+
+## D54. Senior engineer switched from Opus to Sonnet
+- 2026-10-30, Joe P asked; manager did it.
+- The Opus reviewer (about 725k tokens over its run) is retired and will not be resumed. A new Sonnet senior engineer took over with a written handover: review standard, conventions (D32, D44, D46, D47, D51), the open PR queue (#136, #138, #143 and the coming H1c, G3, H8, H7b, #140). Trade-off to know: Sonnet is cheaper on the usage window but may catch fewer subtle issues than the Opus reviewer did (which found the D7 whitelist breach, the G1 CSRF mount gap and the E4/E5 metric holes). Reverse: start an Opus reviewer again.
