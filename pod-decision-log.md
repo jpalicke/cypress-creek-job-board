@@ -365,3 +365,9 @@ Each entry: date (UTC), who decided, the question, the choice, the alternatives,
 - Manager reviewed and merged: #149 (G1 review note), #148 (#140 runner wiring, read the diff: labels checked as committed before any case or provider exists, case id = fixture id, posting text unchanged, header records the fixture set hash), #158 (employer rule clarified, Joe P's decision), #155 (OpenAI and LM Studio results, model pick, temperature limit; closes #130), #157 (strict schema rewriter, closes #134; faithful refactor, keyword sets per provider identical to the old ones), #159 (Andrew's handover doc).
 - Independence note: #155 and #158 were written by the manager and reviewed by the manager (the content was decided by Joe P); #157 and #159 were written by Andrew and reviewed only by the manager. Joe P's Opus pass covers these.
 - Open: #154 (H7b; the live Ollama job failed one older H7a test on the slow runner; Barry root-causes it).
+
+## D70. LM Studio: schema enforcement and loaded context adopted (decision on D62)
+- 2026-10-30, Joe P ran two PowerShell probes against LM Studio 0.4.17 (Build 4), model gemma-4-e4b, and chose "options 2 and 3" for the context length.
+- json_schema is enforced: a prompt asking for "gamma" against an enum of alpha and beta came back alpha (one probe, one model). `strict_schema` is now true for loopback (PR #161); replies are still validated either way. Other local servers are untested.
+- LM Studio's /api/v0/models reports loaded_context_length (8192) and max_context_length (131072). The adapter reads it once when built: no configured context_tokens means the loaded value is used; a configured value at or below it wins; above it is a ConfigError. No endpoint, unloaded model or odd shape changes nothing.
+- Two live tests were added; the manager could not run them (no LM Studio here), so Joe P's manual probes are the evidence.
