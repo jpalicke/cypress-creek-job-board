@@ -15,7 +15,7 @@ Status: accepted (card C5)
 
 ## Why
 
-Native structured output constrains the answer to the schema without a tool round trip, works on the default model, and leaves no tool surface for injected text to aim at. Dropping unsupported keywords is safe because the validators and the pydantic model are the real control, as for every backend.
+Native structured output constrains the answer to the schema without a tool round trip, works on the default model, and leaves no tool surface for injected text to aim at. The rewrite is the shared `strict_schema` with the Anthropic keyword set (`ANTHROPIC_UNSUPPORTED_KEYWORDS`), so the two hosted adapters have one rewriter and two named sets. Dropping unsupported keywords is safe because the validators and the pydantic model are the real control, as for every backend.
 
 ## Limits
 

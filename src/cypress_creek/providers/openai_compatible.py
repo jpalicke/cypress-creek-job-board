@@ -37,6 +37,22 @@ PROVIDER = "openai_compatible"
 DEFAULT_BASE_URL = "https://api.openai.com/v1"
 CHARS_PER_TOKEN = 3
 ERROR_BODY_LIMIT = 200
+# Keywords the strict structured output mode rejects. The pydantic model validates the reply
+# afterwards, so dropping them loses no check.
+OPENAI_UNSUPPORTED_KEYWORDS = frozenset(
+    {
+        "default",
+        "exclusiveMaximum",
+        "exclusiveMinimum",
+        "maxItems",
+        "maxLength",
+        "maximum",
+        "minLength",
+        "minimum",
+        "multipleOf",
+        "uniqueItems",
+    }
+)
 
 # Phrases that mark a 400 as a context length problem, matched on lower case text. The first is
 # OpenAI's documented error code. The rest are guesses at server wording, none of them verified
@@ -206,7 +222,7 @@ class OpenAICompatibleProvider:
                 "json_schema": {
                     "name": schema.__name__,
                     "strict": True,
-                    "schema": strict_schema(schema, require_all=True),
+                    "schema": strict_schema(schema, OPENAI_UNSUPPORTED_KEYWORDS, require_all=True),
                 },
             },
         }
