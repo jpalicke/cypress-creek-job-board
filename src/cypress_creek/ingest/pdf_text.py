@@ -2,6 +2,7 @@
 # ABOUTME: The parent only reads a size-checked JSON answer, so a hostile file cannot hurt it.
 import contextlib
 import json
+import logging
 import os
 import subprocess
 import sys
@@ -9,7 +10,7 @@ import tempfile
 import threading
 from dataclasses import asdict, dataclass
 from importlib.metadata import version
-from typing import Any
+from typing import IO, Any
 
 from cypress_creek.ingest.models import Extractor
 
@@ -17,6 +18,9 @@ PDF_MAGIC = b"%PDF-"
 WORKER_MODULE = "cypress_creek.ingest.pdf_worker"
 MIB = 1024 * 1024
 OUTPUT_SLACK_BYTES = 64 * 1024
+STDERR_TAIL_BYTES = 2048
+
+logger = logging.getLogger(__name__)
 
 
 class PdfError(Exception):
@@ -118,6 +122,25 @@ def _feed(process: subprocess.Popen[bytes], data: bytes) -> None:
         process.stdin.close()
 
 
+def _drain(stream: IO[bytes], tail: bytearray) -> None:
+    """Read the child's stderr to the end, keeping only the last STDERR_TAIL_BYTES."""
+    with contextlib.suppress(OSError, ValueError):
+        while chunk := stream.read(4096):
+            tail.extend(chunk)
+            del tail[:-STDERR_TAIL_BYTES]
+
+
+def _stopped(process: subprocess.Popen[bytes], tail: bytearray) -> PdfResourceLimit:
+    """The error for a worker that failed. The stderr tail goes to the log and the message, which
+    the API never sends to a caller, so a maintainer can see why a platform fails."""
+    detail = bytes(tail).decode("utf-8", errors="replace").strip()
+    message = (
+        f"the PDF worker was stopped by its limits (exit {process.returncode}; stderr: {detail!r})"
+    )
+    logger.warning(message)
+    return PdfResourceLimit(message)
+
+
 def run_worker(limits: PdfLimits, data: bytes, *flags: str) -> bytes:
     """Run the worker with an empty environment in an empty folder.
 
@@ -130,7 +153,7 @@ def run_worker(limits: PdfLimits, data: bytes, *flags: str) -> bytes:
             worker_command(limits, *flags),
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
             env=_child_environment(),
             cwd=empty,
             close_fds=True,
@@ -144,8 +167,12 @@ def run_worker(limits: PdfLimits, data: bytes, *flags: str) -> bytes:
 
         timer = threading.Timer(limits.timeout_seconds, expire)
         timer.start()
+        tail = bytearray()
         feeder = threading.Thread(target=_feed, args=(process, data), daemon=True)
         feeder.start()
+        assert process.stderr is not None
+        drainer = threading.Thread(target=_drain, args=(process.stderr, tail), daemon=True)
+        drainer.start()
         try:
             assert process.stdout is not None
             out = process.stdout.read(cap + 1)
@@ -156,12 +183,14 @@ def run_worker(limits: PdfLimits, data: bytes, *flags: str) -> bytes:
             process.kill()
             process.wait()
             feeder.join()
+            drainer.join(timeout=2)
             if process.stdout is not None:
                 process.stdout.close()
+            process.stderr.close()
     if timed_out.is_set():
         raise PdfTimeout("the PDF took too long to read")
     if len(out) > cap or process.returncode != 0:
-        raise PdfResourceLimit("the PDF worker was stopped by its limits")
+        raise _stopped(process, tail)
     return out
 
 

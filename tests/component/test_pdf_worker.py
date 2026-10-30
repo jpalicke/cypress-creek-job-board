@@ -73,9 +73,17 @@ def test_a_run_that_takes_too_long_is_killed_with_a_typed_error() -> None:
         extract_pdf_text(_read("clean.pdf"), PdfLimits(timeout_seconds=0.01))
 
 
-@pytest.mark.skipif(os.name != "posix", reason="the memory limit uses POSIX resource limits")
-def test_the_memory_limit_stops_the_bomb_even_when_the_decode_cap_is_off() -> None:
-    limits = PdfLimits(max_decoded_bytes=2_000_000_000, memory_bytes=400 * 1024 * 1024)
+def test_the_memory_limit_stops_the_bomb_where_it_exists_and_the_decode_cap_where_it_does_not() -> (
+    None
+):
+    report = json.loads(pdf_text.run_worker(PdfLimits(), b"", "--self-check"))
+    if os.name == "posix":
+        assert report["limits_applied"] is True
+        limits = PdfLimits(max_decoded_bytes=2_000_000_000, memory_bytes=400 * 1024 * 1024)
+    else:
+        # No POSIX resource limits: the documented fallback is the decoded size cap and the timeout.
+        assert report["limits_applied"] is False
+        limits = PdfLimits()
 
     with pytest.raises(PdfResourceLimit):
         extract_pdf_text(_read("decompression_bomb.pdf"), limits)
@@ -96,6 +104,52 @@ def test_a_worker_that_crashes_gives_a_typed_error(monkeypatch: pytest.MonkeyPat
 
     with pytest.raises(PdfResourceLimit):
         extract_pdf_text(_read("clean.pdf"))
+
+
+def _crash(message: str, size: int = 0) -> object:
+    code = f"import sys\nsys.stderr.write({message!r} + 'x' * {size})\nsys.exit(3)\n"
+    return lambda _limits, *_flags: [sys.executable, "-I", "-c", code]
+
+
+def test_a_crashing_worker_keeps_the_tail_of_its_stderr_in_the_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(pdf_text, "worker_command", _crash("Traceback: boom"))
+
+    with pytest.raises(PdfResourceLimit) as caught:
+        extract_pdf_text(_read("clean.pdf"))
+
+    assert "boom" in str(caught.value) and "exit 3" in str(caught.value)
+
+
+def test_only_the_last_two_kilobytes_of_stderr_are_kept(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(pdf_text, "worker_command", _crash("HEAD-", 10_000))
+
+    with pytest.raises(PdfResourceLimit) as caught:
+        extract_pdf_text(_read("clean.pdf"))
+
+    assert "HEAD-" not in str(caught.value)
+    assert len(str(caught.value)) < 3000
+
+
+def test_the_stderr_tail_is_logged_and_never_sent_to_an_api_caller(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    from api_support import ApiClient, csrf_headers
+
+    from cypress_creek.api.app import create_app
+
+    monkeypatch.setattr(pdf_text, "worker_command", _crash("Traceback: boom"))
+    client = ApiClient(create_app(None, static_dir=None, database_path=Path("/nonexistent/x.db")))
+    headers = csrf_headers(client, {"content-type": "application/pdf"})
+
+    with caplog.at_level("WARNING"):
+        response = client.post("/api/postings", content=_read("clean.pdf"), headers=headers)
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "pdf_resource_limit"
+    assert "boom" not in response.text
+    assert any("boom" in record.getMessage() for record in caplog.records)
 
 
 def test_a_worker_that_floods_its_output_is_stopped_while_reading(
