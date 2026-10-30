@@ -55,6 +55,11 @@ class CandidateOut(ApiModel):
     state: str
 
 
+class ExtractionWarningOut(ApiModel):
+    kind: str
+    count: int
+
+
 class ImportResponse(ApiModel):
     resume_hash: str
     status: str
@@ -63,6 +68,7 @@ class ImportResponse(ApiModel):
     hosted: bool
     candidates: list[CandidateOut]
     dropped: dict[str, int]
+    extraction_warnings: list[ExtractionWarningOut]
 
 
 class CandidatesResponse(ApiModel):
@@ -92,6 +98,7 @@ def _import(
     request: Request,
     database_path: DatabasePath,
     bank_path: BankPath,
+    warnings: list[ExtractionWarningOut],
 ) -> ImportResponse:
     backend = backend_of(request)
     if backend is None:
@@ -139,6 +146,7 @@ def _import(
         hosted=not backend.provider.capabilities.local,
         candidates=[_out(candidate) for candidate in stored],
         dropped=dropped,
+        extraction_warnings=warnings,
     )
 
 
@@ -159,11 +167,21 @@ async def import_resume(
         if backend is None:
             raise ApiError(422, ErrorCode.INVALID_REQUEST)
         try:
-            text = await run_in_threadpool(lambda: extract_pdf_text(body).text)
+            extracted = await run_in_threadpool(extract_pdf_text, body)
         except PdfError as error:
             raise pdf_api_error(error) from None
+        dropped_hidden = [
+            ExtractionWarningOut(kind=w.kind, count=w.count) for w in extracted.warnings
+        ]
         return await run_in_threadpool(
-            _import, text, backend, confirm_hosted, request, database_path, bank_path
+            _import,
+            extracted.text,
+            backend,
+            confirm_hosted,
+            request,
+            database_path,
+            bank_path,
+            dropped_hidden,
         )
     if media != JSON_TYPE:
         raise ApiError(415, ErrorCode.UNSUPPORTED_MEDIA_TYPE)
@@ -181,6 +199,7 @@ async def import_resume(
         request,
         database_path,
         bank_path,
+        [],
     )
 
 

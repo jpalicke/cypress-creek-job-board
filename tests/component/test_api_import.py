@@ -300,6 +300,7 @@ def test_a_pdf_resume_goes_through_the_extractor_and_hidden_text_never_reaches_t
         )
 
     assert response.status_code == 200 and response.json()["status"] == "done"
+    assert response.json()["extraction_warnings"] == [{"kind": "hidden_white_text", "count": 1}]
     (request,) = log
     user = request.json["messages"][1]["content"]
     assert "Senior Data Engineer" in user and "ZXQ-PAYLOAD" not in user
