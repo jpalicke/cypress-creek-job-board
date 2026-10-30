@@ -840,7 +840,6 @@ No auto apply. Ever. A human reviews every draft.
 - TDD. Write a failing test, see it fail, write the minimum code, see it pass, refactor.
 - Branch per task. Open a PR. Merge to main after review. No worktrees.
 - At most 5 files per phase. Run verification, then wait for approval.
-- Development goes through the subagent development skill.
 - Never use --no-verify, --no-hooks or any hook bypass. If a hook fails, fix the cause.
 - Commit messages and PR text carry no attribution lines.
 - Never use em dashes in any text, code comment or commit message.
