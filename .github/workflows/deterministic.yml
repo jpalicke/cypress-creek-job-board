@@ -55,14 +55,15 @@ jobs:
         working-directory: web
   windows:
     # The PDF extractor starts a child process and uses POSIX resource limits where they exist, so
-    # the platform sensitive tests also run here. Not a required check.
+    # the platform sensitive tests also run here, along with tests that pin line endings and file
+    # permissions. Not a required check.
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
       - run: uv sync --locked
-      - name: PDF extractor, link posting and PDF upload tests
+      - name: PDF extractor, link posting, PDF upload, results table and fact store tests
         run: >-
           uv run --locked pytest
           tests/unit/test_pdf_fixtures.py
@@ -71,4 +72,6 @@ jobs:
           tests/component/test_link_posting.py
           tests/component/test_api_postings.py
           tests/e2e/test_pdf_upload_process.py
+          tests/component/test_table_cli.py
+          tests/unit/test_fact_store.py
           -q --no-cov

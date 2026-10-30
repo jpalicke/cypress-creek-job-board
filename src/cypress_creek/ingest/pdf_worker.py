@@ -34,6 +34,8 @@ def block_network() -> None:
 
 def apply_limits(limits: dict[str, Any]) -> bool:
     """POSIX resource limits: memory, CPU seconds, no files created. False when unavailable."""
+    if sys.platform == "win32":
+        return False
     try:
         import resource
     except ImportError:

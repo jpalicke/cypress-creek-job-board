@@ -445,8 +445,8 @@ def main(argv: list[str] | None = None) -> int:
                 )
             print("the results table is current")
             return 0
-        args.page.write_text(page, encoding="utf-8")
-        args.readme.write_text(readme, encoding="utf-8")
+        args.page.write_text(page, encoding="utf-8", newline="\n")
+        args.readme.write_text(readme, encoding="utf-8", newline="\n")
     except (TableError, OSError, ValueError) as error:
         print(f"table failed: {error}", file=sys.stderr)
         return 1
