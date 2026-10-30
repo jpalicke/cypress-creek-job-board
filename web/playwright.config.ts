@@ -12,19 +12,29 @@ export default defineConfig({
   workers: 1,
   reporter: "list",
   use: { baseURL: "http://127.0.0.1:5309", headless: true },
-  webServer: {
-    command: `sh -c 'rm -rf "${dataDir}" && uv run python scripts/seed_ui_fixtures.py && exec uv run cypress-creek-api'`,
-    cwd: "..",
-    url: "http://127.0.0.1:5309/api/health",
-    reuseExistingServer: false,
-    timeout: 90_000,
-    env: {
-      CYPRESS_CREEK_DATA_DIR: dataDir,
-      CYPRESS_CREEK_BANK: bank,
-      // Nothing listens on the discard port, so the backend is down, like a real outage.
-      CYPRESS_CREEK_PROVIDER: "ollama",
-      CYPRESS_CREEK_MODEL: "qwen3.5:0.8b",
-      CYPRESS_CREEK_BASE_URL: "http://127.0.0.1:9",
+  webServer: [
+    {
+      // A hand written model for the Draft help tests: it drafts when asked and refuses the rest.
+      command: "uv run python scripts/ui_chat_server.py",
+      cwd: "..",
+      url: "http://127.0.0.1:5319/health",
+      reuseExistingServer: false,
+      timeout: 30_000,
     },
-  },
+    {
+      command: `sh -c 'rm -rf "${dataDir}" && uv run python scripts/seed_ui_fixtures.py && exec uv run cypress-creek-api'`,
+      cwd: "..",
+      url: "http://127.0.0.1:5309/api/health",
+      reuseExistingServer: false,
+      timeout: 90_000,
+      env: {
+        CYPRESS_CREEK_DATA_DIR: dataDir,
+        CYPRESS_CREEK_BANK: bank,
+        CYPRESS_CREEK_PROVIDER: "openai_compatible",
+        CYPRESS_CREEK_MODEL: "ui-test-model",
+        CYPRESS_CREEK_BASE_URL: "http://127.0.0.1:5319/v1",
+        CYPRESS_CREEK_CONTEXT_TOKENS: "8192",
+      },
+    },
+  ],
 });
