@@ -34,7 +34,7 @@ jobs:
       - run: ollama --version
       - name: Live tests
         run: uv run --locked pytest tests/e2e tests/integration -m "live and not needs_network and not live_openai and not live_lmstudio" -q
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: Browser test with a real model

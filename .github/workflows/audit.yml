@@ -20,7 +20,7 @@ jobs:
         run: |
           uv run --locked pip-licenses --format=json > licenses.json
           uv run --locked python scripts/check_licenses.py licenses.json
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
       - name: Vulnerability audit of the web dependencies
