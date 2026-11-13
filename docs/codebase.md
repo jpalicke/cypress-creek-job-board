@@ -19,7 +19,7 @@ docs/                    Documentation, indexed in docs/README.md
 scripts/                 Repo tooling run by hooks and CI (ABOUTME check, license check, UI type generator, UI test fixtures)
 web/                     The browser UI: Svelte 5, Vite and TypeScript strict, no SvelteKit
   src/lib/               api.ts (typed client, CSRF token flow), types.ts (generated from the pydantic models), grouping.ts
-  src/routes/            Analyze.svelte, DraftHelp.svelte (the review gate), FactBank.svelte, GapReport.svelte, ReportPage.svelte
+  src/routes/            Analyze.svelte, DraftHelp.svelte (the review gate), FactBank.svelte, GapReport.svelte, ReportPage.svelte, ResumeImport.svelte
   src/App.svelte         The shell and the hash router
   scripts/check-dist.mjs Build check: no {@html}, inline script or remote origin
   tests/e2e/             Playwright tests against the real API on 5309; tests/live/ needs a real Ollama

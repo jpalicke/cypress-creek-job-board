@@ -61,6 +61,10 @@ flowchart LR
 
 `facts/store.py` is the one writer of the bank file: a draft (claim, kind, dates, tags, evidence) has no id, verification or share field, validation is the loader's own `parse_fact`, and only `verify()` ever sets a verification date. The routes call it under a lock and write atomically. `FactBank.svelte` shows the API's states and errors as text and holds no rule of its own; the trust boundary is the same as before, because the pipeline still receives only verified facts from `load_bank` (and shareable ones for a hosted backend), which an integration test checks over a bank built through the store.
 
+### The resume import screen
+
+`ResumeImport.svelte` runs `POST /api/import/resume` only when its button is pressed and then lists the pending candidates the API holds (`GET /api/import/candidates`), each with the resume words it came from. It validates and rewrites nothing: V15 already ran in the API. Approve and Reject are one call per candidate, so a decision is always one explicit press, and approving only ever creates an unverified, local only fact.
+
 ## Polite fetching
 
 Discovery code never calls `fetch_url` directly. It calls `PoliteClient.get(url)`, which adds the politeness rules described in [the README](../README.md#discovery-findings-and-sources) on top of the guarded transport. The layering, outermost first:

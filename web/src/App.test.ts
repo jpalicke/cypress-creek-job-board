@@ -52,4 +52,10 @@ describe("App", () => {
       expect(document.querySelector('[role="alert"]')?.textContent).toContain("unreachable");
     });
   });
+
+  it("shows the resume import screen at its address", () => {
+    window.location.hash = "#/import";
+    mounted = mount(App, { target: freshHost() });
+    expect(document.querySelector("main h2")?.textContent).toBe("Start from a resume");
+  });
 });

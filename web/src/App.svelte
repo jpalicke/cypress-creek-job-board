@@ -4,6 +4,7 @@
   import { onMount } from "svelte";
   import Analyze from "./routes/Analyze.svelte";
   import FactBank from "./routes/FactBank.svelte";
+  import ResumeImport from "./routes/ResumeImport.svelte";
   import ReportPage from "./routes/ReportPage.svelte";
 
   const REPORT_ROUTE = /^#\/report\/([A-Za-z0-9_-]+)$/;
@@ -28,12 +29,15 @@
   <nav aria-label="Main">
     <a href="#/">Analyze</a>
     <a href="#/facts">Fact bank</a>
+    <a href="#/import">Start from a resume</a>
   </nav>
 </header>
 
 <main>
   {#if hash === "#/facts"}
     <FactBank />
+  {:else if hash === "#/import"}
+    <ResumeImport />
   {:else if reportId}
     {#key reportId}
       <ReportPage {reportId} />
